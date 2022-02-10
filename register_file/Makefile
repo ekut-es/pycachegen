@@ -8,11 +8,13 @@ all: $(TESTBENCH)
 $(TESTBENCH): $(TARGET)
 	cp $< $@
 
-$(TARGET): obj_dir
+$(TARGET): obj_dir FORCE
 	$(MAKE) -j -C obj_dir -f VRegisterFile.mk VRegisterFile
 
-obj_dir: $(CPP_FILES) $(VERILOG_FILE) 
-	verilator -Wall --sc --exe $(CPP_FILES) $(VERILOG_FILES)
+obj_dir: $(CPP_FILES) $(VERILOG_FILE) FORCE
+	verilator -Wno-LITENDIAN --trace --sc --exe -Mdir $@ $(CPP_FILES) $(VERILOG_FILES)
+
+FORCE: ;
 
 .PHONY clean:
 	-rm -rf obj_dir

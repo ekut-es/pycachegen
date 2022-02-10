@@ -5,7 +5,9 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${env:VERILATOR_ROOT}/include/",
+                "${env:VERILATOR_ROOT}/include/vltstd",
                 "/home/konze/Programming/verilator/include/",
+                "/home/konze/Programming/verilator/include/vltstd",
                 "${workspaceFolder}/register_file/"
             ],
             "defines": [],
