@@ -1,13 +1,18 @@
-all: VRegisterFile_tb
+TESTBENCH = obj_dir/VRegisterFile_tb
+TARGET = $(subst _tb,, $(TESTBENCH))
+CPP_FILES = RegisterFile_tb.cpp
+VERILOG_FILES = RegisterFile.v
 
-VRegisterFile_tb: obj_dir/VRegisterFile
-	cp obj_dir/VRegisterFile obj_dir/VRegisterFile_tb
+all: $(TESTBENCH)
 
-obj_dir/VRegisterFile: obj_dir
-	make -j -C obj_dir -f VRegisterFile.mk VRegisterFile
+$(TESTBENCH): $(TARGET)
+	cp $< $@
 
-obj_dir: RegisterFile.v RegisterFile_tb.cpp
-	verilator -Wall --sc --exe RegisterFile_tb.cpp RegisterFile.v
+$(TARGET): obj_dir
+	$(MAKE) -j -C obj_dir -f VRegisterFile.mk VRegisterFile
+
+obj_dir: $(CPP_FILES) $(VERILOG_FILE) 
+	verilator -Wall --sc --exe $(CPP_FILES) $(VERILOG_FILES)
 
 .PHONY clean:
 	-rm -rf obj_dir
