@@ -1,6 +1,6 @@
 module MemoryAccessUnit 
 #(
-	parameter LATENCY /* verilator public */ = 1,
+	parameter LATENCY /* verilator public */ = 4,
 	parameter DATA_WIDTH /* verilator public */ = 32,
 
 	parameter INSTRUCTION_LENGTH /* verilator public */ = 32,
@@ -68,6 +68,7 @@ module MemoryAccessUnit
 			// processing of instruction done
 			if(latency_buffer[LATENCY_BUFFER_SIZE-1] == 1'b1) begin
 				latency_buffer <= {LATENCY_BUFFER_SIZE{1'b0}};
+				instruction <= 0;
 				instruction_done <= 1;
 				ready <= 1;
 				// TODO write regs

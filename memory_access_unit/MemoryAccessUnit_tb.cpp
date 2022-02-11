@@ -12,6 +12,7 @@ int sc_main(int argc, char** argv) {
     sc_clock clk{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n;
 
+    const int parameter_latency = VMemoryAccessUnit_MemoryAccessUnit::LATENCY;
     const int parameter_data_width = VMemoryAccessUnit_MemoryAccessUnit::DATA_WIDTH;
     const int parameter_instruction_length = VMemoryAccessUnit_MemoryAccessUnit::INSTRUCTION_LENGTH;
     const int parameter_opcode_length = VMemoryAccessUnit_MemoryAccessUnit::OPCODE_LENGTH;
@@ -24,7 +25,7 @@ int sc_main(int argc, char** argv) {
     const int parameter_memory_write_ports = VMemoryAccessUnit_MemoryAccessUnit::MEMORY_WRITE_PORTS;
     const int parameter_num_write_memories = VMemoryAccessUnit_MemoryAccessUnit::NUM_WRITE_MEMORIES;
 
-
+    std::cout << "LATENCY:              " << parameter_latency << std::endl;
     std::cout << "DATA_WIDTH:           " << parameter_data_width << std::endl;
     std::cout << "INSTRUCTION_LENGTH:   " << parameter_instruction_length << std::endl;
     std::cout << "OPCODE_LENGTH:        " << parameter_opcode_length << std::endl;
@@ -81,13 +82,27 @@ int sc_main(int argc, char** argv) {
     // run simulation further
     sc_start(1, SC_NS);
     reset_n.write(1);
-
     sc_start(1, SC_NS);
     reset_n.write(1);
+    sc_start(1, SC_NS);
 
-    // TODO test
+    // insert instruction
+    uint32_t instruction = 0xdeadbeef;
+    instruction_i.write(instruction);
+    instruction_valid_i.write(1);
+    sc_start(1, SC_NS);
+
+    instruction_i.write(0);
+    instruction_valid_i.write(0);
+
+    for(int i = 0; i < parameter_latency; i++) {
+        sc_start(1, SC_NS);
+    }
 
     sc_start(1, SC_NS);
+
+    // check if instructions is done after latency
+    assert(instruction_done_o.read() == 1);
 
     // end simulation with reset
     reset_n.write(0);

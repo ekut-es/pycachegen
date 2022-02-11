@@ -1,3 +1,2 @@
-bin
-*/obj_dir
 *.vcd
+build

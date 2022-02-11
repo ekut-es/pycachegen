@@ -8,7 +8,7 @@
                 "${env:VERILATOR_ROOT}/include/vltstd",
                 "/home/konze/Programming/verilator/include/",
                 "/home/konze/Programming/verilator/include/vltstd",
-                "${workspaceFolder}/register_file/"
+                "${workspaceFolder}/build/CMakeFiles/"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
