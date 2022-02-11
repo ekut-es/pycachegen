@@ -24,7 +24,7 @@ int sc_main(int argc, char** argv) {
 
     // CAUTION!!! 
     // when input/output wire of verilog module has less than 32 bits sc_signal<uint32_t> is inferred
-    // instreand of sc_signal<sc_bv<X>>
+    // instead of sc_signal<sc_bv<X>>
     sc_signal<u_int32_t> register_select_i;
     //sc_signal<sc_bv<parameter_data_width*parameter_read_write_ports>> data_i;
     sc_signal<vluint64_t> data_i;
@@ -88,7 +88,7 @@ int sc_main(int argc, char** argv) {
         for(int i = 0; i < parameter_num_registers; i++) {
             register_select_i.write(0x1 << i+parameter_num_registers*j);
             sc_start(1, SC_NS);
-            
+
             output_data = data_o.read();
             output_data = output_data >> parameter_data_width*j;
 
