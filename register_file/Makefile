@@ -12,7 +12,7 @@ $(TARGET): obj_dir FORCE
 	$(MAKE) -j -C obj_dir -f VRegisterFile.mk VRegisterFile
 
 obj_dir: $(CPP_FILES) $(VERILOG_FILE) FORCE
-	verilator -Wno-LITENDIAN --trace --sc --exe -Mdir $@ $(CPP_FILES) $(VERILOG_FILES)
+	verilator --trace --sc --exe -Mdir $@ $(CPP_FILES) $(VERILOG_FILES)
 
 FORCE: ;
 

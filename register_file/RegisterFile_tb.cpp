@@ -62,6 +62,7 @@ int sc_main(int argc, char** argv) {
 
     for(int j = 0; j < parameter_read_write_ports; j++) {
         for(int i = 0; i < parameter_num_registers; i++) {
+            // write into register
             register_select_i.write(0x1 << i+parameter_num_registers*j);
             write_select_i.write(0x1 << j);
             data = value;
@@ -69,13 +70,15 @@ int sc_main(int argc, char** argv) {
             value++;
             data_i.write(data.to_int64());
             sc_start(1, SC_NS);
+
+            // read data from register
+            //register_select_i.write(0x0);
             //sc_start(1, SC_NS);
-            //write_select_i.set_bit(parameter_read_write_ports*i+j, 1);
         }
     }
 
     sc_start(1, SC_NS);
-    
+
     // end simulation with reset
     reset_n.write(0);
     sc_start(2, SC_NS);
