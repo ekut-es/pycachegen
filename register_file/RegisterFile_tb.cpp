@@ -23,50 +23,63 @@ int sc_main(int argc, char** argv) {
     // CAUTION!!! 
     // when input/output wire of verilog module has less than 32 bits sc_signal<uint32_t> is inferred
     // instreand of sc_signal<sc_bv<X>>
-    sc_signal<sc_bv<parameter_data_width*parameter_read_write_ports*parameter_num_registers>> data_i;
+    sc_signal<u_int32_t> register_select_i;
+    //sc_signal<sc_bv<parameter_data_width*parameter_read_write_ports>> data_i;
+    sc_signal<vluint64_t> data_i;
     sc_signal<u_int32_t> write_select_i;
 
-    sc_signal<sc_bv<parameter_data_width*parameter_read_write_ports*parameter_num_registers>> data_o;
+    //sc_signal<sc_bv<parameter_data_width*parameter_read_write_ports>> data_o;
+    sc_signal<vluint64_t> data_o;
 
     // instantiate verilog module and connect signals
     VRegisterFile* register_file = new VRegisterFile{"register_file"};
 
-
     register_file->clk_i(clk);
     register_file->reset_n_i(reset_n);
 
+    register_file->register_select_i(register_select_i);
     register_file->data_i(data_i);
+
     register_file->write_select_i(write_select_i);
     register_file->data_o(data_o);
 
     // start simulation, trace, and get parameters
     sc_start(0, SC_NS);
 
-    sc_start(1, SC_NS);
-
     VerilatedVcdSc *trace = new VerilatedVcdSc();
     register_file->trace(trace, 99);
     trace->open("RegisterFile_tb.vcd");
 
     // run simulation further
-    reset_n.write(0);
-
     sc_start(1, SC_NS);
     reset_n.write(1);
 
     sc_start(1, SC_NS);
     reset_n.write(1);
 
-    for(int i = 0; i < parameter_num_registers; i++) {
-        for(int j = 0; j < parameter_read_write_ports; j++) {
-            write_select_i.write(0x1 << parameter_read_write_ports*i+j);
-            data_i.write(0x1 << (parameter_read_write_ports*i+j)*parameter_data_width);
+    uint32_t value = 1;
+    sc_bv<parameter_data_width*parameter_read_write_ports> data;
+
+    for(int j = 0; j < parameter_read_write_ports; j++) {
+        for(int i = 0; i < parameter_num_registers; i++) {
+            register_select_i.write(0x1 << i+parameter_num_registers*j);
+            write_select_i.write(0x1 << j);
+            data = value;
+            data = data << parameter_data_width*j;
+            value++;
+            data_i.write(data.to_int64());
             sc_start(1, SC_NS);
+            //sc_start(1, SC_NS);
             //write_select_i.set_bit(parameter_read_write_ports*i+j, 1);
         }
     }
 
     sc_start(1, SC_NS);
+    
+    // end simulation with reset
+    reset_n.write(0);
+    sc_start(2, SC_NS);
+
     register_file->final();
 
     trace->flush();
