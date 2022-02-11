@@ -1,3 +1,5 @@
+#include <map>
+
 #include "VRegisterFile.h"
 #include "verilated_vcd_sc.h"
 
@@ -58,22 +60,39 @@ int sc_main(int argc, char** argv) {
     reset_n.write(1);
 
     uint32_t value = 1;
-    sc_bv<parameter_data_width*parameter_read_write_ports> data;
+    std::map<int,uint32_t> value_assignment_map;
+
+    sc_bv<parameter_data_width*parameter_read_write_ports> input_data;
+    sc_bv<parameter_data_width*parameter_read_write_ports> output_data;
 
     for(int j = 0; j < parameter_read_write_ports; j++) {
+
+        // write into register
         for(int i = 0; i < parameter_num_registers; i++) {
-            // write into register
             register_select_i.write(0x1 << i+parameter_num_registers*j);
             write_select_i.write(0x1 << j);
-            data = value;
-            data = data << parameter_data_width*j;
-            value++;
-            data_i.write(data.to_int64());
-            sc_start(1, SC_NS);
 
-            // read data from register
-            //register_select_i.write(0x0);
-            //sc_start(1, SC_NS);
+            input_data = value;
+            input_data = input_data << parameter_data_width*j;
+            value_assignment_map[i+parameter_num_registers*j] = value;
+            value++;
+
+            data_i.write(input_data.to_uint64());
+            sc_start(1, SC_NS);
+        }
+
+        write_select_i.write(0x0);
+        sc_start(1, SC_NS);
+
+        // read from registers
+        for(int i = 0; i < parameter_num_registers; i++) {
+            register_select_i.write(0x1 << i+parameter_num_registers*j);
+            sc_start(1, SC_NS);
+            
+            output_data = data_o.read();
+            output_data = output_data >> parameter_data_width*j;
+
+            assert(output_data.to_uint() == value_assignment_map[i+parameter_num_registers*j]);
         }
     }
 

@@ -1,7 +1,7 @@
 module RegisterFile
 #(
 	parameter DATA_WIDTH /* verilator public */ = 32,
-	parameter NUM_REGISTERS /* verilator public */ = 3,
+	parameter NUM_REGISTERS /* verilator public */ = 4,
 	parameter READ_WRITE_PORTS /* verilator public */ = 2
 )
 (
@@ -16,20 +16,16 @@ module RegisterFile
 
 	reg[DATA_WIDTH-1:0] registers[NUM_REGISTERS-1:0];
 
-	/*
-	always @(*) begin
-		//data_o = '1;
-		data_o[0+:DATA_WIDTH] = $clog2(register_select_i[NUM_REGISTERS+:NUM_REGISTERS]);
-	end
-	*/
-
 	generate
 		genvar i, j;
 
 		for(i=0; i<NUM_REGISTERS; i=i+1) begin
 			for(j=0; j<READ_WRITE_PORTS; j=j+1) begin
-				// output MUX
-				//assign data_o[(READ_WRITE_PORTS*i+j)*DATA_WIDTH:(READ_WRITE_PORTS*i+j+1)*DATA_WIDTH-1] = register_select_i[(READ_WRITE_PORTS*i+j)] ? registers[i] : {DATA_WIDTH{1'b0}};
+
+				// output MUX		
+				always @(*) begin
+					data_o[DATA_WIDTH*j+:DATA_WIDTH] = registers[$clog2(register_select_i[NUM_REGISTERS*j+:NUM_REGISTERS])];
+				end
 
 				always @(posedge clk_i, negedge reset_n_i) begin
 					if(reset_n_i == 1'b0) begin
