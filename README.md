@@ -12,6 +12,16 @@ cd ${VERILATOR_ROOT}
 autoconf
 ./configure
 make
+
+cd ../.. # to project root
+export SYSTEMC_HOME="$(pwd)/systemc-2.3.3"
+cd external/systemc
+mkdir build
+cd build
+cmake GNinja -DENABLE_PTHREADS=ON -DCMAKE_CXX_STANDARD=17 ..
+ninja
+ninja check
+ninja install
 ```
 
 Verilator is now usable from `${VERILATOR_ROOT}`
