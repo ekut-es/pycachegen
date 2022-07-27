@@ -1,0 +1,3 @@
+[submodule "/home/luebeck/Programming/acaverilog_dev/external/acaverilog/external/verilator"]
+	path = /home/luebeck/Programming/acaverilog_dev/external/acaverilog/external/verilator
+	url = https://github.com/verilator/verilator
