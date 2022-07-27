@@ -1,4 +1,6 @@
-from .acadl_object_verilog_template import ACADLObjectVerilogTemplate
+import os
+
+from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, TargetDirNotEmptyException
 from acadl import PipelineStage
 
 from jinja2 import Template
@@ -15,11 +17,12 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         self.instruction_size = instruction_size
 
-        self.verilog_template_path = self.verilog_template_dir_path + f"/pipeline_stage/{self.verilog_file_name}"
-        self.tb_template_path = self.verilog_template_dir_path + "/pipeline_stage/PipelineStage_tb.cc"
+        self.pipeline_stage_template_dir_path = self.verilog_template_dir_path + "/pipeline_stage"
+        self.pipeline_stage_verilog_template_path = self.pipeline_stage_template_dir_path + f"/{self.verilog_file_name}"
+        self.tb_template_path = self.pipeline_stage_template_dir_path + "/PipelineStage_tb.cc"
 
     def generate_verilog(self, target_dir_path: str) -> None:
-        with open(self.verilog_template_path) as f:
+        with open(self.pipeline_stage_verilog_template_path) as f:
             verilog_template = Template(f.read())
 
         with open(target_dir_path + f"/{self.name}_{self.verilog_file_name}",
@@ -29,8 +32,14 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     name=self.name, instruction_size=self.instruction_size))
 
     def generate_test_bench(self, target_dir_path: str) -> None:
+        # test bench files can only be generated into an empty target_dir
+        if len(os.listdir(target_dir_path)) != 0:
+            raise TargetDirNotEmptyException(target_dir_path)
+
+        # generate verilog
         self.generate_verilog(target_dir_path)
 
+        # generate SystemC testbench
         with open(self.tb_template_path) as f:
             tb_template = Template(f.read())
 
@@ -39,3 +48,11 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             f.write(
                 tb_template.render(name=self.name,
                                    instruction_size=self.instruction_size))
+
+        # generate CMakeLists.txt
+        with open(self.pipeline_stage_template_dir_path +
+                  "/CMakeLists.txt") as f:
+            cmake_lists_template = Template(f.read())
+
+        with open(target_dir_path + f"/CMakeLists.txt", "w+") as f:
+            f.write(cmake_lists_template.render(name=self.name))

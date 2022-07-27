@@ -3,6 +3,15 @@ import os
 from acadl import ACADLObject
 
 
+class TargetDirNotEmptyException(Exception):
+
+    def __init__(self, target_dir_path):
+        self.target_dir_path = target_dir_path
+
+    def __str__(self):
+        return f"Target directory {self.target_dir_path} not empty!"
+
+
 class ACADLObjectVerilogTemplate():
 
     def __init__(self, acadl_object: ACADLObject) -> None:

@@ -18,13 +18,7 @@ int sc_main(int argc, char** argv) {
     // output signals
     sc_signal<bool> ready_o;
 
-    V {
-        { name }
-    }
-    _PipelineStage* pipeline_stage = new V {
-        { name }
-    }
-    _PipelineStage{"{{ name }}_PipelineStage"};
+    V{{ name }}_PipelineStage* pipeline_stage = new V{{ name }}_PipelineStage{"{{ name }}_PipelineStage"};
 
     pipeline_stage->clk_i(clk_i);
     pipeline_stage->reset_n_i(reset_n_i);
