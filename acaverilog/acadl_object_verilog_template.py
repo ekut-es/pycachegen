@@ -13,3 +13,6 @@ class ACADLObjectVerilogTemplate():
 
     def generate_verilog(self, target_dir_path: str) -> None:
         pass
+
+    def generate_test_bench(self, target_dir_path: str) -> None:
+        pass

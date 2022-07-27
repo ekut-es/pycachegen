@@ -1,6 +1,6 @@
 module {{ name }}_PipelineStage (
 	input clk_i,
-	input reset_i,
+	input reset_n_i,
 
 	input[{{ instruction_size }}-1:0] instruction_i,
 	input instruction_valid_i,
@@ -9,6 +9,8 @@ module {{ name }}_PipelineStage (
 );
 
 	reg [{{ instruction_size }}-1:0] instruction;
+	reg ready;
+	assign ready_o = ready;
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
@@ -17,7 +19,7 @@ module {{ name }}_PipelineStage (
 		else begin
 			if(instruction_valid_i == 1'b1) begin
 				instruction <= instruction_i;
-				ready_o <= 1'b1;
+				ready <= 1'b1;
 			end
 		end
 	end
