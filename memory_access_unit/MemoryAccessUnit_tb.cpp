@@ -1,8 +1,7 @@
 #include "VMemoryAccessUnit.h"
-#include "verilated_vcd_sc.h"
-
 #include "VMemoryAccessUnit_MemoryAccessUnit.h"
 #include "VMemoryAccessUnit__Dpi.h"
+#include "verilated_vcd_sc.h"
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -13,34 +12,55 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> reset_n;
 
     const int parameter_latency = VMemoryAccessUnit_MemoryAccessUnit::LATENCY;
-    const int parameter_data_width = VMemoryAccessUnit_MemoryAccessUnit::DATA_WIDTH;
-    const int parameter_instruction_length = VMemoryAccessUnit_MemoryAccessUnit::INSTRUCTION_LENGTH;
-    const int parameter_opcode_length = VMemoryAccessUnit_MemoryAccessUnit::OPCODE_LENGTH;
-    const int parameter_register_read_ports = VMemoryAccessUnit_MemoryAccessUnit::REGISTER_READ_PORTS;
-    const int parameter_num_read_registers = VMemoryAccessUnit_MemoryAccessUnit::NUM_READ_REGISTERS;
-    const int parameter_register_write_ports = VMemoryAccessUnit_MemoryAccessUnit::REGISTER_WRITE_PORTS;
-    const int parameter_num_write_registers = VMemoryAccessUnit_MemoryAccessUnit::NUM_WRITE_REGISTERS;
-    const int parameter_memory_read_ports = VMemoryAccessUnit_MemoryAccessUnit::MEMORY_READ_PORTS;
-    const int parameter_num_read_memories = VMemoryAccessUnit_MemoryAccessUnit::NUM_READ_MEMORIES;
-    const int parameter_memory_write_ports = VMemoryAccessUnit_MemoryAccessUnit::MEMORY_WRITE_PORTS;
-    const int parameter_num_write_memories = VMemoryAccessUnit_MemoryAccessUnit::NUM_WRITE_MEMORIES;
+    const int parameter_data_width =
+        VMemoryAccessUnit_MemoryAccessUnit::DATA_WIDTH;
+    const int parameter_instruction_length =
+        VMemoryAccessUnit_MemoryAccessUnit::INSTRUCTION_LENGTH;
+    const int parameter_opcode_length =
+        VMemoryAccessUnit_MemoryAccessUnit::OPCODE_LENGTH;
+    const int parameter_register_read_ports =
+        VMemoryAccessUnit_MemoryAccessUnit::REGISTER_READ_PORTS;
+    const int parameter_num_read_registers =
+        VMemoryAccessUnit_MemoryAccessUnit::NUM_READ_REGISTERS;
+    const int parameter_register_write_ports =
+        VMemoryAccessUnit_MemoryAccessUnit::REGISTER_WRITE_PORTS;
+    const int parameter_num_write_registers =
+        VMemoryAccessUnit_MemoryAccessUnit::NUM_WRITE_REGISTERS;
+    const int parameter_memory_read_ports =
+        VMemoryAccessUnit_MemoryAccessUnit::MEMORY_READ_PORTS;
+    const int parameter_num_read_memories =
+        VMemoryAccessUnit_MemoryAccessUnit::NUM_READ_MEMORIES;
+    const int parameter_memory_write_ports =
+        VMemoryAccessUnit_MemoryAccessUnit::MEMORY_WRITE_PORTS;
+    const int parameter_num_write_memories =
+        VMemoryAccessUnit_MemoryAccessUnit::NUM_WRITE_MEMORIES;
 
     std::cout << "LATENCY:              " << parameter_latency << std::endl;
     std::cout << "DATA_WIDTH:           " << parameter_data_width << std::endl;
-    std::cout << "INSTRUCTION_LENGTH:   " << parameter_instruction_length << std::endl;
-    std::cout << "OPCODE_LENGTH:        " << parameter_opcode_length << std::endl;
-    std::cout << "REGISTER_READ_PORTS:  " << parameter_register_read_ports << std::endl;
-    std::cout << "NUM_READ_REGISTERS:   " << parameter_num_read_registers << std::endl;
-    std::cout << "REGISTER_WRITE_PORTS: " << parameter_register_write_ports << std::endl;
-    std::cout << "NUM_WRITE_REGISTERS:  " << parameter_num_write_registers << std::endl;
-    std::cout << "MEMORY_READ_PORTS:    " << parameter_memory_read_ports << std::endl;
-    std::cout << "NUM_READ_MEMORIES:    " << parameter_num_read_memories << std::endl;
-    std::cout << "MEMORY_WRITE_PORTS:   " << parameter_memory_write_ports << std::endl;
-    std::cout << "NUM_WRITE_MEMORIES:   " << parameter_num_write_memories << std::endl;
+    std::cout << "INSTRUCTION_LENGTH:   " << parameter_instruction_length
+              << std::endl;
+    std::cout << "OPCODE_LENGTH:        " << parameter_opcode_length
+              << std::endl;
+    std::cout << "REGISTER_READ_PORTS:  " << parameter_register_read_ports
+              << std::endl;
+    std::cout << "NUM_READ_REGISTERS:   " << parameter_num_read_registers
+              << std::endl;
+    std::cout << "REGISTER_WRITE_PORTS: " << parameter_register_write_ports
+              << std::endl;
+    std::cout << "NUM_WRITE_REGISTERS:  " << parameter_num_write_registers
+              << std::endl;
+    std::cout << "MEMORY_READ_PORTS:    " << parameter_memory_read_ports
+              << std::endl;
+    std::cout << "NUM_READ_MEMORIES:    " << parameter_num_read_memories
+              << std::endl;
+    std::cout << "MEMORY_WRITE_PORTS:   " << parameter_memory_write_ports
+              << std::endl;
+    std::cout << "NUM_WRITE_MEMORIES:   " << parameter_num_write_memories
+              << std::endl;
 
-    // CAUTION!!! 
-    // when input/output wire of verilog module has less than 32 bits sc_signal<uint32_t> is inferred
-    // instead of sc_signal<sc_bv<X>>
+    // CAUTION!!!
+    // when input/output wire of verilog module has less than 32 bits
+    // sc_signal<uint32_t> is inferred instead of sc_signal<sc_bv<X>>
     sc_signal<uint32_t> instruction_i;
     sc_signal<bool> instruction_valid_i;
 
@@ -55,7 +75,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> instruction_done_o;
 
     // instantiate verilog module and connect signals
-    VMemoryAccessUnit * memory_access_unit = new VMemoryAccessUnit{"memory_access_unit"};
+    VMemoryAccessUnit* memory_access_unit =
+        new VMemoryAccessUnit{"memory_access_unit"};
 
     memory_access_unit->clk_i(clk);
     memory_access_unit->reset_n_i(reset_n);
@@ -75,7 +96,7 @@ int sc_main(int argc, char** argv) {
     // start simulation, trace, and get parameters
     sc_start(0, SC_NS);
 
-    VerilatedVcdSc *trace = new VerilatedVcdSc();
+    VerilatedVcdSc* trace = new VerilatedVcdSc();
     memory_access_unit->trace(trace, 99);
     trace->open("MemoryAccessUnit_tb.vcd");
 
@@ -95,7 +116,7 @@ int sc_main(int argc, char** argv) {
     instruction_i.write(0);
     instruction_valid_i.write(0);
 
-    for(int i = 0; i < parameter_latency; i++) {
+    for (int i = 0; i < parameter_latency; i++) {
         sc_start(1, SC_NS);
     }
 

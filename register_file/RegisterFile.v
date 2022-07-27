@@ -22,7 +22,7 @@ module RegisterFile
 		for(i=0; i<NUM_REGISTERS; i=i+1) begin
 			for(j=0; j<READ_WRITE_PORTS; j=j+1) begin
 
-				// output MUX		
+				// output MUX
 				always @(*) begin
 					data_o[DATA_WIDTH*j+:DATA_WIDTH] = registers[$clog2(register_select_i[NUM_REGISTERS*j+:NUM_REGISTERS])];
 				end

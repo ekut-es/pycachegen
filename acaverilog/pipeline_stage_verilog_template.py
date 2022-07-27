@@ -3,11 +3,14 @@ from acadl import PipelineStage
 
 from jinja2 import Template
 
+
 class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
-    def __init__(self, pipeline_stage: PipelineStage, instruction_size: int) -> None:
+
+    def __init__(self, pipeline_stage: PipelineStage,
+                 instruction_size: int) -> None:
         super().__init__(pipeline_stage)
 
-        self.verilog_file_name = "PipelineStage.v" 
+        self.verilog_file_name = "PipelineStage.v"
         self.instruction_size = instruction_size
 
         self.verilog_template_path = self.verilog_template_dir_path + f"/pipeline_stage/{self.verilog_file_name}"
@@ -17,5 +20,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         with open(self.verilog_template_path) as f:
             verilog_template = Template(f.read())
 
-        with open(target_dir_path + f"/{self.name}_{self.verilog_file_name}", "w+") as f:
-            f.write(verilog_template.render(name=self.name, instruction_size=self.instruction_size))
+        with open(target_dir_path + f"/{self.name}_{self.verilog_file_name}",
+                  "w+") as f:
+            f.write(
+                verilog_template.render(
+                    name=self.name, instruction_size=self.instruction_size))

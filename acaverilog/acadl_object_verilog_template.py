@@ -2,7 +2,9 @@ import os
 
 from acadl import ACADLObject
 
+
 class ACADLObjectVerilogTemplate():
+
     def __init__(self, acadl_object: ACADLObject) -> None:
         self.acadl_object = acadl_object
         dir_path = os.path.dirname(os.path.realpath(__file__))

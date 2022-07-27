@@ -30,7 +30,7 @@ verilate(VRegisterFile_tb
 
 verilator_link_systemc(VRegisterFile_tb)
 
-# MemoryAccessUnit_tb 
+# MemoryAccessUnit_tb
 add_executable(VMemoryAccessUnit_tb ./memory_access_unit/MemoryAccessUnit_tb.cpp)
 
 set_property(

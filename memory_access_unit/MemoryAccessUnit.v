@@ -1,4 +1,4 @@
-module MemoryAccessUnit 
+module MemoryAccessUnit
 #(
 	parameter LATENCY /* verilator public */ = 4,
 	parameter DATA_WIDTH /* verilator public */ = 32,
