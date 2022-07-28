@@ -1,6 +1,6 @@
 module {{ name }}_ForwardLookupTable (
 	input[{{ target_id_length }}-1:0] target_id_i,
-	output[{{ forward_ports_size }}-1:0] forward_port_o
+	output reg[{{ forward_ports_size }}-1:0] forward_port_o
 );
 
 	always @(target_id_i) begin

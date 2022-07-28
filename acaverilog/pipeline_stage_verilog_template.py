@@ -86,7 +86,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             f.write(
                 tb_template.render(name=self.name,
                                    latency=self.acadl_object.latency,
-                                   instruction_size=self.instruction_size))
+                                   instruction_size=self.instruction_size,
+                                   forward_ports=self.forward_ports))
 
         # generate CMakeLists.txt
         with open(self.pipeline_stage_template_dir_path +

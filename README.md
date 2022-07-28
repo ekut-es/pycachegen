@@ -18,7 +18,7 @@ export SYSTEMC_HOME="$(pwd)/systemc-2.3.3"
 cd external/systemc
 mkdir build
 cd build
-cmake GNinja -DENABLE_PTHREADS=ON -DCMAKE_CXX_STANDARD=17 ..
+cmake -GNinja -DENABLE_PTHREADS=ON -DCMAKE_CXX_STANDARD=17 ..
 ninja
 ninja check
 ninja install

@@ -38,18 +38,23 @@ module {{ name }}_PipelineStage
 
 	wire [{{ forward_ports_size }}-1:0] forward_port_select;
 
-	{{ name }}_ForwardLookupTable flut(
+	{{ name }}_ForwardLookupTable fwd_lut(
 		.target_id_i(target_id),
 		.forward_port_o(forward_port_select)
 	);
 
+	// TODO DEMUX from instruction reg to instruction_o port and instruction_valid_o port
+	
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
 			instruction <= { {{ instruction_size }} {1'b0}};
 			ready <= 1'b1;
 			latency_counter <= {LATENCY_COUNTER_SIZE{1'b0}};
-			//instruction_o_reg <= { {{ instruction_size }} {1'b0}};
-			//instruction_valid_o_reg <= 1'b0;
+
+			{% for i in range(forward_ports) %}
+			instruction_{{ i }}_o_reg <= { {{ instruction_size }} {1'b0}};
+			instruction_valid_{{ i }}_o_reg <= 1'b0;
+			{% endfor -%}
 		end
 		else begin
 			/*

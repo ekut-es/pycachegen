@@ -1,4 +1,5 @@
 #include <memory>
+#include <vector>
 #include <systemc.h>
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
@@ -19,11 +20,10 @@ int sc_main(int argc, char** argv) {
     sc_signal<uint32_t> instruction_i;
     sc_signal<bool> instruction_valid_i;
 
-    sc_signal<bool> next_stage_ready_i;
-    sc_signal<uint32_t> instruction_o;
-    sc_signal<bool> instruction_valid_o;
+    sc_vector<sc_signal<bool>> next_stage_ready_is("next_stage_ready_is", {{ forward_ports }});
+    sc_vector<sc_signal<uint32_t>> instruction_os("instruction_os", {{ forward_ports }});
+    sc_vector<sc_signal<bool>> instruction_valid_os("instruction_valid_os", {{ forward_ports }});
 
-    /*
     // output signals
     sc_signal<bool> ready_o;
 
@@ -35,9 +35,11 @@ int sc_main(int argc, char** argv) {
     pipeline_stage->instruction_i(instruction_i);
     pipeline_stage->instruction_valid_i(instruction_valid_i);
 
-    pipeline_stage->next_stage_ready_i(next_stage_ready_i);
-    pipeline_stage->instruction_o(instruction_o);
-    pipeline_stage->instruction_valid_o(instruction_valid_o);
+    {%- for i in range(forward_ports) %}
+    pipeline_stage->next_stage_ready_{{ i }}_i(next_stage_ready_is[{{ i }}]);
+    pipeline_stage->instruction_{{ i }}_o(instruction_os[{{ i }}]);
+    pipeline_stage->instruction_valid_{{ i }}_o(instruction_valid_os[{{ i }}]);
+    {% endfor -%}
 
     pipeline_stage->ready_o(ready_o);
 
@@ -59,6 +61,14 @@ int sc_main(int argc, char** argv) {
     reset_n_i.write(1);
     sc_start(1, SC_NS);
 
+    assert(ready_o.read() == 1);
+
+    {%- for i in range(forward_ports) %}
+    assert(instruction_os[{{ i }}] == 0);
+    assert(instruction_valid_os[{{ i }}] == 0);
+    {% endfor -%}
+
+    /*
     // insert single instruction
     uint32_t instruction = 0xdeadbeef;
 
