@@ -1,6 +1,6 @@
 import os
 
-from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, TargetDirNotEmptyException
+from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIsNotAnInteger, TargetDirNotEmptyException
 from acadl import PipelineStage
 
 from jinja2 import Template
@@ -22,6 +22,11 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         self.tb_template_path = self.pipeline_stage_template_dir_path + "/PipelineStage_tb.cc"
 
     def generate_verilog(self, target_dir_path: str) -> None:
+        # check if latency is an integer
+        if self.acadl_object.latency.int_latency == -1:
+            raise LatencyIsNotAnInteger(self.acadl_object,
+                                        self.acadl_object.latency)
+
         with open(self.pipeline_stage_verilog_template_path) as f:
             verilog_template = Template(f.read())
 
@@ -29,7 +34,9 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                   "w+") as f:
             f.write(
                 verilog_template.render(
-                    name=self.name, instruction_size=self.instruction_size))
+                    name=self.name,
+                    latency=self.acadl_object.latency,
+                    instruction_size=self.instruction_size))
 
     def generate_test_bench(self, target_dir_path: str) -> None:
         # test bench files can only be generated into an empty target_dir
@@ -47,6 +54,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                   "w+") as f:
             f.write(
                 tb_template.render(name=self.name,
+                                   latency=self.acadl_object.latency,
                                    instruction_size=self.instruction_size))
 
         # generate CMakeLists.txt

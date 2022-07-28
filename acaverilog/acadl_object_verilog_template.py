@@ -1,6 +1,7 @@
 import os
 
 from acadl import ACADLObject
+import acadl
 
 
 class TargetDirNotEmptyException(Exception):
@@ -10,6 +11,16 @@ class TargetDirNotEmptyException(Exception):
 
     def __str__(self):
         return f"Target directory {self.target_dir_path} not empty!"
+
+
+class LatencyIsNotAnInteger(Exception):
+
+    def __init__(self, acadl_object, latency):
+        self.acadl_object = acadl_object
+        self.latency = latency
+
+    def __str__(self):
+        return f"Latency {self.latency} of {type(self.acadl_object)} {self.acadl_object.name} is not an integer"
 
 
 class ACADLObjectVerilogTemplate():

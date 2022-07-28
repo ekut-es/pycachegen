@@ -6,9 +6,8 @@ set_property(
 	PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
 )
 
-verilate(VPipelineStage_tb
+verilate(VPipelineStage_tb SYSTEMC COVERAGE TRACE
 	INCLUDE_DIRECTORIES "."
-	VERILATOR_ARGS --trace --sc
 	SOURCES {{name}}_PipelineStage.v
 )
 
