@@ -9,9 +9,11 @@ module {{ name }}_PipelineStage
 	input[{{ instruction_size }}-1:0] instruction_i,
 	input instruction_valid_i,
 
-	input next_stage_ready_i, 
-	output[{{ instruction_size }}-1:0] instruction_o,
-	output instruction_valid_o,
+	{% for i in range(forward_ports) %}
+	input next_stage_ready_{{ i }}_i,
+	output[{{ instruction_size }}-1:0] instruction_{{ i }}_o,
+	output instruction_valid_{{ i }}_o,
+	{% endfor %}
 
 	output ready_o
 );
@@ -24,25 +26,39 @@ module {{ name }}_PipelineStage
 
 	reg [LATENCY_COUNTER_SIZE-1:0] latency_counter;
 
-	reg [{{ instruction_size }}-1:0] instruction_o_reg;
-	assign instruction_o = instruction_o_reg;
-	reg instruction_valid_o_reg;
-	assign instruction_valid_o = instruction_valid_o_reg;
+	{% for i in range(forward_ports) %}
+	reg [{{ instruction_size }}-1:0] instruction_{{ i }}_o_reg;
+	assign instruction_{{ i }}_o = instruction_{{ i }}_o_reg;
+	reg instruction_valid_{{ i }}_o_reg;
+	assign instruction_valid_{{ i }}_o = instruction_valid_{{ i }}_o_reg;
+	{% endfor -%}
+
+	wire[{{ target_id_length }}-1:0] target_id;
+	assign target_id = instruction[{{ target_id_start_bit }}+:{{ target_id_length }}];
+
+	wire [{{ forward_ports_size }}-1:0] forward_port_select;
+
+	{{ name }}_ForwardLookupTable flut(
+		.target_id_i(target_id),
+		.forward_port_o(forward_port_select)
+	);
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
 			instruction <= { {{ instruction_size }} {1'b0}};
 			ready <= 1'b1;
 			latency_counter <= {LATENCY_COUNTER_SIZE{1'b0}};
-			instruction_o_reg <= { {{ instruction_size }} {1'b0}};
-			instruction_valid_o_reg <= 1'b0;
+			//instruction_o_reg <= { {{ instruction_size }} {1'b0}};
+			//instruction_valid_o_reg <= 1'b0;
 		end
 		else begin
+			/*
 			// if an instruction was forwarded reset instruction output to 0
 			if(instruction_o_reg != { {{ instruction_size }} {1'b0}}) begin
 				instruction_o_reg <= { {{ instruction_size }} {1'b0}};
 				instruction_valid_o_reg <= 1'b0;
 			end
+			*/
 			if(ready == 1'b1) begin
 				// accept new instruction
 				if(instruction_valid_i == 1'b1) begin
@@ -52,6 +68,7 @@ module {{ name }}_PipelineStage
 					$display("t=%0t: received instruction: %08h", $time, instruction_i);
 				end
 			end
+			/*
 			// forward instruction if subsequent stage is ready
 			if(latency_counter == {LATENCY_COUNTER_SIZE{1'b0}} && next_stage_ready_i && instruction != { {{ instruction_size }} {1'b0}}) begin
 				$display("t=%0t: forward instruction: %08h", $time, instruction);
@@ -66,6 +83,7 @@ module {{ name }}_PipelineStage
 				latency_counter <= latency_counter-1;
 				$display("t=%0t: latency_counter=%d", $time, latency_counter);
 			end
+			*/
 		end
 	end
 endmodule

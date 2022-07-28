@@ -23,6 +23,7 @@ int sc_main(int argc, char** argv) {
     sc_signal<uint32_t> instruction_o;
     sc_signal<bool> instruction_valid_o;
 
+    /*
     // output signals
     sc_signal<bool> ready_o;
 
@@ -95,6 +96,7 @@ int sc_main(int argc, char** argv) {
     trace->close();
 
     delete trace;
+    */
 
     std::cout << "{{ name }}_PipelineStage done!" << std::endl;
     return 0;

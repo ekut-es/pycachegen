@@ -1,24 +1,32 @@
 import os
 
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIsNotAnInteger, TargetDirNotEmptyException
+from .target_id_config import TargetIdConfig
 from acadl import PipelineStage
+from math import ceil, log2
 
 from jinja2 import Template
 
 
 class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self, pipeline_stage: PipelineStage,
-                 instruction_size: int) -> None:
+    def __init__(self, pipeline_stage: PipelineStage, instruction_size: int,
+                 target_id_config: TargetIdConfig,
+                 forward_port_map: int) -> None:
         super().__init__(pipeline_stage)
 
-        self.verilog_file_name = "PipelineStage.v"
+        self.pipeline_stage_verilog_file_name = "PipelineStage.v"
+        self.forward_lookup_table_verilog_file_name = "ForwardLookupTable.v"
         self.tb_file_name = "PipelineStage_tb.cc"
 
         self.instruction_size = instruction_size
+        self.target_id_config = target_id_config
+        self.forward_ports = len(set(forward_port_map.values()))
+        self.forward_port_map = forward_port_map
 
         self.pipeline_stage_template_dir_path = self.verilog_template_dir_path + "/pipeline_stage"
-        self.pipeline_stage_verilog_template_path = self.pipeline_stage_template_dir_path + f"/{self.verilog_file_name}"
+        self.pipeline_stage_verilog_template_path = self.pipeline_stage_template_dir_path + f"/{self.pipeline_stage_verilog_file_name}"
+        self.forward_lookup_table_verilog_template_path = self.pipeline_stage_template_dir_path + f"/{self.forward_lookup_table_verilog_file_name}"
         self.tb_template_path = self.pipeline_stage_template_dir_path + "/PipelineStage_tb.cc"
 
     def generate_verilog(self, target_dir_path: str) -> None:
@@ -27,16 +35,39 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             raise LatencyIsNotAnInteger(self.acadl_object,
                                         self.acadl_object.latency)
 
+        # generate pipeline stage verilog
         with open(self.pipeline_stage_verilog_template_path) as f:
-            verilog_template = Template(f.read())
+            pipeline_stage_verilog_template = Template(f.read())
 
-        with open(target_dir_path + f"/{self.name}_{self.verilog_file_name}",
-                  "w+") as f:
+        with open(
+                target_dir_path +
+                f"/{self.name}_{self.pipeline_stage_verilog_file_name}",
+                "w+") as f:
             f.write(
-                verilog_template.render(
+                pipeline_stage_verilog_template.render(
                     name=self.name,
                     latency=self.acadl_object.latency,
-                    instruction_size=self.instruction_size))
+                    target_id_start_bit=self.target_id_config.start_bit,
+                    target_id_length=self.target_id_config.length,
+                    instruction_size=self.instruction_size,
+                    forward_ports=self.forward_ports,
+                    forward_ports_size=ceil(log2(self.forward_ports))))
+
+        # generate forward lookup table verilog
+        with open(self.forward_lookup_table_verilog_template_path) as f:
+            forward_lookup_table_verilog_template = Template(f.read())
+
+        with open(
+                target_dir_path +
+                f"/{self.name}_{self.forward_lookup_table_verilog_file_name}",
+                "w+") as f:
+            f.write(
+                forward_lookup_table_verilog_template.render(
+                    name=self.name,
+                    target_id_length=self.target_id_config.length,
+                    forward_ports=self.forward_ports,
+                    forward_ports_size=ceil(log2(self.forward_ports)),
+                    forward_port_map=self.forward_port_map))
 
     def generate_test_bench(self, target_dir_path: str) -> None:
         # test bench files can only be generated into an empty target_dir
