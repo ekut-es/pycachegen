@@ -14,12 +14,19 @@ int sc_main(int argc, char** argv) {
     sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
 
+	// TODO extend data types beyond 32 bit
+
     sc_vector<sc_signal<bool>> read_write_select_is("read_write_select_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> address_is("address_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_ports }});
-    sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
+	{% if port_width == 1 -%}
+    sc_vector<sc_signal<bool>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
+    sc_vector<sc_signal<bool>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
+	{% else -%}
+    sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
+	{% endif -%}
 
     sc_signal<bool> ready_o;
 
