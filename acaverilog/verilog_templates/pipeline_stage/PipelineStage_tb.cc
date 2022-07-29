@@ -10,7 +10,7 @@ int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
-    // input signals
+    // signals
     sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
 
@@ -20,11 +20,12 @@ int sc_main(int argc, char** argv) {
     sc_signal<uint32_t> instruction_i;
     sc_signal<bool> instruction_valid_i;
 
+	// TODO extend data types beyond 32 bit
+
     sc_vector<sc_signal<bool>> next_stage_ready_is("next_stage_ready_is", {{ forward_ports }});
     sc_vector<sc_signal<uint32_t>> instruction_os("instruction_os", {{ forward_ports }});
     sc_vector<sc_signal<bool>> instruction_valid_os("instruction_valid_os", {{ forward_ports }});
 
-    // output signals
     sc_signal<bool> ready_o;
 
     const std::unique_ptr<V{{ name }}_PipelineStage> pipeline_stage{new V{{ name }}_PipelineStage{"{{ name }}_PipelineStage"}};
