@@ -61,40 +61,38 @@ int sc_main(int argc, char** argv) {
     reset_n_i.write(1);
     sc_start(1, SC_NS);
 
+    // check that pipeline stage is ready
     assert(ready_o.read() == 1);
 
+    // check if all output are set to 0
     {%- for i in range(forward_ports) %}
     assert(instruction_os[{{ i }}] == 0);
     assert(instruction_valid_os[{{ i }}] == 0);
     {% endfor -%}
 
-    /*
-    // insert single instruction
-    uint32_t instruction = 0xdeadbeef;
+    // for each forward port insert one instruction
 
-    instruction_i.write(instruction);
+    {%- for i in range(forward_ports) %}
+    uint32_t instruction_{{ i }} = 0xF0000000 | {{ i }} << {{ target_id_start_bit }};
+    instruction_i.write(instruction_{{ i }});
     instruction_valid_i.write(1);
-    sc_start(1, SC_NS);
 
-    instruction_i.write(0);
-    instruction_valid_i.write(0);
+    // make corresponding next stage ready
+    next_stage_ready_is[{{ forward_port_map[i] }}].write(1);
 
-    next_stage_ready_i.write(1);
-
-    // wait for latency
     for(int i = 0; i <= latency; i++) {
+        assert(instruction_os[{{ forward_port_map[i] }}].read() == 0);
+        assert(instruction_valid_os[{{ forward_port_map[i] }}].read() == 0);
         sc_start(1, SC_NS);
+        instruction_i.write(0);
+        instruction_valid_i.write(0);
     }
 
-    assert(instruction_o.read() == instruction);
-    assert(instruction_valid_o.read() == 1);
+    assert(instruction_os[{{ forward_port_map[i] }}].read() == instruction_{{ i }});
+    assert(instruction_valid_os[{{ forward_port_map[i] }}].read() == 1);
 
-    // check that after the instruction was read the signals are back to 0
+    {% endfor -%}
     sc_start(1, SC_NS);
-    assert(instruction_o.read() == 0);
-    assert(instruction_valid_o.read() == 0);
-
-    next_stage_ready_i.write(0);
 
     // end simulation with reset
     reset_n_i.write(0);
@@ -106,7 +104,6 @@ int sc_main(int argc, char** argv) {
     trace->close();
 
     delete trace;
-    */
 
     std::cout << "{{ name }}_PipelineStage done!" << std::endl;
     return 0;

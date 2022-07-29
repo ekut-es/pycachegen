@@ -51,7 +51,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     target_id_length=self.target_id_config.length,
                     instruction_size=self.instruction_size,
                     forward_ports=self.forward_ports,
-                    forward_ports_size=ceil(log2(self.forward_ports))))
+                    forward_ports_size=ceil(log2(self.forward_ports)),
+                    forward_port_map=self.forward_port_map))
 
         # generate forward lookup table verilog
         with open(self.forward_lookup_table_verilog_template_path) as f:
@@ -84,10 +85,14 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
                   "w+") as f:
             f.write(
-                tb_template.render(name=self.name,
-                                   latency=self.acadl_object.latency,
-                                   instruction_size=self.instruction_size,
-                                   forward_ports=self.forward_ports))
+                tb_template.render(
+                    name=self.name,
+                    latency=self.acadl_object.latency,
+                    instruction_size=self.instruction_size,
+                    target_id_start_bit=self.target_id_config.start_bit,
+                    target_id_length=self.target_id_config.length,
+                    forward_ports=self.forward_ports,
+                    forward_port_map=self.forward_port_map))
 
         # generate CMakeLists.txt
         with open(self.pipeline_stage_template_dir_path +
