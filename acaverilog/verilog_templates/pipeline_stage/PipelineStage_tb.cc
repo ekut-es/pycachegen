@@ -71,7 +71,6 @@ int sc_main(int argc, char** argv) {
     {% endfor -%}
 
     // for each forward port insert one instruction
-
     {%- for i in range(forward_ports) %}
     uint32_t instruction_{{ i }} = 0xF0000000 | {{ i }} << {{ target_id_start_bit }};
     instruction_i.write(instruction_{{ i }});
@@ -93,6 +92,23 @@ int sc_main(int argc, char** argv) {
 
     {% endfor -%}
     sc_start(1, SC_NS);
+    assert(ready_o.read() == 1);
+
+    std::cout << std::endl;
+
+    // set all next stages ready and insert instructions as fast as possible
+    {%- for i in range(forward_ports) %}
+    next_stage_ready_is[{{ i }}].write(1);
+    {% endfor -%}
+
+    for(int i = 0; i < 2*{{ forward_ports }}; i++) {
+        uint32_t instruction = 0xB0000000 | i % {{ forward_ports }} << {{ target_id_start_bit }};
+        instruction_i.write(instruction);
+        instruction_valid_i.write(1);
+        for(int j = 0; j < latency; j++) {
+            sc_start(1, SC_NS);
+        }
+    }
 
     // end simulation with reset
     reset_n_i.write(0);

@@ -27,32 +27,41 @@ module {{ name }}_PipelineStage
 
 	reg [LATENCY_COUNTER_SIZE-1:0] latency_counter;
 
-	wire[{{ target_id_length }}-1:0] target_id;
-	assign target_id = instruction[{{ target_id_start_bit }}+{{ target_id_length }}-1:{{ target_id_start_bit }}];
+	wire[{{ target_id_length }}-1:0] target_id_internal;
+	assign target_id_internal = instruction[{{ target_id_start_bit }}+{{ target_id_length }}-1:{{ target_id_start_bit }}];
 
 	wire [{{ forward_ports_size }}-1:0] forward_port_select;
 
 	{{ name }}_ForwardLookupTable fwd_lut(
-		.target_id_i(target_id),
+		.target_id_i(target_id_internal),
 		.forward_port_o(forward_port_select)
 	);
 
 	// DEMUX from instruction to forward_port
 	{%- for key, value in forward_port_map.items() %}
 	wire instruction_{{ value }}_cond;
-	assign instruction_{{ value }}_cond = (target_id == {{ key }}) & (instruction_valid == 1'b1) & (latency_counter == {LATENCY_COUNTER_SIZE{1'b0}});
+	assign instruction_{{ value }}_cond = (target_id_internal == {{ key }}) & (instruction_valid == 1'b1) & (latency_counter == {LATENCY_COUNTER_SIZE{1'b0}});
 	assign instruction_{{ value }}_o = instruction_{{ value }}_cond ? instruction : { {{ instruction_size }} {1'b0}};
 	assign instruction_valid_{{ value }}_o = instruction_{{ value }}_cond;
 	{% endfor %}
 
-	// MUX from next_stage_ready_is to next_stage_ready
-	wire next_stage_ready;
-	assign next_stage_ready = 
+	// MUX from next_stage_ready_is to next_stage_ready based on the target_id extracted from the internal instruction reg
+	wire next_stage_ready_internal;
+	assign next_stage_ready_internal = 
 	{%- for key, value in forward_port_map.items() %}
-		(target_id == {{ key }}) ? next_stage_ready_{{ value }}_i : 
+		(target_id_internal == {{ key }}) ? next_stage_ready_{{ value }}_i : 
 	{% endfor -%}
 	1'b0;
 
+	// MUX from next_stage_ready_is to next_stage_ready based on the target_id extracted from the external instruction_i input
+	wire[{{ target_id_length }}-1:0] target_id_external;
+	assign target_id_external = instruction_i[{{ target_id_start_bit }}+{{ target_id_length }}-1:{{ target_id_start_bit }}];
+	wire next_stage_ready_external;
+	assign next_stage_ready_external = 
+	{%- for key, value in forward_port_map.items() %}
+		(target_id_external == {{ key }}) ? next_stage_ready_{{ value }}_i : 
+	{% endfor -%}
+	1'b0;
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
@@ -65,15 +74,23 @@ module {{ name }}_PipelineStage
 			if(ready == 1'b1) begin
 				// accept new instruction
 				if(instruction_valid_i == 1'b1) begin
-					ready <= 1'b0;
 					instruction <= instruction_i;
 					instruction_valid <= 1'b1;
 					latency_counter <= LATENCY-1;
+					ready <= 1'b0;
 					$display("t=%0t: %m received instruction: %08h", $time, instruction_i);
+					
+					// if the next stage is ready the instruction is forwarded directly
+					if(LATENCY == 1 && next_stage_ready_external) begin
+						ready <= 1'b1;
+					end
+					else begin
+						ready <= 1'b0;
+					end
 				end
 			end
 			// forward instruction if subsequent stage is ready
-			if(latency_counter == {LATENCY_COUNTER_SIZE{1'b0}} && instruction_valid == 1'b1 && next_stage_ready) begin
+			if(latency_counter == {LATENCY_COUNTER_SIZE{1'b0}} && instruction_valid == 1'b1 && next_stage_ready_internal) begin
 				$display("t=%0t: %m instruction is forwarded: %08h", $time, instruction);
 				ready <= 1'b1;
 				instruction <= { {{ instruction_size }} {1'b0}};
@@ -83,6 +100,12 @@ module {{ name }}_PipelineStage
 			if(latency_counter != {LATENCY_COUNTER_SIZE{1'b0}}) begin
 				latency_counter <= latency_counter-1;
 				$display("t=%0t: %m latency_counter=%d", $time, latency_counter);
+
+				// if the next stage is ready the instruciton is forwarded in the next cycle and 
+				// a new instruction can be accepted at the same time
+				if(latency_counter == 1 && next_stage_ready_internal) begin
+					ready <= 1'b1;
+				end
 			end
 		end
 	end
