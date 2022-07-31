@@ -8,7 +8,7 @@ set_property(
 
 verilate(VMemory_tb SYSTEMC COVERAGE TRACE
 	INCLUDE_DIRECTORIES "."
-	SOURCES {{name}}_Memory.v 
+	SOURCES {{name}}_Memory.v {{name}}_AddressTranslator.v
 )
 
 verilator_link_systemc(VMemory_tb)

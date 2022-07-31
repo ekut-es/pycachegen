@@ -20,7 +20,7 @@ class LatencyIsNotAnInteger(Exception):
         self.latency = latency
 
     def __str__(self):
-        return f"Latency {self.latency} of {type(self.acadl_object)} {self.acadl_object.name} is not an integer"
+        return f"Latency {self.latency} of {type(self.acadl_object)} {self.acadl_object.name} is not an integer!"
 
 
 class ACADLObjectVerilogTemplate():

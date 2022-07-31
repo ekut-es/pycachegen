@@ -24,17 +24,17 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         self.forward_ports = len(set(forward_port_map.values()))
         self.forward_port_map = forward_port_map
 
+        # check if latency is an integer
+        if self.acadl_object.latency.int_latency == -1:
+            raise LatencyIsNotAnInteger(self.acadl_object,
+                                        self.acadl_object.latency)
+
         self.pipeline_stage_template_dir_path = f"{self.verilog_template_dir_path}/pipeline_stage"
         self.pipeline_stage_verilog_template_path = f"{self.pipeline_stage_template_dir_path}/{self.pipeline_stage_verilog_file_name}"
         self.forward_lookup_table_verilog_template_path = f"{self.pipeline_stage_template_dir_path}/{self.forward_lookup_table_verilog_file_name}"
         self.tb_template_path = f"{self.pipeline_stage_template_dir_path}/{self.tb_file_name}"
 
     def generate_verilog(self, target_dir_path: str) -> None:
-        # check if latency is an integer
-        if self.acadl_object.latency.int_latency == -1:
-            raise LatencyIsNotAnInteger(self.acadl_object,
-                                        self.acadl_object.latency)
-
         # generate pipeline stage verilog
         with open(self.pipeline_stage_verilog_template_path) as f:
             pipeline_stage_verilog_template = Template(f.read())
