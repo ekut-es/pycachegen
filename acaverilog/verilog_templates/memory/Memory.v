@@ -6,7 +6,8 @@ module {{ name }}_Memory
 	parameter MAX_CONCURRENT_REQUESTS = {{ max_concurrent_requests }},
 	parameter READ_LATENCY = {{ read_latency }},
 	parameter WRITE_LATENCY = {{ write_latency }},
-	parameter ADDRESS_WIDTH = {{ address_width }}
+	parameter ADDRESS_WIDTH = {{ address_width }},
+	parameter MEMORY_LINES = {{ memory_lines }}
 )
 (
 	input clk_i,
@@ -32,5 +33,25 @@ module {{ name }}_Memory
 		.address_o(address_internal_{{ i }})
 	);
 	{% endfor %}
-	//TODO
+
+	reg[DATA_WIDTH-1:0] mem [MEMORY_LINES-1:0];
+
+	reg ready;
+	assign ready_o = ready;
+
+	integer i;
+
+	always @(posedge clk_i, negedge reset_n_i) begin
+		if(reset_n_i == 1'b0) begin
+			ready <= 1'b1;
+
+			// reset whole memory
+			for(i = 0; i < MEMORY_LINES; i = i + 1) begin
+				mem[i] = {DATA_WIDTH{1'b0}};
+			end
+		end
+		else begin
+		end
+	end
+
 endmodule

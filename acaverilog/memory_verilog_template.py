@@ -44,9 +44,9 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                 raise MemoryAddressRangesOverlap(self.acadl_object)
 
         # calculate memory lines
-        self.lines = 0
+        self.memory_lines = 0
         for address_range in self.address_ranges:
-            self.lines += len(range(address_range[0], address_range[1]))
+            self.memory_lines += len(range(address_range[0], address_range[1]))
 
         self.address_translation_map = {}
         last_address_of_previous_translated_address_range = 0
@@ -83,7 +83,8 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     port_width=self.acadl_object.port_width,
                     read_latency=self.acadl_object.read_latency,
                     write_latency=self.acadl_object.write_latency,
-                    address_width=self.address_width))
+                    address_width=self.address_width,
+                    memory_lines=self.memory_lines))
 
         # generate address translator verilog
         with open(self.address_translator_verilog_template_path) as f:
