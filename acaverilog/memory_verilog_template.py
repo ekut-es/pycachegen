@@ -5,6 +5,8 @@ from acadl import Memory
 
 from jinja2 import Template
 
+from math import ceil, log2
+
 
 class MemoryAddressRangesOverlap(Exception):
 
@@ -58,7 +60,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     address_range] + address_range[1] - address_range[0]
 
         # calculate address_width
-        self.address_width = 16
+        self.address_width = ceil(log2(self.memory_lines))
 
         self.memory_template_dir_path = f"{self.verilog_template_dir_path}/memory"
         self.memory_verilog_template_path = f"{self.memory_template_dir_path}/{self.memory_verilog_file_name}"

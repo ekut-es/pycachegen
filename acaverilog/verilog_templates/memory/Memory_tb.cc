@@ -18,15 +18,18 @@ int sc_main(int argc, char** argv) {
 
     sc_vector<sc_signal<bool>> read_write_select_is("read_write_select_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> address_is("address_is", {{ read_write_ports }});
+	{% if port_width == 1 -%}
     sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
-	{% if port_width == 1 -%}
     sc_vector<sc_signal<bool>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
     sc_vector<sc_signal<bool>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
 	{% else -%}
+    sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> write_data_is("write_data_is", {{ read_write_ports }});
+    sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> read_data_os("read_data_os", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
 	{% endif -%}
+    sc_vector<sc_signal<bool>> write_done_os("write_done_os", {{ read_write_ports }});
 
     sc_signal<bool> ready_o;
 
@@ -40,9 +43,10 @@ int sc_main(int argc, char** argv) {
 	memory->address_{{ i }}_i(address_is[{{ i }}]);
 	memory->write_data_{{ i }}_i(write_data_is[{{ i }}]);
 	memory->write_data_valid_{{ i }}_i(write_data_valid_is[{{ i }}]);
+	memory->write_done_{{ i }}_o(write_done_os[{{ i }}]);
 	memory->read_data_{{ i }}_o(read_data_os[{{ i }}]);
 	memory->read_data_valid_{{ i }}_o(read_data_valid_os[{{ i }}]);
-	{% endfor -%}
+	{% endfor %}
 
 	memory->ready_o(ready_o);
 

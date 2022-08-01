@@ -1,12 +1,13 @@
 /* verilator lint_off UNSIGNED */
 
+// WARNING! address translation only works up to 32 bits.
 module {{ name }}_AddressTranslator
 #(
 	parameter ADDRESS_WIDTH = {{ address_width }}
 )
 (
-	input unsigned [ADDRESS_WIDTH-1:0] address_i,
-	output unsigned [ADDRESS_WIDTH-1:0] address_o
+	input unsigned [32-1:0] address_i,
+	output unsigned [32-1:0] address_o
 );
 
 	assign address_o = 
