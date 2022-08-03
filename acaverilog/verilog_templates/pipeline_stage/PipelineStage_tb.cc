@@ -57,7 +57,7 @@ int sc_main(int argc, char** argv) {
 
     // reset
     sc_start(1, SC_NS);
-    reset_n_i.write(1);
+    reset_n_i.write(0);
     sc_start(1, SC_NS);
     reset_n_i.write(1);
     sc_start(1, SC_NS);

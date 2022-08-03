@@ -60,7 +60,12 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     address_range] + address_range[1] - address_range[0]
 
         # calculate address_width
-        self.address_width = ceil(log2(self.memory_lines))
+        # collabs address ranges List[Tuple[int,int]] into List[int]
+        min_max_addresses = [
+            address for address_range in self.address_ranges
+            for address in address_range
+        ]
+        self.address_width = ceil(log2(max(min_max_addresses)))
 
         self.memory_template_dir_path = f"{self.verilog_template_dir_path}/memory"
         self.memory_verilog_template_path = f"{self.memory_template_dir_path}/{self.memory_verilog_file_name}"
@@ -126,8 +131,8 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     port_width=self.acadl_object.port_width,
                     read_latency=self.acadl_object.read_latency,
                     write_latency=self.acadl_object.write_latency,
-                    address_width=16  #TODO
-                ))
+                    address_width=self.address_width,
+                    address_ranges=self.address_ranges))
 
         # generate CMakeLists.txt
         with open(self.memory_template_dir_path + "/CMakeLists.txt") as f:

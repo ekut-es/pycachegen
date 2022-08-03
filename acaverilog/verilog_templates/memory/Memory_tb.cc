@@ -18,6 +18,7 @@ int sc_main(int argc, char** argv) {
 
     sc_vector<sc_signal<bool>> read_write_select_is("read_write_select_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> address_is("address_is", {{ read_write_ports }});
+    sc_vector<sc_signal<bool>> address_valid_is("address_valid_is", {{ read_write_ports }});
 	{% if port_width == 1 -%}
     sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_ports }});
     sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
@@ -41,6 +42,7 @@ int sc_main(int argc, char** argv) {
 	{%- for i in range(read_write_ports) %}
 	memory->read_write_select_{{ i }}_i(read_write_select_is[{{ i }}]);
 	memory->address_{{ i }}_i(address_is[{{ i }}]);
+	memory->address_valid_{{ i }}_i(address_valid_is[{{ i }}]);
 	memory->write_data_{{ i }}_i(write_data_is[{{ i }}]);
 	memory->write_data_valid_{{ i }}_i(write_data_valid_is[{{ i }}]);
 	memory->write_done_{{ i }}_o(write_done_os[{{ i }}]);
@@ -58,6 +60,59 @@ int sc_main(int argc, char** argv) {
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     memory->trace(trace, 99);
     trace->open("{{ name }}_Memory.vcd");
+
+    // reset
+    sc_start(1, SC_NS);
+    reset_n_i.write(0);
+    sc_start(1, SC_NS);
+    reset_n_i.write(1);
+    sc_start(1, SC_NS);
+
+    // check that all output are 0
+	{%- for i in range(read_write_ports) %}
+    assert(ready_o.read() == 1);
+    assert(write_done_os[{{ i }}].read() == 0);
+    assert(read_data_os[{{ i }}].read() == 0);
+    assert(read_data_valid_os[{{ i }}].read() == 0);
+	{% endfor %}
+
+    sc_start(1, SC_NS);
+
+    // write into memory at port 0
+    read_write_select_is[0].write(1);
+    address_is[0].write({{ address_ranges[0][0] }});
+    address_valid_is[0].write(1);
+    write_data_is[0].write(42);
+    write_data_valid_is[0].write(1);
+
+    // set signals to low 
+    sc_start(2, SC_NS);
+
+    read_write_select_is[0].write(0);
+    address_is[0].write(0);
+    address_valid_is[0].write(0);
+    write_data_is[0].write(0);
+    write_data_valid_is[0].write(0);
+
+    sc_start(10, SC_NS);
+
+    // read from memory at port 0
+    read_write_select_is[0].write(0);
+    address_is[0].write({{ address_ranges[0][0] }});
+    address_valid_is[0].write(1);
+
+    sc_start(2, SC_NS);
+
+    read_write_select_is[0].write(0);
+    address_is[0].write(0);
+    address_valid_is[0].write(0);
+
+    // wait for data at read_data_o
+    while(read_data_valid_os[0].read() == 0) {
+        sc_start(1, SC_NS);
+    }
+
+    std::cout << read_data_os[0].read().to_int() << std::endl;
 
 	memory->final();
 
