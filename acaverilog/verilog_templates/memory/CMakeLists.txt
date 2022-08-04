@@ -6,9 +6,10 @@ set_property(
 	PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
 )
 
-verilate(VMemory_tb SYSTEMC COVERAGE TRACE
-	INCLUDE_DIRECTORIES "."
+verilate(VMemory_tb 
 	SOURCES {{name}}_Memory.v {{name}}_AddressTranslator.v
+	TRACE SYSTEMC COVERAGE
+	INCLUDE_DIRECTORIES "."
 )
 
 verilator_link_systemc(VMemory_tb)

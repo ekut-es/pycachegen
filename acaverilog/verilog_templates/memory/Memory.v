@@ -33,13 +33,13 @@ module {{ name }}_Memory
 	output ready_o
 );
 
+	// TODO find better way to get max(READ_LATENCY, WRITE_LATENCY)
 	localparam LATENCY_COUNTER_SIZE = $clog2(READ_LATENCY+WRITE_LATENCY)+1;
 	localparam INTERNAL_ADDRESS_WIDTH = $clog2(MEMORY_LINES);
 
 	reg[DATA_WIDTH-1:0] mem [MEMORY_LINES-1:0];
 
 	{%- for i in range(read_write_ports) %}
-	// TODO find better way to get max(READ_LATENCY, WRITE_LATENCY)
 	reg[LATENCY_COUNTER_SIZE-1:0] latency_counter_{{ i }};
 	reg write_in_progress_{{ i }};
 	reg write_done_{{ i }};
@@ -95,73 +95,75 @@ module {{ name }}_Memory
 			{% endfor %}
 		end
 		else begin
+			{%- for i in range(read_write_ports) %}
 			// decrease read/write latency counter
-			if(latency_counter_0 != {LATENCY_COUNTER_SIZE{1'b0}}) begin
-				latency_counter_0 <= latency_counter_0-1;
+			if(latency_counter_{{ i }} != {LATENCY_COUNTER_SIZE{1'b0}}) begin
+				latency_counter_{{ i }} <= latency_counter_{{ i }}-1;
 			end
-			// write at port 0
-			if(latency_counter_0 == {LATENCY_COUNTER_SIZE{1'b0}} 
-				&& write_in_progress_0 == 1'b0 
-				&& read_in_progress_0 == 1'b0 
-				&& read_write_select_0_i == 1'b1 
-				&& address_valid_0_i == 1'b1 
-				&& write_data_valid_0_i != 0) begin
+			// write at port {{ i }}
+			if(latency_counter_{{ i }} == {LATENCY_COUNTER_SIZE{1'b0}} 
+				&& write_in_progress_{{ i }} == 1'b0 
+				&& read_in_progress_{{ i }} == 1'b0 
+				&& read_write_select_{{ i }}_i == 1'b1 
+				&& address_valid_{{ i }}_i == 1'b1 
+				&& write_data_valid_{{ i }}_i != 0) begin
 
-				latency_counter_0 <= WRITE_LATENCY-1;
-				write_in_progress_0 <= 1'b1;
+				latency_counter_{{ i }} <= WRITE_LATENCY-1;
+				write_in_progress_{{ i }} <= 1'b1;
 				// copy data, address and valid signals to internal registers
-				write_data_0 <= write_data_0_i;
-				write_data_valid_0 <= write_data_valid_0_i;
-				address_0 <= address_0_i;
+				write_data_{{ i }} <= write_data_{{ i }}_i;
+				write_data_valid_{{ i }} <= write_data_valid_{{ i }}_i;
+				address_{{ i }} <= address_{{ i }}_i;
 				$display("t=%0t: %m write at port {{ i }} to address=%d with data=%d initialized.", $time, address_0_i, write_data_0_i);
 			end
 			// latency counter is 0 and a write is in progress
 			// write data to memory
-			if(latency_counter_0 == {LATENCY_COUNTER_SIZE{1'b0}}
-				&& write_in_progress_0 == 1'b1) begin
+			if(latency_counter_{{ i }} == {LATENCY_COUNTER_SIZE{1'b0}}
+				&& write_in_progress_{{ i }} == 1'b1) begin
 				// depending on the port width and the valid bits write data at write_data_i port into mem
-				write_done_0 <= 1'b1;
+				write_done_{{ i }} <= 1'b1;
 				{% for j in range(port_width) -%}
-				if(write_data_valid_0[{{ j }}] == 1'b1) begin
-					mem[address_internal_0+{{ j }}] <= write_data_0[{{ (j+1)*data_width }}-1:{{ j*data_width }}];
+				if(write_data_valid_{{ i }}[{{ j }}] == 1'b1) begin
+					mem[address_internal_{{ i }}+{{ j }}] <= write_data_{{ i }}[{{ (j+1)*data_width }}-1:{{ j*data_width }}];
 				end
-				write_in_progress_0 <= 1'b0;
+				write_in_progress_{{ i }} <= 1'b0;
 				$display("t=%0t: %m data from port {{ i }} is now in memory.", $time);
 				{% endfor %}
 			end
 			// write_done signal is only 1 (high) for one clock cycle
-			if(write_done_0 == 1'b1) begin
-				write_done_0 <= 1'b0;
+			if(write_done_{{ i }} == 1'b1) begin
+				write_done_{{ i }} <= 1'b0;
 			end
 
-			// read at port 0
-			if(latency_counter_0 == {LATENCY_COUNTER_SIZE{1'b0}}
-				&& write_in_progress_0 == 1'b0
-				&& read_in_progress_0 == 1'b0
-				&& read_write_select_0_i == 1'b0
-				&& address_valid_0_i == 1'b1) begin
+			// read at port {{ i }}
+			if(latency_counter_{{ i }} == {LATENCY_COUNTER_SIZE{1'b0}}
+				&& write_in_progress_{{ i }} == 1'b0
+				&& read_in_progress_{{ i }} == 1'b0
+				&& read_write_select_{{ i }}_i == 1'b0
+				&& address_valid_{{ i }}_i == 1'b1) begin
 
-				latency_counter_0 <= READ_LATENCY-1;
-				read_in_progress_0 <= 1'b1;
-				address_0 <= address_0_i;
+				latency_counter_{{ i }} <= READ_LATENCY-1;
+				read_in_progress_{{ i }} <= 1'b1;
+				address_{{ i }} <= address_{{ i }}_i;
 				$display("t=%0t: %m read at port {{ i }} initialized.", $time);
 			end
 			// latency counter is 0 and a read is in progress
 			// put data at output ports
-			if(latency_counter_0 == {LATENCY_COUNTER_SIZE{1'b0}}
-				&& read_in_progress_0 == 1'b1) begin
+			if(latency_counter_{{ i }} == {LATENCY_COUNTER_SIZE{1'b0}}
+				&& read_in_progress_{{ i }} == 1'b1) begin
 				{% for j in range(port_width) -%}
-				read_data_0[{{ (j+1)*data_width }}-1:{{ j*data_width }}] <= mem[address_internal_0+{{ j }}];
+				read_data_{{ i }}[{{ (j+1)*data_width }}-1:{{ j*data_width }}] <= mem[address_internal_{{ i }}+{{ j }}];
 				{% endfor %}
-				read_data_valid_0 <= {PORT_WIDTH{1'b1}};
-				read_in_progress_0 <= 1'b0;
+				read_data_valid_{{ i }} <= {PORT_WIDTH{1'b1}};
+				read_in_progress_{{ i }} <= 1'b0;
 				$display("t=%0t: %m data from memory {{ i }} is now at read_data_{{ i }}_o.", $time);
 			end
 			// drive read_data_o ports to low
-			if(read_data_valid_0 != 0) begin
-				read_data_valid_0 <= {PORT_WIDTH{1'b0}};
-				read_data_0 <= {PORT_WIDTH_BITS{1'b0}};
+			if(read_data_valid_{{ i }} != 0) begin
+				read_data_valid_{{ i }} <= {PORT_WIDTH{1'b0}};
+				read_data_{{ i }} <= {PORT_WIDTH_BITS{1'b0}};
 			end
+			{% endfor %}
 		end
 	end
 
