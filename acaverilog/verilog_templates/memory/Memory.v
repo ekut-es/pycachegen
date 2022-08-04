@@ -25,6 +25,7 @@ module {{ name }}_Memory
 	output write_done_{{ i }}_o,
 	output[PORT_WIDTH_BITS-1:0] read_data_{{ i }}_o,
 	output unsigned[PORT_WIDTH-1:0] read_data_valid_{{ i }}_o,
+	output port_ready_{{ i }}_o,
 	{% endfor -%}
 
 	output ready_o
@@ -49,6 +50,7 @@ module {{ name }}_Memory
 	assign read_data_{{ i }}_o = read_data_{{ i }};
 	reg[PORT_WIDTH-1:0] read_data_valid_{{ i }};
 	assign read_data_valid_{{ i }}_o = read_data_valid_{{ i }};
+	assign port_ready_{{ i }}_o = ~read_in_progress_{{ i }} & ~write_in_progress_{{ i }};
 
 	// this is necessary as the AddressTranslator address_o port is 32 bits wide
 	// however the actual address might be smaller than that.
@@ -152,6 +154,11 @@ module {{ name }}_Memory
 				read_data_valid_0 <= {PORT_WIDTH{1'b1}};
 				read_in_progress_0 <= 1'b0;
 				$display("t=%0t: %m data from memory {{ i }} is now at read_data_{{ i }}_o.", $time);
+			end
+			// drive read_data_o ports to low
+			if(read_data_valid_0 != 0) begin
+				read_data_valid_0 <= {PORT_WIDTH{1'b0}};
+				read_data_0 <= {PORT_WIDTH_BITS{1'b0}};
 			end
 		end
 	end
