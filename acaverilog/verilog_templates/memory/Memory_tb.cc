@@ -12,18 +12,20 @@ sc_signal<bool> reset_n_i;
 
 sc_vector<sc_signal<bool>> read_write_select_is("read_write_select_is", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> address_is("address_is", {{ read_write_ports }});
+sc_vector<sc_signal<uint32_t>> data_word_distance_is("data_word_distance_is", {{ read_write_ports }});
 sc_vector<sc_signal<bool>> address_valid_is("address_valid_is", {{ read_write_ports }});
-{% if port_width == 1 -%}
 sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
-sc_vector<sc_signal<bool>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
-sc_vector<sc_signal<bool>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
-{% else -%}
+sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
+sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
+
+/*
 sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> write_data_is("write_data_is", {{ read_write_ports }});
 sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> read_data_os("read_data_os", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
-{% endif -%}
+*/
+
 sc_vector<sc_signal<bool>> write_done_os("write_done_os", {{ read_write_ports }});
 sc_vector<sc_signal<bool>> port_ready_os("port_ready_os", {{ read_write_ports }});
 
@@ -69,6 +71,7 @@ int sc_main(int argc, char** argv) {
 	{%- for i in range(read_write_ports) %}
 	memory->read_write_select_{{ i }}_i(read_write_select_is[{{ i }}]);
 	memory->address_{{ i }}_i(address_is[{{ i }}]);
+	memory->data_word_distance_{{ i }}_i(data_word_distance_is[{{ i }}]);
 	memory->address_valid_{{ i }}_i(address_valid_is[{{ i }}]);
 	memory->write_data_{{ i }}_i(write_data_is[{{ i }}]);
 	memory->write_data_valid_{{ i }}_i(write_data_valid_is[{{ i }}]);

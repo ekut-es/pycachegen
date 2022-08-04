@@ -8,13 +8,24 @@ from jinja2 import Template
 from math import ceil, log2
 
 
-class MemoryAddressRangesOverlap(Exception):
+class MemoryAddressRangesOverlapException(Exception):
 
     def __init__(self, memory):
         self.memory = memory
 
     def __str__(self):
         return f"Address ranges {self.memory.address_ranges} of {type(self.memory)} {self.memory.name} overlap!"
+
+
+class MemoryTestbenchParameterException(Exception):
+
+    def __init__(self, memory, parameter_name, parameter_value):
+        self.memory = memory
+        self.parameter_name = parameter_name
+        self.parameter_value = parameter_value
+
+    def __str__(self):
+        return f"Testbench parameter malformed of {type(self.memory)} {self.memory.name} {self.parameter_name}={self.parameter_value}"
 
 
 class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
@@ -43,7 +54,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
         previous_address_range = self.address_ranges[0]
         for current_address_range in self.address_ranges[1:]:
             if previous_address_range[1] > current_address_range[0]:
-                raise MemoryAddressRangesOverlap(self.acadl_object)
+                raise MemoryAddressRangesOverlapException(self.acadl_object)
 
         # calculate memory lines
         self.memory_lines = 0
@@ -66,6 +77,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
             for address in address_range
         ]
         self.address_width = ceil(log2(max(min_max_addresses)))
+        self.max_data_word_distance = 1024  # TODO change
 
         self.memory_template_dir_path = f"{self.verilog_template_dir_path}/memory"
         self.memory_verilog_template_path = f"{self.memory_template_dir_path}/{self.memory_verilog_file_name}"
@@ -73,6 +85,12 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
         self.tb_template_path = f"{self.memory_template_dir_path}/{self.tb_file_name}"
 
     def generate_verilog(self, target_dir_path: str) -> None:
+        # check parameters for testbench
+        if self.acadl_object.port_width * self.acadl_object.data_width > 32:
+            raise MemoryTestbenchParameterException(
+                self.acadl_object, "port_bits_width",
+                self.acadl_object.port_width * self.acadl_object.data_width)
+
         # generate memory stage verilog
         with open(self.memory_verilog_template_path) as f:
             memory_verilog_template = Template(f.read())
@@ -91,6 +109,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     read_latency=self.acadl_object.read_latency,
                     write_latency=self.acadl_object.write_latency,
                     address_width=self.address_width,
+                    max_data_word_distance=self.max_data_word_distance,
                     memory_lines=self.memory_lines))
 
         # generate address translator verilog

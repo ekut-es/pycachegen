@@ -3,6 +3,7 @@
 module {{ name }}_Memory
 #(
 	parameter DATA_WIDTH = {{ data_width }}, 
+	parameter MAX_DATA_WORD_DISTANCE = {{ max_data_word_distance }}, 
 	parameter PORT_WIDTH = {{ port_width }},
 	parameter PORT_WIDTH_BITS = {{ data_width*port_width }},
 	parameter MAX_CONCURRENT_REQUESTS = {{ max_concurrent_requests }},
@@ -19,6 +20,7 @@ module {{ name }}_Memory
 	{%- for i in range(read_write_ports) %}
 	input read_write_select_{{ i }}_i,
 	input unsigned[ADDRESS_WIDTH-1:0] address_{{ i }}_i,
+	input[$clog2(MAX_DATA_WORD_DISTANCE)-1:0] data_word_distance_{{ i }}_i,
 	input address_valid_{{ i }}_i,
 	input[PORT_WIDTH_BITS-1:0] write_data_{{ i }}_i,
 	input unsigned[PORT_WIDTH-1:0] write_data_valid_{{ i }}_i,
