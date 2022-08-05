@@ -18,23 +18,33 @@ sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_port
 sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
 sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
-
-/*
-sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> write_data_is("write_data_is", {{ read_write_ports }});
-sc_vector<sc_signal<sc_bv<{{ port_width*data_width }}>>> read_data_os("read_data_os", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
-*/
-
 sc_vector<sc_signal<bool>> write_done_os("write_done_os", {{ read_write_ports }});
 sc_vector<sc_signal<bool>> port_ready_os("port_ready_os", {{ read_write_ports }});
 
 sc_signal<bool> ready_o;
 
-void set_init_write_signals(int port, int address, int data, int valid_bits) {
+void reset() {
+    sc_start(1, SC_NS);
+    reset_n_i.write(0);
+    sc_start(1, SC_NS);
+    reset_n_i.write(1);
+    sc_start(1, SC_NS);   
+
+    // check that all output are 0 except for port_ready
+	{%- for i in range(read_write_ports) %}
+    assert(ready_o.read() == 1);
+    assert(write_done_os[{{ i }}].read() == 0);
+    assert(read_data_os[{{ i }}].read() == 0);
+    assert(read_data_valid_os[{{ i }}].read() == 0);
+    assert(port_ready_os[{{ i }}].read() == 1);
+	{% endfor %}
+}
+
+void set_init_write_signals(int port, int address, int data, int data_word_distance, int valid_bits) {
     read_write_select_is[port].write(1);
     address_is[port].write(address);
     address_valid_is[port].write(1);
+    data_word_distance_is[port].write(data_word_distance);
     write_data_is[port].write(data);
     write_data_valid_is[port].write(valid_bits);
 }
@@ -43,20 +53,23 @@ void unset_write_signals(int port) {
     read_write_select_is[port].write(0);
     address_is[port].write(0);
     address_valid_is[port].write(0);
+    data_word_distance_is[port].write(0);
     write_data_is[port].write(0);
     write_data_valid_is[port].write(0);
 }
 
-void set_init_read_signals(int port, int address) {
+void set_init_read_signals(int port, int address, int data_word_distance) {
     read_write_select_is[port].write(0);
     address_is[port].write(address);
     address_valid_is[port].write(1);
+    data_word_distance_is[port].write(data_word_distance);
 }
 
 void unset_read_signals(int port) {
     read_write_select_is[port].write(0);
     address_is[port].write(0);
     address_valid_is[port].write(0);
+    data_word_distance_is[port].write(0);
 }
 
 int sc_main(int argc, char** argv) {
@@ -93,25 +106,12 @@ int sc_main(int argc, char** argv) {
     trace->open("{{ name }}_Memory.vcd");
 
     // reset
-    sc_start(1, SC_NS);
-    reset_n_i.write(0);
-    sc_start(1, SC_NS);
-    reset_n_i.write(1);
-    sc_start(1, SC_NS);
-
-    // check that all output are 0 except for port_ready
-	{%- for i in range(read_write_ports) %}
-    assert(ready_o.read() == 1);
-    assert(write_done_os[{{ i }}].read() == 0);
-    assert(read_data_os[{{ i }}].read() == 0);
-    assert(read_data_valid_os[{{ i }}].read() == 0);
-    assert(port_ready_os[{{ i }}].read() == 1);
-	{% endfor %}
+    reset(); 
 
     sc_start(1, SC_NS);
 
     // write into memory at port 0 to first address in address range
-    set_init_write_signals(0, {{ address_ranges[0][0] }}, 42, 0x1);
+    set_init_write_signals(0, {{ address_ranges[0][0] }}, 42, 1, 0x1);
     sc_start(2, SC_NS);
     unset_write_signals(0);
 
@@ -121,7 +121,7 @@ int sc_main(int argc, char** argv) {
     }
 
     // read from memory at port 0
-    set_init_read_signals(0, {{ address_ranges[0][0] }});
+    set_init_read_signals(0, {{ address_ranges[0][0] }}, 1);
     sc_start(2, SC_NS);
     unset_read_signals(0);
 
@@ -139,7 +139,7 @@ int sc_main(int argc, char** argv) {
     }
 
     // read from memory at port 0
-    set_init_read_signals(0, {{ address_ranges[0][0] }});
+    set_init_read_signals(0, {{ address_ranges[0][0] }}, 1);
     sc_start(2, SC_NS);
     unset_read_signals(0);
 
@@ -150,6 +150,21 @@ int sc_main(int argc, char** argv) {
 
     assert(read_data_os[0].read() == 42);
     std::cout << "t=" << sc_time_stamp() << ": " << read_data_os[0].read() << std::endl;
+
+    reset();
+    sc_start(1, SC_NS);
+
+    // for each port write to every address
+    int port = 0;
+    {%- for address_range in address_ranges %}
+    for(int address = {{ address_range[0] }}; address < {{ address_range[1] }}; address+={{ port_width }}) {
+        uint32_t data = 42;
+        set_init_write_signals(port, address, data, 1, 0xF);
+        sc_start(2, SC_NS);
+        //std::cout << address << std::endl;
+    }
+    {% endfor %}
+
 
 	memory->final();
 
