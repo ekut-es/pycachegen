@@ -96,6 +96,15 @@ int sc_main(int argc, char** argv) {
 
 	memory->ready_o(ready_o);
 
+    // set bits from 0 to data_width-1 in data_mask
+    uint32_t data_mask = 0;
+    for(int i = 0; i < {{ data_width }}; i++) {
+        data_mask = data_mask << 1;
+        data_mask = data_mask | 0x1;
+    }
+
+    uint32_t data = 0;
+
 	// start simulation and trace
     std::cout << "{{ name }}_Memory start!" << std::endl;
 
@@ -110,8 +119,10 @@ int sc_main(int argc, char** argv) {
 
     sc_start(1, SC_NS);
 
+    data = 42 & data_mask;
+
     // write into memory at port 0 to first address in address range
-    set_init_write_signals(0, {{ address_ranges[0][0] }}, 42, 1, 0x1);
+    set_init_write_signals(0, {{ address_ranges[0][0] }}, data, 1, 0x1);
     sc_start(2, SC_NS);
     unset_write_signals(0);
 
@@ -130,7 +141,7 @@ int sc_main(int argc, char** argv) {
         sc_start(1, SC_NS);
     }
 
-    assert(read_data_os[0].read() == 42);
+    assert(read_data_os[0].read() == data);
     std::cout << "t=" << sc_time_stamp() << ": " << read_data_os[0].read() << std::endl;
 
     // wait until port is ready again
@@ -156,15 +167,49 @@ int sc_main(int argc, char** argv) {
 
     // for each port write to every address
     int port = 0;
+    data = 1; 
+
+    // write at each address of the memory
     {%- for address_range in address_ranges %}
     for(int address = {{ address_range[0] }}; address < {{ address_range[1] }}; address+={{ port_width }}) {
-        uint32_t data = 42;
-        set_init_write_signals(port, address, data, 1, 0xF);
+        uint32_t data_words;
+        //data_words = data;
+
+        for(int i = 0; i < {{ port_width }}; i++) {
+            data_words = (data_words << {{ data_width }}) | (data++ & data_mask);
+        }
+        set_init_write_signals(port, address, data_words, 1, 0xF);
         sc_start(2, SC_NS);
-        //std::cout << address << std::endl;
+
+        // wait until port is ready again
+        while(port_ready_os[port].read() != 1) {
+            sc_start(1, SC_NS);
+        }
     }
     {% endfor %}
 
+    // wait some cycles so it is visible in the VCD
+    sc_start(4, SC_NS);
+
+    // read from each address of the memory
+    {%- for address_range in address_ranges %}
+    for(int address = {{ address_range[0] }}; address < {{ address_range[1] }}; address+={{ port_width }}) {
+        set_init_read_signals(port, address, 1);
+        sc_start(1, SC_NS);
+
+        // wait until read_data_o is valid
+        while(read_data_valid_os[port].read() != 0) {
+            sc_start(1, SC_NS);
+        }
+
+        std::cout << "read_data: " << std::hex << read_data_os[port].read() << std::endl;
+
+        // wait until port is ready again
+        while(port_ready_os[port].read() != 1) {
+            sc_start(1, SC_NS);
+        }
+    }
+    {% endfor %}
 
 	memory->final();
 

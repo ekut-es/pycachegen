@@ -53,6 +53,7 @@ module {{ name }}_Memory
 	reg[PORT_WIDTH-1:0] read_data_valid_{{ i }};
 	assign read_data_valid_{{ i }}_o = read_data_valid_{{ i }};
 	assign port_ready_{{ i }}_o = ~read_in_progress_{{ i }} & ~write_in_progress_{{ i }};
+	reg hold_read_data_{{ i }}_o;
 
 	// this is necessary as the AddressTranslator address_o port is 32 bits wide
 	// however the actual address might be smaller than that.
@@ -69,7 +70,6 @@ module {{ name }}_Memory
 
 	reg ready;
 	assign ready_o = ready;
-
 
 	integer i;
 
@@ -155,13 +155,18 @@ module {{ name }}_Memory
 				read_data_{{ i }}[{{ (j+1)*data_width }}-1:{{ j*data_width }}] <= mem[address_internal_{{ i }}+{{ j }}];
 				{% endfor %}
 				read_data_valid_{{ i }} <= {PORT_WIDTH{1'b1}};
-				read_in_progress_{{ i }} <= 1'b0;
+				hold_read_data_{{ i }}_o <= 1;
 				$display("t=%0t: %m data from memory {{ i }} is now at read_data_{{ i }}_o.", $time);
 			end
+			// make sure the read data is at least 2 cycles available at the read_data_o port
+			if(hold_read_data_{{ i }}_o != 0) begin
+				hold_read_data_{{ i }}_o <= hold_read_data_{{ i }}_o - 1;
+			end
 			// drive read_data_o ports to low
-			if(read_data_valid_{{ i }} != 0) begin
+			if(read_data_valid_{{ i }} != 0 && hold_read_data_{{ i }}_o == 1'b0) begin
 				read_data_valid_{{ i }} <= {PORT_WIDTH{1'b0}};
 				read_data_{{ i }} <= {PORT_WIDTH_BITS{1'b0}};
+				read_in_progress_{{ i }} <= 1'b0;
 			end
 			{% endfor %}
 		end
