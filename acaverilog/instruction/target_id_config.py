@@ -11,4 +11,4 @@ class TargetIdConfig(InstructionFormatConfig):
         self.end_bit = self.start_bit + self.length - 1
 
     def __repr__(self):
-        return f"TargetIdConfig=[{self.start_bit}:{self.end_bit}]"
+        return f"TargetIdConfig=[{self.end_bit}:{self.start_bit}]"

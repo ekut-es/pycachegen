@@ -28,4 +28,4 @@ class DataFieldConfig(InstructionFormatConfig):
         if self.length == 0:
             return f"DataFieldConfig ({self.data_field_type})=[x:x]"
         else:
-            return f"DataFieldConfig ({self.data_field_type})=[{self.start_bit}:{self.end_bit}]"
+            return f"DataFieldConfig ({self.data_field_type})=[{self.end_bit}:{self.start_bit}]"

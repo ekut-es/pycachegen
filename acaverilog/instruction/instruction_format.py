@@ -93,6 +93,7 @@ class InstructionFormat:
 
     def __repr__(self):
         configs_sorted_by_position = sorted(self.configs,
-                                            key=lambda x: x.start_bit)
+                                            key=lambda x: x.start_bit,
+                                            reverse=True)
         return self.name + ": " + ', '.join(
             map(lambda x: x.__repr__(), configs_sorted_by_position))
