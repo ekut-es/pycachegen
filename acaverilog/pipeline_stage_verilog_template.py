@@ -1,7 +1,7 @@
 import os
 
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIsNotAnInteger, TargetDirNotEmptyException
-from .target_id_config import TargetIdConfig
+from .instruction.target_id_config import TargetIdConfig
 from acadl import PipelineStage
 from math import ceil, log2
 
