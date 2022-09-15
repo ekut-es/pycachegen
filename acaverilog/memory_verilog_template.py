@@ -39,10 +39,14 @@ class MemoryFileDoesNotExist(Exception):
 
 class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self, memory: Memory, memory_file_path: str = None) -> None:
+    def __init__(self,
+                 memory: Memory,
+                 memory_file_path: str = None,
+                 enable_data_reset=True) -> None:
         super().__init__(memory)
 
         self.memory_file_path = memory_file_path
+        self.enable_data_reset = enable_data_reset
         self.memory_verilog_file_name = "Memory.v"
         self.address_translator_verilog_file_name = "AddressTranslator.v"
         self.tb_file_name = "Memory_tb.cc"
@@ -127,7 +131,8 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     max_data_word_distance=self.max_data_word_distance,
                     memory_lines=self.memory_lines,
                     load_from_memory_file=(self.memory_file_path is not None),
-                    memory_file_path=self.memory_file_path))
+                    memory_file_path=self.memory_file_path,
+                    enable_data_reset=self.enable_data_reset))
 
         # generate address translator verilog
         with open(self.address_translator_verilog_template_path) as f:

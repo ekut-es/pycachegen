@@ -23,7 +23,7 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
             raise InstructionMemoryInstantiationWithoutInstructions(
                 self.acadl_object)
 
-        super().__init__(memory, memory_file_path)
+        super().__init__(memory, memory_file_path, enable_data_reset=False)
 
         self.tb_file_name = "InstructionMemory_tb.cc"
         self.instruction_memory_template_dir_path = f"{self.verilog_template_dir_path}/instruction_memory"
@@ -43,7 +43,9 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
 
         with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
                   "w+") as f:
-            f.write(tb_template.render(name=self.name))
+            f.write(
+                tb_template.render(name=self.name,
+                                   port_width=self.acadl_object.port_width))
 
         # generate CMakeLists.txt
         with open(self.instruction_memory_template_dir_path +

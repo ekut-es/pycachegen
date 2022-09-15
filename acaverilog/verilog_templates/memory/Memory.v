@@ -85,9 +85,11 @@ module {{ name }}_Memory
 			ready <= 1'b1;
 
 			// reset whole memory
+			{% if enable_data_reset %}
 			for(i = 0; i < MEMORY_LINES; i = i + 1) begin
 				mem[i] = {DATA_WIDTH{1'b0}};
 			end
+			{% endif %}
 
 			// reset all regs for each port
 			{%- for i in range(read_write_ports) %}
