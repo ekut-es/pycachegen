@@ -1,14 +1,14 @@
 import os
 import glob
 import shutil
-import shlex
 import subprocess
-from sys import stderr
 
 from bitarray import bitarray
+from typing import List
+from .instruction.instruction import Instruction
 
 
-def ba_to_little_endian_str(bits: bitarray):
+def ba_to_little_endian_str(bits: bitarray) -> str:
     return str(bits.to01())[::-1]
 
 
@@ -21,7 +21,9 @@ class TargetDirPathDoesNotExist(Exception):
         return f"Target directory '{self.target_dir_path}' does not exist."
 
 
-def verilate(build_dir_path: str, target_dir_path: str, clean_build_dir=False):
+def verilate(build_dir_path: str,
+             target_dir_path: str,
+             clean_build_dir: bool = False) -> None:
     # check if target_dir_path exists
     if not os.path.isdir(target_dir_path):
         raise TargetDirPathDoesNotExist(target_dir_path)
@@ -84,7 +86,7 @@ class SimulationTargetDoesNotExist(Exception):
         return f"Simulation target '{self.simulation_target_path}' does not exist."
 
 
-def simulate(simulation_target_path, args=None):
+def simulate(simulation_target_path: str, args: List[str] = None) -> None:
     # check if simulation target exists
     if not os.path.exists(simulation_target_path):
         raise SimulationTargetDoesNotExist(simulation_target_path)
@@ -104,3 +106,10 @@ def simulate(simulation_target_path, args=None):
 
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
+
+
+def create_memory_file_from_instructions(memory_file_path: str,
+                                         instructions: List[Instruction]):
+    with open(memory_file_path, "w") as memory_file:
+        for instruction in instructions:
+            memory_file.write('test')
