@@ -1,3 +1,2 @@
-from .acaverilog import test_func
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate
 from .pipeline_stage_verilog_template import PipelineStageVerilogTemplate

@@ -10,7 +10,7 @@ class TargetDirNotEmptyException(Exception):
         self.target_dir_path = target_dir_path
 
     def __str__(self):
-        return f"Target directory {self.target_dir_path} not empty!"
+        return f"Target directory '{self.target_dir_path}' not empty!"
 
 
 class LatencyIsNotAnInteger(Exception):
