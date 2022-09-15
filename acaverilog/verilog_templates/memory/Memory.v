@@ -38,6 +38,13 @@ module {{ name }}_Memory
 	localparam INTERNAL_ADDRESS_WIDTH = $clog2(MEMORY_LINES);
 
 	reg[DATA_WIDTH-1:0] mem [MEMORY_LINES-1:0];
+	{% if load_from_memory_file %}
+	// load data into mem
+	initial begin
+		$display("Loading data into memory from '{{ memory_file_path }}'.");
+		$readmemh("{{ memory_file_path }}", mem);
+	end
+	{% endif %}
 
 	{%- for i in range(read_write_ports) %}
 	reg[LATENCY_COUNTER_SIZE-1:0] latency_counter_{{ i }};

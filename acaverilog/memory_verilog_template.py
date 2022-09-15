@@ -25,14 +25,24 @@ class MemoryTestbenchParameterException(Exception):
         self.parameter_value = parameter_value
 
     def __str__(self):
-        return f"Testbench parameter malformed of {type(self.memory)} {self.memory.name} {self.parameter_name}={self.parameter_value}"
+        return f"Testbench parameter malformed of {type(self.memory)} {self.memory.name} {self.parameter_name}={self.parameter_value}!"
+
+
+class MemoryFileDoesNotExist(Exception):
+
+    def __init__(self, memory_file_path):
+        self.memory_file_path = memory_file_path
+
+    def __str__(self):
+        return f"Memory file '{self.memory_file_path}' does not exist!"
 
 
 class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self, memory: Memory) -> None:
+    def __init__(self, memory: Memory, memory_file_path: str = None) -> None:
         super().__init__(memory)
 
+        self.memory_file_path = memory_file_path
         self.memory_verilog_file_name = "Memory.v"
         self.address_translator_verilog_file_name = "AddressTranslator.v"
         self.tb_file_name = "Memory_tb.cc"
@@ -91,6 +101,11 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                 self.acadl_object, "port_bits_width",
                 self.acadl_object.port_width * self.acadl_object.data_width)
 
+        # if a memory file path is given check if it exists
+        if self.memory_file_path is not None and not os.path.exists(
+                self.memory_file_path):
+            raise MemoryFileDoesNotExist(self.memory_file_path)
+
         # generate memory stage verilog
         with open(self.memory_verilog_template_path) as f:
             memory_verilog_template = Template(f.read())
@@ -110,7 +125,9 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     write_latency=self.acadl_object.write_latency,
                     address_width=self.address_width,
                     max_data_word_distance=self.max_data_word_distance,
-                    memory_lines=self.memory_lines))
+                    memory_lines=self.memory_lines,
+                    load_from_memory_file=(self.memory_file_path is not None),
+                    memory_file_path=self.memory_file_path))
 
         # generate address translator verilog
         with open(self.address_translator_verilog_template_path) as f:

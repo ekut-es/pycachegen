@@ -1,6 +1,17 @@
 from acadl import Instruction as ACADLInstruction
 from .instruction_format import InstructionFormat
-from bitarray.util import int2ba, zeros
+from bitarray.util import int2ba, zeros, ba2hex, ba2int
+from typing import List
+
+
+def create_memory_file_from_instructions(memory_file_path: str,
+                                         instructions: List["Instruction"],
+                                         instruction_length: int):
+    with open(memory_file_path, "w") as memory_file:
+        for instruction in instructions:
+            hex_instruction = f"{ba2int(instruction.generate_bitarray()):x}".zfill(
+                instruction_length // 4)
+            memory_file.write(f"{hex_instruction}\n")
 
 
 class Instruction:
@@ -27,3 +38,6 @@ class Instruction:
                 bits[bits_i] = target_id_bits[target_id_i]
 
         return bits
+
+    def __repr__(self):
+        return f"{self.acadl_instruction.__repr__()}; target_id={self.target_id}"

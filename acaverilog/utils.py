@@ -18,7 +18,7 @@ class TargetDirPathDoesNotExist(Exception):
         self.target_dir_path = target_dir_path
 
     def __str__(self):
-        return f"Target directory '{self.target_dir_path}' does not exist."
+        return f"Target directory '{self.target_dir_path}' does not exist!"
 
 
 def verilate(build_dir_path: str,
@@ -83,7 +83,7 @@ class SimulationTargetDoesNotExist(Exception):
         self.simulation_target_path = simulation_target_path
 
     def __str__(self):
-        return f"Simulation target '{self.simulation_target_path}' does not exist."
+        return f"Simulation target '{self.simulation_target_path}' does not exist!"
 
 
 def simulate(simulation_target_path: str, args: List[str] = None) -> None:
@@ -106,10 +106,3 @@ def simulate(simulation_target_path: str, args: List[str] = None) -> None:
 
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
-
-
-def create_memory_file_from_instructions(memory_file_path: str,
-                                         instructions: List[Instruction]):
-    with open(memory_file_path, "w") as memory_file:
-        for instruction in instructions:
-            memory_file.write('test')
