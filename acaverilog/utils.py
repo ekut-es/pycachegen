@@ -3,6 +3,7 @@ import glob
 import shutil
 import shlex
 import subprocess
+from sys import stderr
 
 from bitarray import bitarray
 
@@ -69,6 +70,37 @@ def verilate(build_dir_path: str, target_dir_path: str, clean_build_dir=False):
                                         stderr=subprocess.STDOUT)
 
     stdout_iterator = iter(ninja_subprocess.stdout.readline, b"")
+
+    for line in stdout_iterator:
+        print(line.decode("utf-8"), end="")
+
+
+class SimulationTargetDoesNotExist(Exception):
+
+    def __init__(self, simulation_target_path):
+        self.simulation_target_path = simulation_target_path
+
+    def __str__(self):
+        return f"Simulation target '{self.simulation_target_path}' does not exist."
+
+
+def simulate(simulation_target_path, args=None):
+    # check if simulation target exists
+    if not os.path.exists(simulation_target_path):
+        raise SimulationTargetDoesNotExist(simulation_target_path)
+
+    if args is not None:
+        simluation_command = './' + simulation_target_path + ' ' + ' '.join(
+            args)
+    else:
+        simluation_command = './' + simulation_target_path
+
+    simulation_subprocess = subprocess.Popen(simluation_command,
+                                             shell=True,
+                                             stdout=subprocess.PIPE,
+                                             stderr=subprocess.STDOUT)
+
+    stdout_iterator = iter(simulation_subprocess.stdout.readline, b"")
 
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
