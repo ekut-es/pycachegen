@@ -7,6 +7,11 @@ from bitarray import bitarray
 from typing import List
 from .instruction.instruction import Instruction
 
+__verilator_root_path__ = os.path.dirname(
+    os.path.abspath(__file__)) + '/../external/verilator'
+__systemc_home_path__ = os.path.dirname(
+    os.path.abspath(__file__)) + '/../systemc-2.3.3'
+
 
 def ba_to_little_endian_str(bits: bitarray) -> str:
     return str(bits.to01())[::-1]
@@ -19,6 +24,25 @@ class TargetDirPathDoesNotExist(Exception):
 
     def __str__(self):
         return f"Target directory '{self.target_dir_path}' does not exist!"
+
+
+def is_verilator_installed():
+    verilator_path = __verilator_root_path__ + '/bin/verilator'
+
+    # check if verilator binary exists
+    if not os.path.exists(verilator_path):
+        print(f"does not exist: {verilator_path}")
+
+    verilator_version_cmd = [verilator_path, '--version']
+    cmd = ' '.join(verilator_version_cmd)
+    output = subprocess.check_output(cmd, shell=True)
+
+    return "Verilator 4.224" in str(output)
+
+
+def is_systemc_installed():
+    files_and_dirs = os.listdir(__systemc_home_path__)
+    return 'lib' in files_and_dirs and 'share' in files_and_dirs and 'include' in files_and_dirs
 
 
 def verilate(build_dir_path: str,
@@ -43,11 +67,9 @@ def verilate(build_dir_path: str,
 
     # run cmake
     current_file_dir_path = os.path.dirname(os.path.abspath(__file__))
-    verilator_root_path = current_file_dir_path + '/../external/verilator'
-    systemc_home_path = current_file_dir_path + '/../systemc-2.3.3'
     cmake_command = [
-        'cmake', '-GNinja', f'-DVERILATOR_ROOT="{verilator_root_path}"',
-        f'-DSYSTEMC_HOME="{systemc_home_path}"', '..'
+        'cmake', '-GNinja', f'-DVERILATOR_ROOT="{__verilator_root_path__}"',
+        f'-DSYSTEMC_HOME="{__systemc_home_path__}"', '..'
     ]
     cmake_command = ' '.join(cmake_command)
 

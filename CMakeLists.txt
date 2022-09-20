@@ -48,8 +48,6 @@ add_custom_target(verilator
 )
 
 # SystemC
-set(ENV{SYSTEMC_HOME} ${CMAKE_CURRENT_LIST_DIR}/systemc-2.3.3)
-
 add_custom_target(systemc_build_dir
 	COMMAND mkdir -p build
 	WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/external/systemc
@@ -57,7 +55,7 @@ add_custom_target(systemc_build_dir
 
 add_custom_target(systemc_cmake
 	DEPENDS systemc_build_dir
-	COMMAND cmake -GNinja -DENABLE_PTHREADS=ON -DENABLE_PHASE_CALLBACKS_TRACING=OFF -DCMAKE_CXX_STANDARD=17 ..
+	COMMAND cmake -GNinja -DENABLE_PTHREADS=ON -DENABLE_PHASE_CALLBACKS_TRACING=OFF -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_LIST_DIR}/systemc-2.3.3 ..
 	WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/external/systemc/build
 )
 
