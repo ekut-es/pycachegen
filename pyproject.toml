@@ -32,6 +32,10 @@ dev = ["yapf", "bumpver", "isort", "pip-tools", "unittest", "pre-commit"]
 [project.urls]
 Homepage = "https://github.com/ekut-es/acaverilog"
 
+[tool.yapf]
+arithmetic_precedence_indication = "True"
+force_multiline_dict = "True"
+
 [tool.bumpver]
 current_version = "1.0.0"
 version_pattern = "MAJOR.MINOR.PATCH"
