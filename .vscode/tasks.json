@@ -7,7 +7,7 @@
             "label": "clean",
             "type": "shell",
             "command":
-                "rm -rf build dist acaverilog.egg-info \"systemc-2.3.3/*\" external/systemc/build",
+                "rm -rf build dist acaverilog.egg-info systemc-2.3.3/lib systemc-2.3.3/share systemc-2.3.3/include external/systemc/build",
         },
     ]
 }
