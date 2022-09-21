@@ -35,4 +35,11 @@ class ACADLObjectVerilogTemplate():
         pass
 
     def generate_test_bench(self, target_dir_path: str) -> None:
-        pass
+        # test bench files can only be generated into an empty target_dir
+        file_list = os.listdir(target_dir_path)
+
+        if '.gitkeep' in file_list:
+            file_list.remove('.gitkeep')
+
+        if len(file_list) != 0:
+            raise TargetDirNotEmptyException(target_dir_path)

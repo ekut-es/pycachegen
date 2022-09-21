@@ -30,9 +30,7 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
         self.tb_template_path = f"{self.instruction_memory_template_dir_path}/{self.tb_file_name}"
 
     def generate_test_bench(self, target_dir_path: str) -> None:
-        # test bench files can only be generated into an empty target_dir
-        if len(os.listdir(target_dir_path)) != 0:
-            raise TargetDirNotEmptyException(target_dir_path)
+        super().generate_test_bench(target_dir_path)
 
         # generate verilog
         self.generate_verilog(target_dir_path)

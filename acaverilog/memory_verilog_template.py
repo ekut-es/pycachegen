@@ -149,9 +149,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     address_translation_map=self.address_translation_map))
 
     def generate_test_bench(self, target_dir_path: str) -> None:
-        # test bench files can only be generated into an empty target_dir
-        if len(os.listdir(target_dir_path)) != 0:
-            raise TargetDirNotEmptyException(target_dir_path)
+        super().generate_test_bench(target_dir_path)
 
         # generate verilog
         self.generate_verilog(target_dir_path)
