@@ -26,3 +26,5 @@ repos:
     rev: v0.6.10
     hooks:
     -   id: cmake-format
+        additional_dependencies: [pyyaml]
+        args: ['CMakeLists.txt', 'acaverilog/CMakeLists.txt']

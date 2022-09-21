@@ -3,10 +3,10 @@ project(test CXX)
 
 find_package(verilator HINTS ${VERILATOR_ROOT} $ENV{VERILATOR_ROOT})
 if(NOT verilator_FOUND)
-  message(
-    FATAL_ERROR
-      "Verilator was not found. Either install it, or set the VERILATOR_ROOT environment variable"
-  )
+    message(
+        FATAL_ERROR
+            "Verilator was not found. Either install it, or set the VERILATOR_ROOT environment variable"
+    )
 endif()
 
 # SystemC dependencies
