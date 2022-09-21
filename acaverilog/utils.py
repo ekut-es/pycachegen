@@ -59,7 +59,8 @@ def verilate(build_dir_path: str,
 
     # check if verilog_out_dir_path exists
     if not os.path.isdir(verilog_out_dir_path):
-        raise PathDoesNotExist('Verilog output directory', verilog_out_dir_path)
+        raise PathDoesNotExist('Verilog output directory',
+                               verilog_out_dir_path)
 
     # clean directory
     if clean_build_dir:
@@ -73,7 +74,9 @@ def verilate(build_dir_path: str,
     # run cmake
     cmake_command = [
         'cmake', '-GNinja', f'-DVERILATOR_ROOT="{__verilator_root_path__}"',
-        f'-DSYSTEMC_HOME="{__systemc_home_path__}"', f'-DVERILOG_OUT_DIR_PATH="{verilog_out_dir_path}"', __verilator_cmakelists_dir_path__
+        f'-DSYSTEMC_HOME="{__systemc_home_path__}"',
+        f'-DVERILOG_OUT_DIR_PATH="{verilog_out_dir_path}"',
+        __verilator_cmakelists_dir_path__
     ]
     cmake_command = ' '.join(cmake_command)
 
@@ -102,7 +105,6 @@ def verilate(build_dir_path: str,
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
 
-        
 
 class SimulationTargetDoesNotExist(Exception):
 
