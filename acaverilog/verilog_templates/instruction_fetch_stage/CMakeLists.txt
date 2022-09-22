@@ -8,10 +8,10 @@ set_property(
 
 verilate(VInstructionFetchStage_tb
 	SOURCES 
-		{{ instruction_fetch_stage_name }}_InstructionFetchStage.v 
 		{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper.v
 		{{ instruction_memory_name }}_Memory.v 
 		{{ instruction_memory_name }}_AddressTranslator.v 
+		{{ instruction_fetch_stage_name }}_InstructionFetchStage.v 
 	TRACE SYSTEMC COVERAGE
 	INCLUDE_DIRECTORIES "."
 )

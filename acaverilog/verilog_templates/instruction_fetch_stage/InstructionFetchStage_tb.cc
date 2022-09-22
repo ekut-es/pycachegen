@@ -4,7 +4,7 @@
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
 
-//#include "V{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper.h"
+#include "V{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper.h"
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
