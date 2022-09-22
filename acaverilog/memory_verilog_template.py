@@ -116,7 +116,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
 
         with open(
                 target_dir_path +
-                f"/{self.name}_{self.memory_verilog_file_name}", "w+") as f:
+                f"/{self.name}_{self.memory_verilog_file_name}", "w") as f:
             f.write(
                 memory_verilog_template.render(
                     name=self.name,
@@ -148,8 +148,11 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
                     address_width=self.address_width,
                     address_translation_map=self.address_translation_map))
 
-    def generate_test_bench(self, target_dir_path: str) -> None:
-        super().generate_test_bench(target_dir_path)
+    def generate_test_bench(self,
+                            target_dir_path: str,
+                            ignore_target_dir_contents: bool = False) -> None:
+        super().generate_test_bench(target_dir_path,
+                                    ignore_target_dir_contents)
 
         # generate verilog
         self.generate_verilog(target_dir_path)
@@ -159,7 +162,7 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
             tb_template = Template(f.read())
 
         with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
-                  "w+") as f:
+                  "w") as f:
             f.write(
                 tb_template.render(
                     name=self.name,

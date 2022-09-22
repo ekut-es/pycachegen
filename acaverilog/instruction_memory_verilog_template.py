@@ -29,8 +29,11 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
         self.instruction_memory_template_dir_path = f"{self.verilog_template_dir_path}/instruction_memory"
         self.tb_template_path = f"{self.instruction_memory_template_dir_path}/{self.tb_file_name}"
 
-    def generate_test_bench(self, target_dir_path: str) -> None:
-        super().generate_test_bench(target_dir_path)
+    def generate_test_bench(self,
+                            target_dir_path: str,
+                            ignore_target_dir_contents: bool = False) -> None:
+        super().generate_test_bench(target_dir_path,
+                                    ignore_target_dir_contents)
 
         # generate verilog
         self.generate_verilog(target_dir_path)
@@ -50,5 +53,5 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
                   "/CMakeLists.txt") as f:
             cmake_lists_template = Template(f.read())
 
-        with open(target_dir_path + f"/CMakeLists.txt", "w+") as f:
+        with open(target_dir_path + f"/CMakeLists.txt", "w") as f:
             f.write(cmake_lists_template.render(name=self.name))

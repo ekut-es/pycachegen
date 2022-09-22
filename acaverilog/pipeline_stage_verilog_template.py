@@ -70,8 +70,11 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     forward_ports_size=ceil(log2(self.forward_ports)),
                     forward_port_map=self.forward_port_map))
 
-    def generate_test_bench(self, target_dir_path: str) -> None:
-        super().generate_test_bench(target_dir_path)
+    def generate_test_bench(self,
+                            target_dir_path: str,
+                            ignore_target_dir_contents: bool = False) -> None:
+        super().generate_test_bench(target_dir_path,
+                                    ignore_target_dir_contents)
 
         # generate verilog
         self.generate_verilog(target_dir_path)
