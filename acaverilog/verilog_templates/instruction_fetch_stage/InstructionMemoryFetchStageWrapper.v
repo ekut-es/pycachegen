@@ -8,19 +8,7 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 )
 (
 	input clk_i,
-	input reset_n_i,
-
-	output read_write_select_o,
-	output [ADDRESS_WIDTH-1:0] address_o,
-	output [$clog2(MAX_DATA_WORD_DISTANCE)-1:0] data_word_distance_o,
-	output address_valid_o,
-	output [PORT_WIDTH_BITS-1:0] write_data_o,
-	output [PORT_WIDTH-1:0] write_data_valid_o,
-	output write_done_o,
-	output [PORT_WIDTH_BITS-1:0] read_data_o,
-	output [PORT_WIDTH-1:0] read_data_valid_o,
-	output port_ready_o,
-	output instruction_memory_ready_o
+	input reset_n_i
 );
 
 	wire read_write_select;
@@ -34,20 +22,6 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 	wire [PORT_WIDTH-1:0] read_data_valid;
 	wire port_ready;
 	wire instruction_memory_ready;
-
-	/*
-	assign read_write_select_o = read_write_select;
-	assign address_o = address;
-	assign data_word_distance_o = data_word_distance;
-	assign address_valid_o = address_valid;
-	assign write_data_o = write_data;
-	assign write_data_valid_o= write_data_valid;
-	assign write_done_o = write_done;
-	assign read_data_o = read_data;
-	assign read_data_valid_o = read_data_valid;
-	assign port_ready_o = port_ready;
-	assign instruction_memory_ready_o = instruction_memory_ready;
-	*/
 
 	{{ instruction_memory_name }}_Memory imem(
 		.clk_i(clk_i),
