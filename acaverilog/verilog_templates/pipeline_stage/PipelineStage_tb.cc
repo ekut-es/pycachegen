@@ -10,6 +10,13 @@ int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
+    // get vcd file path from command line arguments
+    std::string vcd_file_path;
+
+    if(argc == 2) {
+        vcd_file_path = std::string(argv[1]);
+    }
+
     // signals
     sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
@@ -53,7 +60,12 @@ int sc_main(int argc, char** argv) {
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     pipeline_stage->trace(trace, 99);
-    trace->open("{{ name }}_PipelineStage.vcd");
+
+    if(vcd_file_path.empty()) {
+        trace->open("{{ name }}_PipelineStage.vcd");
+    } else {
+        trace->open(vcd_file_path.c_str());
+    }
 
     // reset
     sc_start(1, SC_NS);

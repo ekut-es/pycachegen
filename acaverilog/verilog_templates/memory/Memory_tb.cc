@@ -76,6 +76,13 @@ int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
+    // get vcd file path from command line arguments
+    std::string vcd_file_path;
+
+    if(argc == 2) {
+        vcd_file_path = std::string(argv[1]);
+    }
+
     const std::unique_ptr<V{{ name }}_Memory> memory{new V{{ name }}_Memory{"{{ name }}_Memory"}};
 
 	memory->clk_i(clk_i);
@@ -112,7 +119,12 @@ int sc_main(int argc, char** argv) {
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     memory->trace(trace, 99);
-    trace->open("{{ name }}_Memory.vcd");
+
+    if(vcd_file_path.empty()) {
+        trace->open("{{ name }}_Memory.vcd");
+    } else {
+        trace->open(vcd_file_path.c_str());
+    }
 
     // reset
     reset(); 
