@@ -49,6 +49,12 @@ def is_systemc_installed():
     return 'lib' in files_and_dirs and 'share' in files_and_dirs and 'include' in files_and_dirs
 
 
+class VerilateFailed(Exception):
+
+    def __str__(self):
+        return "Verilate Failed!"
+
+
 def verilate(build_dir_path: str,
              verilog_out_dir_path: str,
              clean_build_dir: bool = False) -> None:
@@ -105,6 +111,12 @@ def verilate(build_dir_path: str,
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
 
+    streamdata = ninja_subprocess.communicate()[0]
+    return_code = ninja_subprocess.returncode
+
+    if return_code != 0:
+        raise VerilateFailed
+
 
 class SimulationTargetDoesNotExist(Exception):
 
@@ -113,6 +125,12 @@ class SimulationTargetDoesNotExist(Exception):
 
     def __str__(self):
         return f"Simulation target '{self.simulation_target_path}' does not exist!"
+
+
+class SimulationFailed(Exception):
+
+    def __str__(self):
+        return f"Simulation failed!"
 
 
 def simulate(simulation_target_path: str, args: List[str] = None) -> None:
@@ -135,3 +153,9 @@ def simulate(simulation_target_path: str, args: List[str] = None) -> None:
 
     for line in stdout_iterator:
         print(line.decode("utf-8"), end="")
+
+    streamdata = simulation_subprocess.communicate()[0]
+    return_code = simulation_subprocess.returncode
+
+    if return_code != 0:
+        raise SimulationFailed
