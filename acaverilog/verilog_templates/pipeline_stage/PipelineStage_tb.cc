@@ -66,6 +66,7 @@ int sc_main(int argc, char** argv) {
     } else {
         trace->open(vcd_file_path.c_str());
     }
+    
 
     // reset
     sc_start(1, SC_NS);
