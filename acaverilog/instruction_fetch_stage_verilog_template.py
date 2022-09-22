@@ -1,6 +1,12 @@
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate
 from .instruction_memory_verilog_template import InstructionMemoryVerilogTemplate
-from acadl import InstructionFetchStage
+from acadl import Memory, InstructionFetchStage, latency_t
+from acadl import Instruction as ACADLInstruction
+from .instruction.instruction import Instruction, create_memory_file_from_instructions
+from .instruction.target_id_config import TargetIdConfig
+from .instruction.opcode_config import OpcodeConfig
+from .instruction.data_field_config import DataFieldConfig, DataFieldType
+from .instruction.instruction_format import InstructionFormat
 
 from jinja2 import Template
 
@@ -15,6 +21,7 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         self.instruction_fetch_stage_verilog_file_name = "InstructionFetchStage.v"
         self.tb_file_name = "InstructionFetchStage_tb.cc"
+        self.instruction_memory_fetch_stage_wrapper_verilog_file_name = "InstructionMemoryFetchStageWrapper.v"
 
         self.instruction_memory_verilog_template = instruction_memory_verilog_template
 
@@ -22,6 +29,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         self.instruction_fetch_stage_template_dir_path = f"{self.verilog_template_dir_path}/instruction_fetch_stage"
         self.instruction_fetch_stage_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_fetch_stage_verilog_file_name}"
+        self.instruction_memory_fetch_stage_wrapper_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}"
+        self.tb_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.tb_file_name}"
 
     def generate_verilog(self, target_dir_path: str) -> None:
         # generate instruction fetch stage verilog
@@ -43,3 +52,141 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     acadl_object.port_width,
                     address_width=self.instruction_memory_verilog_template.
                     address_width))
+
+    def generate_test_bench(self,
+                            target_dir_path: str,
+                            ignore_target_dir_contents: bool = False) -> None:
+        super().generate_test_bench(target_dir_path,
+                                    ignore_target_dir_contents)
+
+        # generate verilog for instruction fetch stage itself
+        self.generate_verilog(target_dir_path)
+
+        # generate instructions
+        target_id_config = TargetIdConfig(start_bit=0, max_id=10)
+        opcode_config = OpcodeConfig(start_bit=target_id_config.end_bit + 1,
+                                     max_id=3)
+        read_registers_config = DataFieldConfig(
+            start_bit=opcode_config.end_bit + 1,
+            data_field_type=DataFieldType.READ_REGISTER,
+            num_fields=2,
+            field_length=3)
+        write_registers_config = DataFieldConfig(
+            start_bit=read_registers_config.end_bit + 1,
+            data_field_type=DataFieldType.WRITE_REGISTER,
+            num_fields=1,
+            field_length=3)
+        read_addresses_config = DataFieldConfig(
+            start_bit=write_registers_config.end_bit + 1,
+            data_field_type=DataFieldType.READ_ADDRESS,
+            num_fields=0,
+            field_length=0)
+        write_addresses_config = DataFieldConfig(
+            start_bit=read_addresses_config.end_bit,
+            data_field_type=DataFieldType.WRITE_ADDRESS,
+            num_fields=0,
+            field_length=0)
+        immediates_config = DataFieldConfig(
+            start_bit=write_addresses_config.end_bit + 1,
+            data_field_type=DataFieldType.IMMEDIATE,
+            num_fields=0,
+            field_length=0)
+
+        i_form = InstructionFormat(
+            name="i_form",
+            length=16,
+            target_id_config=target_id_config,
+            opcode_config=opcode_config,
+            read_registers_config=read_registers_config,
+            write_registers_config=write_registers_config,
+            read_addresses_config=read_addresses_config,
+            write_addresses_config=write_addresses_config,
+            immediates_config=immediates_config)
+
+        add_0 = ACADLInstruction(id=0,
+                                 size=16,
+                                 operation="add",
+                                 read_registers=['r0', 'r1'],
+                                 write_registers=['r1'],
+                                 read_addresses=[],
+                                 write_addresses=[],
+                                 immediates=[])
+
+        acadl_instructions = [add_0]
+        instructions = []
+
+        target_id = 1
+
+        for acadl_instruction in acadl_instructions:
+            i = Instruction(acadl_instruction=acadl_instruction,
+                            target_id=target_id,
+                            instruction_format=i_form)
+            instructions.append(i)
+            target_id += 1
+
+        memory_file_path = target_dir_path + '/instructions.mem'
+
+        create_memory_file_from_instructions(memory_file_path, instructions,
+                                             i_form.length)
+
+        # generate verilog for instruction memory
+        imem0 = Memory(name="imem",
+                       data_width=i_form.length,
+                       max_concurrent_requests=1,
+                       read_write_ports=1,
+                       port_width=1,
+                       data={},
+                       read_latency=latency_t(3),
+                       write_latency=latency_t(1),
+                       address_ranges={(0, 10)})
+
+        imem0v = InstructionMemoryVerilogTemplate(imem0, memory_file_path)
+        imem0v.generate_verilog(target_dir_path)
+
+        # generate verilog for mem-ifs wrapper
+        with open(self.instruction_memory_fetch_stage_wrapper_template_path
+                  ) as f:
+            instruction_memory_fetch_stage_wrapper_template = Template(
+                f.read())
+
+        imfsw_name = "imfsw0"
+
+        with open(
+                target_dir_path +
+                f"/{imfsw_name}_{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}",
+                "w") as f:
+            f.write(
+                instruction_memory_fetch_stage_wrapper_template.render(
+                    name=imfsw_name,
+                    instruction_fetch_stage_name=self.name,
+                    instruction_memory_name=imem0.name,
+                    data_width=self.instruction_memory_verilog_template.
+                    acadl_object.data_width,
+                    max_data_word_distance=self.
+                    instruction_memory_verilog_template.max_data_word_distance,
+                    port_width=self.instruction_memory_verilog_template.
+                    acadl_object.port_width,
+                    address_width=self.instruction_memory_verilog_template.
+                    address_width))
+
+        # generate systemc test bench
+        with open(self.tb_template_path) as f:
+            tb_template = Template(f.read())
+
+        with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
+                  "w") as f:
+            f.write(
+                tb_template.render(
+                    instruction_memory_fetch_stage_wrapper_name=imfsw_name))
+
+        # generate CMakeLists.txt
+        with open(self.instruction_fetch_stage_template_dir_path +
+                  "/CMakeLists.txt") as f:
+            cmake_lists_template = Template(f.read())
+
+        with open(target_dir_path + f"/CMakeLists.txt", "w+") as f:
+            f.write(
+                cmake_lists_template.render(
+                    instruction_fetch_stage_name=self.name,
+                    instruction_memory_name=imem0.name,
+                    instruction_memory_fetch_stage_wrapper_name=imfsw_name))

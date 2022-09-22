@@ -18,12 +18,12 @@ class InstructionMemoryInstantiationWithoutInstructions(Exception):
 class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
 
     def __init__(self, memory: Memory, memory_file_path: str = None) -> None:
+        super().__init__(memory, memory_file_path, enable_data_reset=False)
+
         # check if instructions are provided
         if memory_file_path is None:
             raise InstructionMemoryInstantiationWithoutInstructions(
                 self.acadl_object)
-
-        super().__init__(memory, memory_file_path, enable_data_reset=False)
 
         self.tb_file_name = "InstructionMemory_tb.cc"
         self.instruction_memory_template_dir_path = f"{self.verilog_template_dir_path}/instruction_memory"

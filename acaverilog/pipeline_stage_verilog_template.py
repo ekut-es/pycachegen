@@ -42,7 +42,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         with open(
                 target_dir_path +
                 f"/{self.name}_{self.pipeline_stage_verilog_file_name}",
-                "w+") as f:
+                "w") as f:
             f.write(
                 pipeline_stage_verilog_template.render(
                     name=self.name,
