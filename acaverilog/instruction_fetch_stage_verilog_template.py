@@ -51,7 +51,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     port_width=self.instruction_memory_verilog_template.
                     acadl_object.port_width,
                     address_width=self.instruction_memory_verilog_template.
-                    address_width))
+                    address_width,
+                    initial_address=0))
 
     def generate_test_bench(self,
                             target_dir_path: str,
@@ -103,6 +104,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             write_addresses_config=write_addresses_config,
             immediates_config=immediates_config)
 
+        num_instructions = 10
+
         add_0 = ACADLInstruction(id=0,
                                  size=16,
                                  operation="add",
@@ -112,7 +115,7 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
                                  write_addresses=[],
                                  immediates=[])
 
-        acadl_instructions = [add_0]
+        acadl_instructions = [add_0] * num_instructions
         instructions = []
 
         target_id = 1

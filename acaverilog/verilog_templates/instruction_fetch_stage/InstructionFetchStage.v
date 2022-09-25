@@ -38,11 +38,16 @@ module {{ name }}_InstructionFetchStage
 	// instruction fetch stage only reads from instruction memory
 	assign write_data_valid_o = {PORT_WIDTH{1'b0}};
 
-	
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
-			address <= {ADDRESS_WIDTH{1'b0}};
+			//address <= {ADDRESS_WIDTH{1'b0}};
+			address <= {{ initial_address }};
 			address_valid <= 1'b0;
+		end
+		else begin
+			if(instruction_memory_ready_i == 1'b1) begin
+
+			end
 		end
 	end
 
