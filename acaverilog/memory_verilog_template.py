@@ -1,6 +1,7 @@
 import os
 
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIsNotAnInteger, TargetDirNotEmptyException
+from .utils import read_write_template
 from acadl import Memory
 
 from jinja2 import Template
@@ -111,42 +112,31 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
             raise MemoryFileDoesNotExist(self.memory_file_path)
 
         # generate memory stage verilog
-        with open(self.memory_verilog_template_path) as f:
-            memory_verilog_template = Template(f.read())
-
-        with open(
-                target_dir_path +
-                f"/{self.name}_{self.memory_verilog_file_name}", "w") as f:
-            f.write(
-                memory_verilog_template.render(
-                    name=self.name,
-                    data_width=self.acadl_object.data_width,
-                    max_concurrent_requests=self.acadl_object.
-                    max_concurrent_requests,
-                    read_write_ports=self.acadl_object.read_write_ports,
-                    port_width=self.acadl_object.port_width,
-                    read_latency=self.acadl_object.read_latency,
-                    write_latency=self.acadl_object.write_latency,
-                    address_width=self.address_width,
-                    max_data_word_distance=self.max_data_word_distance,
-                    memory_lines=self.memory_lines,
-                    load_from_memory_file=(self.memory_file_path is not None),
-                    memory_file_path=self.memory_file_path,
-                    enable_data_reset=self.enable_data_reset))
+        read_write_template(
+            self.memory_verilog_template_path,
+            target_dir_path + f"/{self.name}_{self.memory_verilog_file_name}",
+            name=self.name,
+            data_width=self.acadl_object.data_width,
+            max_concurrent_requests=self.acadl_object.max_concurrent_requests,
+            read_write_ports=self.acadl_object.read_write_ports,
+            port_width=self.acadl_object.port_width,
+            read_latency=self.acadl_object.read_latency,
+            write_latency=self.acadl_object.write_latency,
+            address_width=self.address_width,
+            max_data_word_distance=self.max_data_word_distance,
+            memory_lines=self.memory_lines,
+            load_from_memory_file=(self.memory_file_path is not None),
+            memory_file_path=self.memory_file_path,
+            enable_data_reset=self.enable_data_reset)
 
         # generate address translator verilog
-        with open(self.address_translator_verilog_template_path) as f:
-            address_translator_verilog_template = Template(f.read())
-
-        with open(
-                target_dir_path +
-                f"/{self.name}_{self.address_translator_verilog_file_name}",
-                "w+") as f:
-            f.write(
-                address_translator_verilog_template.render(
-                    name=self.name,
-                    address_width=self.address_width,
-                    address_translation_map=self.address_translation_map))
+        read_write_template(
+            self.address_translator_verilog_template_path,
+            target_dir_path +
+            f"/{self.name}_{self.address_translator_verilog_file_name}",
+            name=self.name,
+            address_width=self.address_width,
+            address_translation_map=self.address_translation_map)
 
     def generate_test_bench(self,
                             target_dir_path: str,
@@ -158,27 +148,20 @@ class MemoryVerilogTemplate(ACADLObjectVerilogTemplate):
         self.generate_verilog(target_dir_path)
 
         # generate SystemC testbench
-        with open(self.tb_template_path) as f:
-            tb_template = Template(f.read())
-
-        with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
-                  "w") as f:
-            f.write(
-                tb_template.render(
-                    name=self.name,
-                    data_width=self.acadl_object.data_width,
-                    max_concurrent_requests=self.acadl_object.
-                    max_concurrent_requests,
-                    read_write_ports=self.acadl_object.read_write_ports,
-                    port_width=self.acadl_object.port_width,
-                    read_latency=self.acadl_object.read_latency,
-                    write_latency=self.acadl_object.write_latency,
-                    address_width=self.address_width,
-                    address_ranges=self.address_ranges))
+        read_write_template(
+            self.tb_template_path,
+            target_dir_path + f"/{self.name}_{self.tb_file_name}",
+            name=self.name,
+            data_width=self.acadl_object.data_width,
+            max_concurrent_requests=self.acadl_object.max_concurrent_requests,
+            read_write_ports=self.acadl_object.read_write_ports,
+            port_width=self.acadl_object.port_width,
+            read_latency=self.acadl_object.read_latency,
+            write_latency=self.acadl_object.write_latency,
+            address_width=self.address_width,
+            address_ranges=self.address_ranges)
 
         # generate CMakeLists.txt
-        with open(self.memory_template_dir_path + "/CMakeLists.txt") as f:
-            cmake_lists_template = Template(f.read())
-
-        with open(target_dir_path + f"/CMakeLists.txt", "w+") as f:
-            f.write(cmake_lists_template.render(name=self.name))
+        read_write_template(self.memory_template_dir_path + "/CMakeLists.txt",
+                            target_dir_path + f"/CMakeLists.txt",
+                            name=self.name)
