@@ -33,7 +33,7 @@ module {{ name }}_InstructionFetchStage
 	reg[DATA_WIDTH-1:0] issue_buffer [ISSUE_BUFFER_SIZE-1:0];
 	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid;
 	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_pop_count;
-	wire[$clog2(ISSUE_BUFFER_SIZE)-1:0] issue_buffer_available_slots;
+	wire[$clog2(ISSUE_BUFFER_SIZE):0] issue_buffer_available_slots;
 
 	// instruction fetch stage only reads from instruction memory
 	assign read_write_select_o = 1'b0;
@@ -55,7 +55,7 @@ module {{ name }}_InstructionFetchStage
 		.pop_count_o(issue_buffer_valid_pop_count)
 	);
 
-	//assign issue_buffer_available_slots = issue_buffer_valid_pop_count;
+	assign issue_buffer_available_slots = ISSUE_BUFFER_SIZE - issue_buffer_valid_pop_count;
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin

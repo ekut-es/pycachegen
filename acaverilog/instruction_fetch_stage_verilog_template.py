@@ -12,6 +12,17 @@ from .utils import read_write_template
 from jinja2 import Template
 
 
+class IssueBufferSmallerThanPortWidth(Exception):
+
+    def __init__(self, instruction_fetch_stage: InstructionFetchStage,
+                 instruction_memory: Memory):
+        self.instruction_fetch_stage = instruction_fetch_stage
+        self.instruction_memory = instruction_memory
+
+    def __str__(self):
+        return f"InstructionFetchStage '{self.instruction_fetch_stage.name}'.issue_buffer_size = {self.instruction_fetch_stage.issue_buffer_size}! smaller than Memory '{self.instruction_memory.name}.'.port_width = {self.instruction_memory.port_width}!"
+
+
 class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
     def __init__(
@@ -26,6 +37,12 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
         self.instruction_memory_fetch_stage_wrapper_verilog_file_name = "InstructionMemoryFetchStageWrapper.v"
 
         self.instruction_memory_verilog_template = instruction_memory_verilog_template
+
+        # issue_buffer_size has to be at least as large as the port_width
+        if self.acadl_object.issue_buffer_size < instruction_memory_verilog_template.acadl_object.port_width:
+            raise IssueBufferSmallerThanPortWidth(
+                self.acadl_object,
+                self.instruction_memory_verilog_template.acadl_object)
 
         # TODO checks
 

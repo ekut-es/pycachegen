@@ -60,113 +60,122 @@ module {{ name }}_PopCount
     output  reg     [POPCOUNT_WIDTH-1:0]   	pop_count_o 
 );
 
-    initial begin
-        pop_count_o = {POPCOUNT_WIDTH{1'b0}};
-    end
+	generate
+		if (WORD_WIDTH == 1) begin
+			always @(*) begin
+				pop_count_o = word_i;
+			end
+		end
+		else if (WORD_WIDTH > 1) begin
+			initial begin
+				pop_count_o = {POPCOUNT_WIDTH{1'b0}};
+			end
 
-	// This part of the code never changes regardless of input word width, so to
-	// keep the code concise, I'll break the rule of always naming constants and
-	// instead use the literals: a 4-entry table of 2-bit values, converting the
-	// integer described by a pair of bits into an integer describing the number
-	// of bits set in that pair of bits (the "paircount"). Since both have 2 bits,
-	// we can conveniently just replace the input bit pairs by their paircounts.
-	// We put a ramstyle attribute to tell the CAD tool this should NOT be
-	// synthesized as a memory, but just as LUT logic. It works without it, but
-	// I have seen my CAD tool randomly decide to use Block RAM instead.
+			// This part of the code never changes regardless of input word width, so to
+			// keep the code concise, I'll break the rule of always naming constants and
+			// instead use the literals: a 4-entry table of 2-bit values, converting the
+			// integer described by a pair of bits into an integer describing the number
+			// of bits set in that pair of bits (the "paircount"). Since both have 2 bits,
+			// we can conveniently just replace the input bit pairs by their paircounts.
+			// We put a ramstyle attribute to tell the CAD tool this should NOT be
+			// synthesized as a memory, but just as LUT logic. It works without it, but
+			// I have seen my CAD tool randomly decide to use Block RAM instead.
 
-    //(* ramstyle = "logic" *)        // Quartus
-    //(* ram_style = "distributed" *) // Vivado
+			//(* ramstyle = "logic" *)        // Quartus
+			//(* ram_style = "distributed" *) // Vivado
 
-    reg [1:0] popcount2bits [0:3];
+			reg [1:0] popcount2bits [0:3];
 
-    initial begin
-        popcount2bits[0] = 2'd0;
-        popcount2bits[1] = 2'd1;
-        popcount2bits[2] = 2'd1;
-        popcount2bits[3] = 2'd2;
-    end
+			initial begin
+				popcount2bits[0] = 2'd0;
+				popcount2bits[1] = 2'd1;
+				popcount2bits[2] = 2'd1;
+				popcount2bits[3] = 2'd2;
+			end
 
-	// Then let's calculate how many pairs of bits we have to process, and the
-	// zero-padding we will use to extend them to POPCOUNT_WIDTH, so all the
-	// adders work on the same number of bits. Using the maximum number of bits is
-	// a lot easier than figuring out the necessary adder bit width at each step,
-	// and since the padding is constant zero, it wil be optimized away during
-	// synthesis. If no padding is required, we return the otherwise impossible
-	// maximal `PAD_WIDTH` for later special case handling.
+			// Then let's calculate how many pairs of bits we have to process, and the
+			// zero-padding we will use to extend them to POPCOUNT_WIDTH, so all the
+			// adders work on the same number of bits. Using the maximum number of bits is
+			// a lot easier than figuring out the necessary adder bit width at each step,
+			// and since the padding is constant zero, it wil be optimized away during
+			// synthesis. If no padding is required, we return the otherwise impossible
+			// maximal `PAD_WIDTH` for later special case handling.
 
-    localparam PAIR_COUNT       = WORD_WIDTH / 2;
-    localparam PAIR_WORD_WIDTH  = PAIR_COUNT * 2;
-    localparam PAD_WIDTH        = POPCOUNT_WIDTH > 2 ? POPCOUNT_WIDTH - 2 : POPCOUNT_WIDTH;
-    localparam PAD              = {PAD_WIDTH{1'b0}};
+			localparam PAIR_COUNT       = WORD_WIDTH / 2;
+			localparam PAIR_WORD_WIDTH  = PAIR_COUNT * 2;
+			localparam PAD_WIDTH        = POPCOUNT_WIDTH > 2 ? POPCOUNT_WIDTH - 2 : POPCOUNT_WIDTH;
+			localparam PAD              = {PAD_WIDTH{1'b0}};
 
-	// Then define our working space: a vector of paircounts holding all bit
-	// pairs (might be less than WORD_WIDTH if its value is odd), and
-	// a vector of popcount words, one popcount for each paircount. We will
-	// accumulate popcounts and paircounts into each successive popcount word,
-	// and the last popcount will hold our final result.
+			// Then define our working space: a vector of paircounts holding all bit
+			// pairs (might be less than WORD_WIDTH if its value is odd), and
+			// a vector of popcount words, one popcount for each paircount. We will
+			// accumulate popcounts and paircounts into each successive popcount word,
+			// and the last popcount will hold our final result.
 
-	// Veril\*tor can't quite see what we're doing here, so we tell it to ignore
-	// the apparent combinational loop. (The "*" is so that program doesn't see
-	// this comment as an erroneous directive.)
+			// Veril\*tor can't quite see what we're doing here, so we tell it to ignore
+			// the apparent combinational loop. (The "*" is so that program doesn't see
+			// this comment as an erroneous directive.)
 
-    reg [PAIR_WORD_WIDTH-1:0]               paircount   = {PAIR_WORD_WIDTH{1'b0}};
-    // verilator lint_off UNOPTFLAT
-    reg [(POPCOUNT_WIDTH*PAIR_COUNT)-1:0]   popcount    = {POPCOUNT_WIDTH*PAIR_COUNT{1'b0}};
-    // verilator lint_on  UNOPTFLAT
+			reg [PAIR_WORD_WIDTH-1:0]               paircount   = {PAIR_WORD_WIDTH{1'b0}};
+			// verilator lint_off UNOPTFLAT
+			reg [(POPCOUNT_WIDTH*PAIR_COUNT)-1:0]   popcount    = {POPCOUNT_WIDTH*PAIR_COUNT{1'b0}};
+			// verilator lint_on  UNOPTFLAT
 
-	// Finally, if WORD_WIDTH is odd, we will have to account for the last bit not
-	// in a pair. So let's compute that flag now.
+			// Finally, if WORD_WIDTH is odd, we will have to account for the last bit not
+			// in a pair. So let's compute that flag now.
 
-    localparam WORD_WIDTH_IS_ODD = (WORD_WIDTH % 2) == 1;
+			localparam WORD_WIDTH_IS_ODD = (WORD_WIDTH % 2) == 1;
 
-	// Translate the initial bit pair into a paircount and then pad it into
-	// a popcount value. Doing this also peels out the first iteration of the
-	// following loop so we can refer to the previous loop index without having
-	// a negative number (which is not allowed).
+			// Translate the initial bit pair into a paircount and then pad it into
+			// a popcount value. Doing this also peels out the first iteration of the
+			// following loop so we can refer to the previous loop index without having
+			// a negative number (which is not allowed).
 
-    integer i;
+			integer i;
 
-    always @(*) begin
-        paircount[0 +: 2]               = popcount2bits[word_i[0 +: 2]];
-        // This is decided at elaboration, but the linter doesn't know that.
-        if (PAD_WIDTH == POPCOUNT_WIDTH) begin
-            //popcount[0 +: POPCOUNT_WIDTH]   = paircount[0 +: 2];
-            popcount[0 +: POPCOUNT_WIDTH] = { { (POPCOUNT_WIDTH-PAIR_WORD_WIDTH+2) {1'b0}}, paircount[0 +: 2]};
-        end 
-        else begin
-            // verilator lint_off WIDTH
-            popcount[0 +: POPCOUNT_WIDTH]   = {PAD,paircount[0 +: 2]};
-            // verilator lint_on  WIDTH
-        end
+			always @(*) begin
+				paircount[0 +: 2]               = popcount2bits[word_i[0 +: 2]];
+				// This is decided at elaboration, but the linter doesn't know that.
+				if (PAD_WIDTH == POPCOUNT_WIDTH) begin
+					//popcount[0 +: POPCOUNT_WIDTH]   = paircount[0 +: 2];
+					popcount[0 +: POPCOUNT_WIDTH] = { { (POPCOUNT_WIDTH-2) {1'b0}}, paircount[0 +: 2]};
+				end 
+				else begin
+					// verilator lint_off WIDTH
+					popcount[0 +: POPCOUNT_WIDTH]   = {PAD,paircount[0 +: 2]};
+					// verilator lint_on  WIDTH
+				end
 
-		// Now repeat for all remaining bit pairs, but also accumulate the popcount
-		// from the previous iteration.  Note the start index due to the peeled-out
-		// first iteration.
+				// Now repeat for all remaining bit pairs, but also accumulate the popcount
+				// from the previous iteration.  Note the start index due to the peeled-out
+				// first iteration.
 
-        for(i=1; i < PAIR_COUNT; i=i+1) begin : per_paircount
-            paircount[2*i +: 2]                          = popcount2bits[word_i[2*i +: 2]];
-            // This is decided at elaboration, but the linter doesn't know that.
-            if (PAD_WIDTH == POPCOUNT_WIDTH) begin
-                //popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = paircount[2*i +: 2] + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
-                popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = { { (POPCOUNT_WIDTH-PAIR_WORD_WIDTH+2) {1'b0}}, paircount[2*i +: 2]} + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
-            end 
-            else begin
-                // verilator lint_off WIDTH
-                popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = {PAD,paircount[2*i +: 2]} + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
-                // verilator lint_on  WIDTH
-            end
-        end
+				for(i=1; i < PAIR_COUNT; i=i+1) begin : per_paircount
+					paircount[2*i +: 2]                          = popcount2bits[word_i[2*i +: 2]];
+					// This is decided at elaboration, but the linter doesn't know that.
+					if (PAD_WIDTH == POPCOUNT_WIDTH) begin
+						//popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = paircount[2*i +: 2] + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
+						popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = { { (POPCOUNT_WIDTH-2) {1'b0}}, paircount[2*i +: 2]} + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
+					end 
+					else begin
+						// verilator lint_off WIDTH
+						popcount[POPCOUNT_WIDTH*i +: POPCOUNT_WIDTH] = {PAD,paircount[2*i +: 2]} + popcount[POPCOUNT_WIDTH*(i-1) +: POPCOUNT_WIDTH];
+						// verilator lint_on  WIDTH
+					end
+				end
 
-		// If the input word width was odd, pad up the last bit not in a pair to the
-		// popcount width and add it to the last popcount.
+				// If the input word width was odd, pad up the last bit not in a pair to the
+				// popcount width and add it to the last popcount.
 
-        if (WORD_WIDTH_IS_ODD == 1'b1) begin
-            popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] + { {POPCOUNT_WIDTH-1{1'b0}},word_i[WORD_WIDTH-1]};
-        end
+				if (WORD_WIDTH_IS_ODD == 1'b1) begin
+					popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH] + { {POPCOUNT_WIDTH-1{1'b0}},word_i[WORD_WIDTH-1]};
+				end
 
-		// Then the last popcount is the total for the whole input word.
+				// Then the last popcount is the total for the whole input word.
 
-        pop_count_o = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH];
-    end
+				pop_count_o = popcount[POPCOUNT_WIDTH*(PAIR_COUNT-1) +: POPCOUNT_WIDTH];
+			end
+		end
+	endgenerate
 
 endmodule

@@ -23,9 +23,6 @@ def ba_to_little_endian_str(bits: bitarray) -> str:
 
 def read_write_template(path_to_template_file: str, path_to_target_file: str,
                         **kwargs):
-    for k, v in kwargs.items():
-        print(k, v)
-
     # open template file
     with open(path_to_template_file, "r") as f:
         template = Template(f.read())
