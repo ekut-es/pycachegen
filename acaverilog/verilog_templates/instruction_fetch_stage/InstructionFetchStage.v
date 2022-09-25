@@ -26,6 +26,9 @@ module {{ name }}_InstructionFetchStage
 
 	reg[ADDRESS_WIDTH-1:0] address;
 	reg address_valid;
+	reg[PORT_WIDTH_BITS-1:0] read_data;
+	reg initialize_read;
+	reg read_in_progress;
 
 	// instruction fetch stage only reads from instruction memory
 	assign read_write_select_o = 1'b0;
@@ -43,10 +46,24 @@ module {{ name }}_InstructionFetchStage
 			//address <= {ADDRESS_WIDTH{1'b0}};
 			address <= {{ initial_address }};
 			address_valid <= 1'b0;
+			initialize_read <= 1'b1;
+			read_in_progress <= 1'b0;
 		end
 		else begin
-			if(instruction_memory_ready_i == 1'b1) begin
+			// initialize a read from memory when instruction memory is ready
+			if(instruction_memory_ready_i == 1'b1 && initialize_read == 1'b1) begin
+				address_valid <= 1'b1;
+				read_in_progress <= 1'b1;
+				initialize_read <= 1'b0;
+			end
 
+			// a read is in progress and the instruction memory has valid data
+			if(read_in_progress == 1'b1 && initialize_read == 1'b0 && read_data_valid_i > 0) begin
+				$display("t=%0t: %m read from address=%d with data=%d.", $time, address, read_data_i);
+				read_data <= read_data_i;
+				address_valid <= 1'b0;
+				address <= address + 1;
+				initialize_read <= 1'b1;
 			end
 		end
 	end

@@ -139,7 +139,7 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
                        read_write_ports=1,
                        port_width=1,
                        data={},
-                       read_latency=latency_t(3),
+                       read_latency=latency_t(1),
                        write_latency=latency_t(1),
                        address_ranges={(0, 10)})
 

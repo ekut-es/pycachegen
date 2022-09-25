@@ -47,6 +47,10 @@ int sc_main(int argc, char** argv) {
     reset_n_i.write(1);
     sc_start(1, SC_NS);
 
+    // run test bench
+    sc_start(50, SC_NS);
+
+
     // end simulation with reset
     reset_n_i.write(0);
     sc_start(2, SC_NS);
