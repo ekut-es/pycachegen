@@ -3,7 +3,7 @@ import os
 from acadl import Memory
 from .acadl_object_verilog_template import TargetDirNotEmptyException
 from .memory_verilog_template import MemoryVerilogTemplate
-from jinja2 import Template
+from .utils import read_write_template
 
 
 class InstructionMemoryInstantiationWithoutInstructions(Exception):
@@ -39,19 +39,14 @@ class InstructionMemoryVerilogTemplate(MemoryVerilogTemplate):
         self.generate_verilog(target_dir_path)
 
         # generate SystemC testbench
-        with open(self.tb_template_path) as f:
-            tb_template = Template(f.read())
-
-        with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
-                  "w+") as f:
-            f.write(
-                tb_template.render(name=self.name,
-                                   port_width=self.acadl_object.port_width))
+        read_write_template(self.tb_template_path,
+                            target_dir_path +
+                            f"/{self.name}_{self.tb_file_name}",
+                            name=self.name,
+                            port_width=self.acadl_object.port_width)
 
         # generate CMakeLists.txt
-        with open(self.instruction_memory_template_dir_path +
-                  "/CMakeLists.txt") as f:
-            cmake_lists_template = Template(f.read())
-
-        with open(target_dir_path + f"/CMakeLists.txt", "w") as f:
-            f.write(cmake_lists_template.render(name=self.name))
+        read_write_template(self.instruction_memory_template_dir_path +
+                            "/CMakeLists.txt",
+                            target_dir_path + f"/CMakeLists.txt",
+                            name=self.name)
