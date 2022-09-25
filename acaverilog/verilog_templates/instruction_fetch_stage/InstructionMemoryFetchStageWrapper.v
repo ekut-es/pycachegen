@@ -1,6 +1,7 @@
 module {{ name }}_InstructionMemoryFetchStageWrapper
 #(
 	parameter DATA_WIDTH = {{ data_width }},
+	parameter INSTRUCTION_SIZE = DATA_WIDTH,
 	parameter MAX_DATA_WORD_DISTANCE = {{ max_data_word_distance }}, 
 	parameter PORT_WIDTH = {{ port_width }},
 	parameter PORT_WIDTH_BITS = {{ data_width*port_width }},
@@ -8,7 +9,14 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 )
 (
 	input clk_i,
-	input reset_n_i
+	input reset_n_i,
+
+	// instruction fetch stage forward ports
+	{%- for i in range(forward_ports) %}
+	input next_stage_ready_{{ i }}_i,
+	output[DATA_WIDTH-1:0] instruction_{{ i }}_o,
+	output instruction_valid_{{ i }}_o{{ "," if not loop.last }}
+	{% endfor %}
 );
 
 	wire read_write_select;
@@ -52,7 +60,13 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 		.read_data_i(read_data),
 		.read_data_valid_i(read_data_valid),
 		.port_ready_i(port_ready),
-		.instruction_memory_ready_i(instruction_memory_ready)
+		.instruction_memory_ready_i(instruction_memory_ready),
+
+		{%- for i in range(forward_ports) %}
+		.next_stage_ready_{{ i }}_i(next_stage_ready_{{ i }}_i),
+		.instruction_{{ i }}_o(instruction_{{ i }}_o),
+		.instruction_valid_{{ i }}_o(instruction_valid_{{ i }}_o){{ "," if not loop.last }}
+		{% endfor %}
 	);
 
 endmodule

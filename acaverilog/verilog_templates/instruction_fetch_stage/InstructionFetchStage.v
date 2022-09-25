@@ -1,6 +1,7 @@
 module {{ name }}_InstructionFetchStage
 #(
 	parameter DATA_WIDTH = {{ data_width }},
+	parameter INSTRUCTION_SIZE = DATA_WIDTH,
 	parameter MAX_DATA_WORD_DISTANCE = {{ max_data_word_distance }}, 
 	parameter PORT_WIDTH = {{ port_width }},
 	parameter PORT_WIDTH_BITS = {{ data_width*port_width }},
@@ -10,7 +11,7 @@ module {{ name }}_InstructionFetchStage
 (
 	input clk_i,
 	input reset_n_i,
-
+	
 	// connection to instruction memory
 	output read_write_select_o,
 	output unsigned[ADDRESS_WIDTH-1:0] address_o,
@@ -22,7 +23,14 @@ module {{ name }}_InstructionFetchStage
 	input[PORT_WIDTH_BITS-1:0] read_data_i,
 	input unsigned[PORT_WIDTH-1:0] read_data_valid_i,
 	input port_ready_i,
-	input instruction_memory_ready_i
+	input instruction_memory_ready_i,
+
+	// forward ports
+	{%- for i in range(forward_ports) %}
+	input next_stage_ready_{{ i }}_i,
+	output[DATA_WIDTH-1:0] instruction_{{ i }}_o,
+	output instruction_valid_{{ i }}_o{{ "," if not loop.last }}
+	{% endfor %}
 );
 
 	reg[ADDRESS_WIDTH-1:0] program_counter;
@@ -95,9 +103,10 @@ module {{ name }}_InstructionFetchStage
 
 				issue_buffer_first_free_slot <= issue_buffer_first_free_slot + PORT_WIDTH;
 
+				initialize_read <= 1'b1;
+
 				address_valid <= 1'b0;
 				program_counter <= program_counter + PORT_WIDTH;
-				initialize_read <= 1'b1;
 			end
 		end
 	end

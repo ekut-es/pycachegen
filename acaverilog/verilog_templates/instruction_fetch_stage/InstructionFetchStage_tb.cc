@@ -21,10 +21,20 @@ int sc_main(int argc, char** argv) {
     sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
 
+    sc_vector<sc_signal<bool>> next_stage_ready_is("next_stage_ready_is", {{ forward_ports }});
+    sc_vector<sc_signal<uint32_t>> instruction_os("instruction_os", {{ forward_ports }});
+    sc_vector<sc_signal<bool>> instruction_valid_os("instruction_valid_os", {{ forward_ports }});
+
     const std::unique_ptr<V{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper> imfsw{new V{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper{"{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper"}};
 
     imfsw->clk_i(clk_i);
     imfsw->reset_n_i(reset_n_i);
+
+    {%- for i in range(forward_ports) %}
+    imfsw->next_stage_ready_{{ i }}_i(next_stage_ready_is[{{ i }}]);
+    imfsw->instruction_{{ i }}_o(instruction_os[{{ i }}]);
+    imfsw->instruction_valid_{{ i }}_o(instruction_valid_os[{{ i }}]);
+    {% endfor -%}
 
     // start simulation and trace
     std::cout << "{{ instruction_memory_fetch_stage_wrapper_name }}_InstructionMemoryFetchStageWrapper start!" << std::endl;

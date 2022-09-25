@@ -1,3 +1,4 @@
+from typing import Dict
 from .acadl_object_verilog_template import ACADLObjectVerilogTemplate
 from .instruction_memory_verilog_template import InstructionMemoryVerilogTemplate
 from acadl import Memory, InstructionFetchStage, latency_t
@@ -8,8 +9,6 @@ from .instruction.opcode_config import OpcodeConfig
 from .instruction.data_field_config import DataFieldConfig, DataFieldType
 from .instruction.instruction_format import InstructionFormat
 from .utils import read_write_template
-
-from jinja2 import Template
 
 
 class IssueBufferSmallerThanPortWidth(Exception):
@@ -25,11 +24,15 @@ class IssueBufferSmallerThanPortWidth(Exception):
 
 class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(
-        self, instruction_fetch_stage: InstructionFetchStage,
-        instruction_memory_verilog_template: InstructionMemoryVerilogTemplate
-    ) -> None:
+    def __init__(self, instruction_fetch_stage: InstructionFetchStage,
+                 instruction_memory_verilog_template:
+                 InstructionMemoryVerilogTemplate,
+                 target_id_config: TargetIdConfig,
+                 forward_port_map: Dict[int, int]) -> None:
         super().__init__(instruction_fetch_stage)
+
+        self.target_id_config = target_id_config
+        self.forward_port_map = forward_port_map
 
         self.instruction_fetch_stage_verilog_file_name = "InstructionFetchStage.v"
         self.pop_count_verilog_file_name = "PopCount.v"
@@ -68,7 +71,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             address_width=self.instruction_memory_verilog_template.
             address_width,
             issue_buffer_size=self.acadl_object.issue_buffer_size,
-            initial_address=0)
+            initial_address=0,
+            forward_ports=len(self.forward_port_map))
 
         # generate pop count verilog
         read_write_template(self.pop_count_verilog_template_path,
@@ -178,13 +182,15 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             port_width=self.instruction_memory_verilog_template.acadl_object.
             port_width,
             address_width=self.instruction_memory_verilog_template.
-            address_width)
+            address_width,
+            forward_ports=len(self.forward_port_map))
 
         # generate systemc test bench
         read_write_template(
             self.tb_template_path,
             target_dir_path + f"/{self.name}_{self.tb_file_name}",
-            instruction_memory_fetch_stage_wrapper_name=imfsw_name)
+            instruction_memory_fetch_stage_wrapper_name=imfsw_name,
+            forward_ports=len(self.forward_port_map))
 
         # generate CMakeLists.txt
         read_write_template(

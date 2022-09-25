@@ -5,13 +5,14 @@ from .instruction.target_id_config import TargetIdConfig
 from .utils import read_write_template
 from acadl import PipelineStage
 from math import ceil, log2
+from typing import Dict
 
 
 class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
     def __init__(self, pipeline_stage: PipelineStage, instruction_size: int,
                  target_id_config: TargetIdConfig,
-                 forward_port_map: int) -> None:
+                 forward_port_map: Dict[int, int]) -> None:
         super().__init__(pipeline_stage)
 
         self.pipeline_stage_verilog_file_name = "PipelineStage.v"
