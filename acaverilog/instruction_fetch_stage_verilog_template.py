@@ -21,6 +21,7 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
         super().__init__(instruction_fetch_stage)
 
         self.instruction_fetch_stage_verilog_file_name = "InstructionFetchStage.v"
+        self.pop_count_verilog_file_name = "PopCount.v"
         self.tb_file_name = "InstructionFetchStage_tb.cc"
         self.instruction_memory_fetch_stage_wrapper_verilog_file_name = "InstructionMemoryFetchStageWrapper.v"
 
@@ -30,6 +31,7 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         self.instruction_fetch_stage_template_dir_path = f"{self.verilog_template_dir_path}/instruction_fetch_stage"
         self.instruction_fetch_stage_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_fetch_stage_verilog_file_name}"
+        self.pop_count_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.pop_count_verilog_file_name}"
         self.instruction_memory_fetch_stage_wrapper_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}"
         self.tb_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.tb_file_name}"
 
@@ -48,7 +50,14 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             port_width,
             address_width=self.instruction_memory_verilog_template.
             address_width,
+            issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0)
+
+        # generate pop count verilog
+        read_write_template(self.pop_count_verilog_template_path,
+                            target_dir_path +
+                            f"/{self.name}_{self.pop_count_verilog_file_name}",
+                            name=self.name)
 
     def generate_test_bench(self,
                             target_dir_path: str,

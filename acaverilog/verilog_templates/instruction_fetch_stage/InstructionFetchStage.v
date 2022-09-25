@@ -4,7 +4,8 @@ module {{ name }}_InstructionFetchStage
 	parameter MAX_DATA_WORD_DISTANCE = {{ max_data_word_distance }}, 
 	parameter PORT_WIDTH = {{ port_width }},
 	parameter PORT_WIDTH_BITS = {{ data_width*port_width }},
-	parameter ADDRESS_WIDTH = {{ address_width }}
+	parameter ADDRESS_WIDTH = {{ address_width }},
+	parameter ISSUE_BUFFER_SIZE = {{ issue_buffer_size }}
 )
 (
 	input clk_i,
@@ -24,15 +25,19 @@ module {{ name }}_InstructionFetchStage
 	input instruction_memory_ready_i
 );
 
-	reg[ADDRESS_WIDTH-1:0] address;
+	reg[ADDRESS_WIDTH-1:0] program_counter;
 	reg address_valid;
 	reg[PORT_WIDTH_BITS-1:0] read_data;
 	reg initialize_read;
 	reg read_in_progress;
+	reg[DATA_WIDTH-1:0] issue_buffer [ISSUE_BUFFER_SIZE-1:0];
+	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid;
+	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_pop_count;
+	wire[$clog2(ISSUE_BUFFER_SIZE)-1:0] issue_buffer_available_slots;
 
 	// instruction fetch stage only reads from instruction memory
 	assign read_write_select_o = 1'b0;
-	assign address_o = address;
+	assign address_o = program_counter;
 	// data word distance is always 1
 	assign data_word_distance_o = 1;
 	assign address_valid_o = address_valid;
@@ -41,10 +46,21 @@ module {{ name }}_InstructionFetchStage
 	// instruction fetch stage only reads from instruction memory
 	assign write_data_valid_o = {PORT_WIDTH{1'b0}};
 
+	// returns how much space there is in the issue buffer
+	{{ name }}_PopCount
+	#(
+		.WORD_WIDTH(ISSUE_BUFFER_SIZE)
+	) pop_counter (
+		.word_i(issue_buffer_valid),
+		.pop_count_o(issue_buffer_valid_pop_count)
+	);
+
+	//assign issue_buffer_available_slots = issue_buffer_valid_pop_count;
+
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
 			//address <= {ADDRESS_WIDTH{1'b0}};
-			address <= {{ initial_address }};
+			program_counter <= {{ initial_address }};
 			address_valid <= 1'b0;
 			initialize_read <= 1'b1;
 			read_in_progress <= 1'b0;
@@ -59,11 +75,12 @@ module {{ name }}_InstructionFetchStage
 
 			// a read is in progress and the instruction memory has valid data
 			if(read_in_progress == 1'b1 && initialize_read == 1'b0 && read_data_valid_i > 0) begin
-				$display("t=%0t: %m read from address=%d with data=%d.", $time, address, read_data_i);
+				$display("t=%0t: %m read from address=%d with data=%h.", $time, program_counter, read_data_i);
 				read_data <= read_data_i;
 				address_valid <= 1'b0;
-				address <= address + PORT_WIDTH;
+				program_counter <= program_counter + PORT_WIDTH;
 				initialize_read <= 1'b1;
+				issue_buffer_valid <= issue_buffer_valid + 1;
 			end
 		end
 	end

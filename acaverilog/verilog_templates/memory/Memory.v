@@ -123,7 +123,7 @@ module {{ name }}_Memory
 				write_data_{{ i }} <= write_data_{{ i }}_i;
 				write_data_valid_{{ i }} <= write_data_valid_{{ i }}_i;
 				address_{{ i }} <= address_{{ i }}_i;
-				$display("t=%0t: %m write at port {{ i }} to address=%d with data=%d initialized.", $time, address_0_i, write_data_0_i);
+				$display("t=%0t: %m write at port {{ i }} to address=%d with data=%h initialized.", $time, address_0_i, write_data_0_i);
 			end
 			// latency counter is 0 and a write is in progress
 			// write data to memory
