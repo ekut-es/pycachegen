@@ -7,6 +7,7 @@ from .instruction.target_id_config import TargetIdConfig
 from .instruction.opcode_config import OpcodeConfig
 from .instruction.data_field_config import DataFieldConfig, DataFieldType
 from .instruction.instruction_format import InstructionFormat
+from .utils import read_write_template
 
 from jinja2 import Template
 
@@ -34,25 +35,20 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
     def generate_verilog(self, target_dir_path: str) -> None:
         # generate instruction fetch stage verilog
-        with open(self.instruction_fetch_stage_verilog_template_path) as f:
-            instruction_fetch_stage_verilog_template = Template(f.read())
-
-        with open(
-                target_dir_path +
-                f"/{self.name}_{self.instruction_fetch_stage_verilog_file_name}",
-                "w+") as f:
-            f.write(
-                instruction_fetch_stage_verilog_template.render(
-                    name=self.name,
-                    data_width=self.instruction_memory_verilog_template.
-                    acadl_object.data_width,
-                    max_data_word_distance=self.
-                    instruction_memory_verilog_template.max_data_word_distance,
-                    port_width=self.instruction_memory_verilog_template.
-                    acadl_object.port_width,
-                    address_width=self.instruction_memory_verilog_template.
-                    address_width,
-                    initial_address=0))
+        read_write_template(
+            self.instruction_fetch_stage_verilog_template_path,
+            target_dir_path +
+            f"/{self.name}_{self.instruction_fetch_stage_verilog_file_name}",
+            name=self.name,
+            data_width=self.instruction_memory_verilog_template.acadl_object.
+            data_width,
+            max_data_word_distance=self.instruction_memory_verilog_template.
+            max_data_word_distance,
+            port_width=self.instruction_memory_verilog_template.acadl_object.
+            port_width,
+            address_width=self.instruction_memory_verilog_template.
+            address_width,
+            initial_address=0)
 
     def generate_test_bench(self,
                             target_dir_path: str,
@@ -147,49 +143,34 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
         imem0v.generate_verilog(target_dir_path)
 
         # generate verilog for mem-ifs wrapper
-        with open(self.instruction_memory_fetch_stage_wrapper_template_path
-                  ) as f:
-            instruction_memory_fetch_stage_wrapper_template = Template(
-                f.read())
-
         imfsw_name = "imfsw0"
 
-        with open(
-                target_dir_path +
-                f"/{imfsw_name}_{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}",
-                "w") as f:
-            f.write(
-                instruction_memory_fetch_stage_wrapper_template.render(
-                    name=imfsw_name,
-                    instruction_fetch_stage_name=self.name,
-                    instruction_memory_name=imem0.name,
-                    data_width=self.instruction_memory_verilog_template.
-                    acadl_object.data_width,
-                    max_data_word_distance=self.
-                    instruction_memory_verilog_template.max_data_word_distance,
-                    port_width=self.instruction_memory_verilog_template.
-                    acadl_object.port_width,
-                    address_width=self.instruction_memory_verilog_template.
-                    address_width))
+        read_write_template(
+            self.instruction_memory_fetch_stage_wrapper_template_path,
+            target_dir_path +
+            f"/{imfsw_name}_{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}",
+            name=imfsw_name,
+            instruction_fetch_stage_name=self.name,
+            instruction_memory_name=imem0.name,
+            data_width=self.instruction_memory_verilog_template.acadl_object.
+            data_width,
+            max_data_word_distance=self.instruction_memory_verilog_template.
+            max_data_word_distance,
+            port_width=self.instruction_memory_verilog_template.acadl_object.
+            port_width,
+            address_width=self.instruction_memory_verilog_template.
+            address_width)
 
         # generate systemc test bench
-        with open(self.tb_template_path) as f:
-            tb_template = Template(f.read())
-
-        with open(target_dir_path + f"/{self.name}_{self.tb_file_name}",
-                  "w") as f:
-            f.write(
-                tb_template.render(
-                    instruction_memory_fetch_stage_wrapper_name=imfsw_name))
+        read_write_template(
+            self.tb_template_path,
+            target_dir_path + f"/{self.name}_{self.tb_file_name}",
+            instruction_memory_fetch_stage_wrapper_name=imfsw_name)
 
         # generate CMakeLists.txt
-        with open(self.instruction_fetch_stage_template_dir_path +
-                  "/CMakeLists.txt") as f:
-            cmake_lists_template = Template(f.read())
-
-        with open(target_dir_path + f"/CMakeLists.txt", "w+") as f:
-            f.write(
-                cmake_lists_template.render(
-                    instruction_fetch_stage_name=self.name,
-                    instruction_memory_name=imem0.name,
-                    instruction_memory_fetch_stage_wrapper_name=imfsw_name))
+        read_write_template(
+            self.instruction_fetch_stage_template_dir_path + "/CMakeLists.txt",
+            target_dir_path + f"/CMakeLists.txt",
+            instruction_fetch_stage_name=self.name,
+            instruction_memory_name=imem0.name,
+            instruction_memory_fetch_stage_wrapper_name=imfsw_name)

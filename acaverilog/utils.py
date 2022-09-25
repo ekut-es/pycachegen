@@ -6,6 +6,7 @@ import subprocess
 from bitarray import bitarray
 from typing import List
 from .instruction.instruction import Instruction
+from jinja2 import Template
 
 __verilator_root_path__ = os.path.dirname(
     os.path.abspath(__file__)) + '/../external/verilator'
@@ -18,6 +19,20 @@ __verilator_cmakelists_dir_path__ = os.path.dirname(
 
 def ba_to_little_endian_str(bits: bitarray) -> str:
     return str(bits.to01())[::-1]
+
+
+def read_write_template(path_to_template_file: str, path_to_target_file: str,
+                        **kwargs):
+    for k, v in kwargs.items():
+        print(k, v)
+
+    # open template file
+    with open(path_to_template_file, "r") as f:
+        template = Template(f.read())
+
+    # write target file
+    with open(path_to_target_file, "w") as f:
+        f.write(template.render(kwargs))
 
 
 class PathDoesNotExist(Exception):
