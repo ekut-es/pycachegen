@@ -4,8 +4,6 @@ from .acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIs
 from .utils import read_write_template
 from acadl import Memory
 
-from jinja2 import Template
-
 from math import ceil, log2
 
 
