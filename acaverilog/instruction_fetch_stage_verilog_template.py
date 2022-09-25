@@ -129,17 +129,9 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
                                              i_form.length)
 
         # generate verilog for instruction memory
-        imem0 = Memory(name="imem",
-                       data_width=i_form.length,
-                       max_concurrent_requests=1,
-                       read_write_ports=1,
-                       port_width=1,
-                       data={},
-                       read_latency=latency_t(1),
-                       write_latency=latency_t(1),
-                       address_ranges={(0, 10)})
-
-        imem0v = InstructionMemoryVerilogTemplate(imem0, memory_file_path)
+        imem0v = InstructionMemoryVerilogTemplate(
+            self.instruction_memory_verilog_template.acadl_object,
+            memory_file_path)
         imem0v.generate_verilog(target_dir_path)
 
         # generate verilog for mem-ifs wrapper
@@ -151,7 +143,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             f"/{imfsw_name}_{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}",
             name=imfsw_name,
             instruction_fetch_stage_name=self.name,
-            instruction_memory_name=imem0.name,
+            instruction_memory_name=self.instruction_memory_verilog_template.
+            acadl_object.name,
             data_width=self.instruction_memory_verilog_template.acadl_object.
             data_width,
             max_data_word_distance=self.instruction_memory_verilog_template.
@@ -172,5 +165,6 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             self.instruction_fetch_stage_template_dir_path + "/CMakeLists.txt",
             target_dir_path + f"/CMakeLists.txt",
             instruction_fetch_stage_name=self.name,
-            instruction_memory_name=imem0.name,
+            instruction_memory_name=self.instruction_memory_verilog_template.
+            acadl_object.name,
             instruction_memory_fetch_stage_wrapper_name=imfsw_name)

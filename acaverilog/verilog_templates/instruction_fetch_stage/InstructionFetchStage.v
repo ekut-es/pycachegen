@@ -62,7 +62,7 @@ module {{ name }}_InstructionFetchStage
 				$display("t=%0t: %m read from address=%d with data=%d.", $time, address, read_data_i);
 				read_data <= read_data_i;
 				address_valid <= 1'b0;
-				address <= address + 1;
+				address <= address + PORT_WIDTH;
 				initialize_read <= 1'b1;
 			end
 		end
