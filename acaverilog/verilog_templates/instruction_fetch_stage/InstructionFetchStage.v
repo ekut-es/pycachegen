@@ -38,10 +38,13 @@ module {{ name }}_InstructionFetchStage
 	reg[PORT_WIDTH_BITS-1:0] read_data;
 	reg initialize_read;
 	reg read_in_progress;
+	reg read_done;
 	reg[DATA_WIDTH-1:0] issue_buffer [ISSUE_BUFFER_SIZE-1:0];
 	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid;
 	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_pop_count;
-	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_available_slots;
+	// signed is needed here to protect against an underflow when the number
+	// of available buffer slots is calculated
+	wire signed[ISSUE_BUFFER_SIZE-1:0] issue_buffer_available_slots;
 	integer issue_buffer_first_free_slot;
 
 	// instruction fetch stage only reads from instruction memory
@@ -74,6 +77,7 @@ module {{ name }}_InstructionFetchStage
 			address_valid <= 1'b0;
 			initialize_read <= 1'b1;
 			read_in_progress <= 1'b0;
+			read_done <= 1'b0;
 
 			// reset issue buffer
 			for(i = 0; i < ISSUE_BUFFER_SIZE; i = i + 1) begin
@@ -84,11 +88,26 @@ module {{ name }}_InstructionFetchStage
 			issue_buffer_first_free_slot <= 0;
 		end
 		else begin
-			// initialize a read from memory when instruction memory is ready
+			// initialize a read from memory if:
+			// - a read is done
+			// - no read has been initialized yet
+			// - the issue buffer has space left
+			// - the instruction memory is ready
+			if(read_done == 1'b1 && initialize_read == 1'b0 && issue_buffer_available_slots >= PORT_WIDTH && instruction_memory_ready_i == 1'b1) begin
+				$display("t=%0t: HERE %d >= ", $time, issue_buffer_available_slots, PORT_WIDTH);
+				initialize_read <= 1'b1;
+				read_done <= 1'b0;
+			end
+
+			// start a read from memory if:
+			// - a read was initialized
+			// - the instruction memory is ready
 			if(instruction_memory_ready_i == 1'b1 && initialize_read == 1'b1) begin
+				$display("t=%0t: %m read initialized from address=%d.", $time, program_counter);
 				address_valid <= 1'b1;
 				read_in_progress <= 1'b1;
 				initialize_read <= 1'b0;
+				read_done <= 1'b0;
 			end
 
 			// a read is in progress and the instruction memory has valid data
@@ -103,9 +122,18 @@ module {{ name }}_InstructionFetchStage
 
 				issue_buffer_first_free_slot <= issue_buffer_first_free_slot + PORT_WIDTH;
 
-				initialize_read <= 1'b1;
+				// initialize a read from memory if:
+				// - the issue buffer has space left
+				// - the instruction memory is ready
+				if((issue_buffer_available_slots - PORT_WIDTH >= PORT_WIDTH) && instruction_memory_ready_i == 1'b1) begin
+					initialize_read <= 1'b1;
+				end
+				else begin
+					read_done <= 1'b1;
+				end
 
 				address_valid <= 1'b0;
+				read_in_progress <= 1'b0;
 				program_counter <= program_counter + PORT_WIDTH;
 			end
 		end
