@@ -39,6 +39,7 @@ class CMakeExtension(Extension):
 class CMakeBuild(build_ext):
 
     def run(self):
+        pass
         # check if cmake is installed
         try:
             out = subprocess.check_output(['cmake', '--version'])
@@ -73,12 +74,6 @@ class CMakeBuild(build_ext):
 ext_modules = [
     CMakeExtension('acaverilog'),
 ]
-
-setup(name="acaverilog",
-      version="1.0.0",
-      packages=["acaverilog"],
-      package_dir={"acaverilog": "acaverilog"},
-      zip_safe=False)
 
 setup(
     name="acaverilog",
