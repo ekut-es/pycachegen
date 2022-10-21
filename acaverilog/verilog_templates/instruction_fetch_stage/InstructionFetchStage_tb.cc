@@ -60,9 +60,15 @@ int sc_main(int argc, char** argv) {
     // run test bench
     sc_start(15, SC_NS);
     next_stage_ready_is[0].write(1);
+    next_stage_ready_is[2].write(1);
 
     // wait until first instruction arrives at forward port 0
     while(instruction_valid_os[0].read() == 0) {
+        sc_start(1, SC_NS);
+    }
+
+    // wait until first instruction arrives at forward port 0
+    while(instruction_valid_os[2].read() == 0) {
         sc_start(1, SC_NS);
     }
 

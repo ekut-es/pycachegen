@@ -74,7 +74,7 @@ module {{ name }}_InstructionFetchStage
 	// registers that track if an issue buffer slot was assigned
 	reg issue_buffer_slot_assigned [{{ issue_buffer_size }}-1:0];
 	reg forward_port_in_use [{{ forward_ports }}-1:0];
-	reg [$clog2({{ forward_ports }})-1:0] issue_buffer_slot_assignment [{{ issue_buffer_size }}-1:0]; 
+	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_assigned_to_forward_port [{{ forward_ports }}-1:0];
 	
 	// returns how much space there is in the issue buffer
 	{{ name }}_PopCount
@@ -222,6 +222,7 @@ module {{ name }}_InstructionFetchStage
 							// assign issue buffer slot to current forward port
 							forward_port_in_use[i] = 1'b1;
 							issue_buffer_slot_assigned[j] = 1'b1;
+							issue_buffer_slot_assigned_to_forward_port[i] <= j[$clog2({{ issue_buffer_size }})-1:0];
 
 							// set forward port mux to issue buffer slot
 							issue_buffer_slot_to_forward_port_mux_select[i] <= j[$clog2({{ issue_buffer_size }})-1:0];	
@@ -244,7 +245,12 @@ module {{ name }}_InstructionFetchStage
 					end
 					else begin
 						instruction_valid[i] <= 1'b0;
-						// TODO remove instruction from issue buffer
+						$display("t=%0t: %m remove instruction from issue buffer slot %d", $time, issue_buffer_slot_assigned_to_forward_port[i]);
+
+						// TODO instead of deleting contents of issue buffer slot move next
+						// slot forward and adjust issue_buffer_first_free_slot
+						issue_buffer[issue_buffer_slot_assigned_to_forward_port[i]] <= { {{ data_width }}{1'b0}};
+						issue_buffer_valid[issue_buffer_slot_assigned_to_forward_port[i]] <= 1'b0;
 					end
 				end
 			end
