@@ -71,6 +71,10 @@ module {{ name }}_InstructionFetchStage
 	assign issue_buffer_target_ids[{{ j }}] = issue_buffer[{{ j }}][{{ target_id_start_bit }}+{{ target_id_length }}-1:{{ target_id_start_bit }}];
 	{%- endfor %}
 
+	// registers that track if an issue buffer slot was assigned
+	reg issue_buffer_slot_assigned [{{ issue_buffer_size }}-1:0];
+	reg [$clog2({{ forward_ports }})-1:0] issue_buffer_slot_assignment [{{ issue_buffer_size }}-1:0]; 
+	
 	// returns how much space there is in the issue buffer
 	{{ name }}_PopCount
 	#(
@@ -96,11 +100,21 @@ module {{ name }}_InstructionFetchStage
 	{INSTRUCTION_SIZE{1'b0}};
 	{% endfor %}
 
+	// forward lookup tables for each issue buffer slot
+	wire [$clog2({{ forward_ports }})-1:0] issue_buffer_forward_port [{{ issue_buffer_size }}-1:0];
+
+	{%- for j in range(issue_buffer_size) %}
+	{{ name }}_{{ j }}_ForwardLookupTable fwd_lut_{{ j }}(
+		.target_id_i(issue_buffer_target_ids[{{ j }}]),
+		.forward_port_o(issue_buffer_forward_port[{{ j }}])
+	);
+	{%- endfor %}
+
 	assign issue_buffer_available_slots = ISSUE_BUFFER_SIZE - issue_buffer_valid_pop_count;
 
 	integer i;
 	integer j;
-
+	
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
 			program_counter <= {{ initial_address }};
@@ -172,6 +186,12 @@ module {{ name }}_InstructionFetchStage
 				program_counter <= program_counter + PORT_WIDTH;
 			end
 
+			// set all issue_buffer_slot_assigned to 0 to track if they have been
+			// assigned in the next for loop
+			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
+				issue_buffer_slot_assigned[j] = 1'b0;
+			end
+
 			// check each next_stage_ready_i if a subsequent stage is ready
 			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
 				if(next_stages_ready[i] == 1'b1) begin
@@ -181,6 +201,9 @@ module {{ name }}_InstructionFetchStage
 					// that can be forwarded to this port that is not already assigned
 					// to another port
 					for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
+						$display("target_id of issue_buffer[%d]: %d", j, issue_buffer_target_ids[j]);
+						{%- for key, value in forward_port_map.items() %}
+						{% endfor %}
 					end
 				end
 			end

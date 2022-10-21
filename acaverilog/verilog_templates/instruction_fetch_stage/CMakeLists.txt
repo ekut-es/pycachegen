@@ -13,6 +13,9 @@ verilate(VInstructionFetchStage_tb
 		{{ instruction_memory_name }}_AddressTranslator.v 
 		{{ instruction_fetch_stage_name }}_InstructionFetchStage.v
 		{{ instruction_fetch_stage_name }}_PopCount.v
+		{%- for j in range(issue_buffer_size) %}
+		{{ instruction_fetch_stage_name }}_{{ j }}_ForwardLookupTable.v
+		{%- endfor %}
 	TRACE SYSTEMC COVERAGE
 	INCLUDE_DIRECTORIES "."
 )
