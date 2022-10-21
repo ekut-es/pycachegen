@@ -73,6 +73,7 @@ module {{ name }}_InstructionFetchStage
 
 	// registers that track if an issue buffer slot was assigned
 	reg issue_buffer_slot_assigned [{{ issue_buffer_size }}-1:0];
+	reg forward_port_in_use [{{ forward_ports }}-1:0];
 	reg [$clog2({{ forward_ports }})-1:0] issue_buffer_slot_assignment [{{ issue_buffer_size }}-1:0]; 
 	
 	// returns how much space there is in the issue buffer
@@ -85,17 +86,24 @@ module {{ name }}_InstructionFetchStage
 	);
 
 	// valid registers for forward ports
+	reg [{{ forward_ports }}-1:0] instruction_valid;
+	// when an instruction is assigned to a forward port wait delay cycles
+	// until the valid signal is set to 1'b0 and the instruction is removed from
+	// the issue buffer
+	reg [0:0] instruction_valid_unassign_delay [{{ forward_ports }}-1:0];
+
 	{%- for i in range(forward_ports) %}
-	reg instruction_valid_{{ i }};
+	assign instruction_valid_{{ i }}_o = instruction_valid[{{ i }}];
 	{%- endfor %}
 
 	// MUX from each issue buffer slot to a forward port
+	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_to_forward_port_mux_select [{{ issue_buffer_size }}-1:0];
+
 	{%- for i in range(forward_ports) %}	
 	// MUX for forward port {{i}}
-	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_to_forward_port_mux_select_{{ i }};
 	assign instruction_{{ i }}_o = 
 	{% for j in range(issue_buffer_size) -%}	
-		(issue_buffer_slot_to_forward_port_mux_select_{{ i }} == {{j}}) ? issue_buffer[{{j}}] : 
+		(issue_buffer_slot_to_forward_port_mux_select[{{ i }}] == {{j}}) ? issue_buffer[{{j}}] : 
 	{% endfor -%}
 	{INSTRUCTION_SIZE{1'b0}};
 	{% endfor %}
@@ -133,7 +141,8 @@ module {{ name }}_InstructionFetchStage
 
 			// reset select registers for MUXes
 			{%- for i in range(forward_ports) %}	
-			issue_buffer_slot_to_forward_port_mux_select_{{ i }} <= 0;
+			issue_buffer_slot_to_forward_port_mux_select[{{ i }}] <= 0;
+			instruction_valid[{{ i }}] <= 0;
 			{% endfor -%}
 		end
 		else begin
@@ -192,6 +201,10 @@ module {{ name }}_InstructionFetchStage
 				issue_buffer_slot_assigned[j] = 1'b0;
 			end
 
+			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
+				forward_port_in_use[i] = 1'b0;
+			end
+
 			// check each next_stage_ready_i if a subsequent stage is ready
 			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
 				if(next_stages_ready[i] == 1'b1) begin
@@ -201,14 +214,40 @@ module {{ name }}_InstructionFetchStage
 					// that can be forwarded to this port that is not already assigned
 					// to another port
 					for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
-						$display("target_id of issue_buffer[%d]: %d, forward_port: %d", j, issue_buffer_target_ids[j], issue_buffer_forward_port[j]);
-						if(issue_buffer_forward_port[j] == i[$clog2({{ forward_ports }})-1:0]) begin
-							$display("cadidate");
+						// check if the current issue buffer slot isn't assigned already,
+						// check if current forward port is already in use,
+						// and if the current issue buffer slot can be forwarded to current 
+						/// forward port
+						if((issue_buffer_slot_assigned[j] == 1'b0) && (forward_port_in_use[i] == 1'b0) && (issue_buffer_forward_port[j] == i[$clog2({{ forward_ports }})-1:0])) begin
+							// assign issue buffer slot to current forward port
+							forward_port_in_use[i] = 1'b1;
+							issue_buffer_slot_assigned[j] = 1'b1;
+
+							// set forward port mux to issue buffer slot
+							issue_buffer_slot_to_forward_port_mux_select[i] <= j[$clog2({{ issue_buffer_size }})-1:0];	
+							// set forward port valid to 1'b1
+							instruction_valid[i] <= 1'b1;
+							instruction_valid_unassign_delay[i] <= 1'b1;
+
+							$display("t=%0t: %m assigned issue_buffer[%d] to forward_port: %d", $time, j, issue_buffer_forward_port[j]);
 						end
+					end
+				end
+			end
+
+			// check for each forward port an instructon was assigned to 
+			// if instruction can be removed from issue buffer
+			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
+				if(instruction_valid[i] == 1'b1) begin
+					if(instruction_valid_unassign_delay[i] != 1'b0) begin
+						instruction_valid_unassign_delay[i] <= instruction_valid_unassign_delay[i] - 1;
+					end
+					else begin
+						instruction_valid[i] <= 1'b0;
+						// TODO remove instruction from issue buffer
 					end
 				end
 			end
 		end
 	end
-
 endmodule

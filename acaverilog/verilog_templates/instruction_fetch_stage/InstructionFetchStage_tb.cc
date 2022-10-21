@@ -61,7 +61,13 @@ int sc_main(int argc, char** argv) {
     sc_start(15, SC_NS);
     next_stage_ready_is[0].write(1);
 
-    sc_start(80, SC_NS);
+    // wait until first instruction arrives at forward port 0
+    while(instruction_valid_os[0].read() == 0) {
+        sc_start(1, SC_NS);
+    }
+
+    std::cout << "t=" << sc_time_stamp() << ": received instruction" << std::endl;
+    sc_start(10, SC_NS);
 
     // end simulation with reset
     reset_n_i.write(0);
