@@ -83,9 +83,16 @@ int sc_main(int argc, char** argv) {
     assert(instruction_valid_os[{{ i }}] == 0);
     {% endfor -%}
 
+    uint32_t instruction_mask = 0x0;
+
+    for(int i = 0; i < {{ instruction_size }}; i++) {
+        instruction_mask = instruction_mask | (0x1 << i);
+    }
+
     // for each forward port insert one instruction
     {%- for i in range(forward_ports) %}
-    uint32_t instruction_{{ i }} = 0xF0000000 | {{ i }} << {{ target_id_start_bit }};
+    uint32_t instruction_{{ i }} = 0x0 | 0xF << ({{ instruction_size }}-4) | {{ i }} << {{ target_id_start_bit }};
+    
     instruction_i.write(instruction_{{ i }});
     instruction_valid_i.write(1);
 

@@ -46,7 +46,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             target_id_length=self.target_id_config.length,
             instruction_size=self.instruction_size,
             forward_ports=self.forward_ports,
-            forward_ports_size=ceil(log2(self.forward_ports)),
+            forward_ports_size=max(ceil(log2(self.forward_ports)), 1),
             forward_port_map=self.forward_port_map)
 
         # generate forward lookup table verilog
@@ -57,7 +57,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             name=self.name,
             target_id_length=self.target_id_config.length,
             forward_ports=self.forward_ports,
-            forward_ports_size=ceil(log2(self.forward_ports)),
+            forward_ports_size=max(ceil(log2(self.forward_ports)), 1),
             forward_port_map=self.forward_port_map)
 
     def generate_test_bench(self,
