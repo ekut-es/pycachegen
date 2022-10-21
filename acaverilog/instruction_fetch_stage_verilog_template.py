@@ -70,6 +70,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             port_width,
             address_width=self.instruction_memory_verilog_template.
             address_width,
+            target_id_start_bit=self.target_id_config.start_bit,
+            target_id_length=self.target_id_config.length,
             issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0,
             forward_ports=len(self.forward_port_map),

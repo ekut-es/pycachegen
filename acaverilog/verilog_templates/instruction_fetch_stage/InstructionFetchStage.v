@@ -58,6 +58,19 @@ module {{ name }}_InstructionFetchStage
 	// instruction fetch stage only reads from instruction memory
 	assign write_data_valid_o = {PORT_WIDTH{1'b0}};
 
+	// wire that merges all next_stage_ready_is to make it possible to iterate over them
+	wire next_stages_ready [{{ forward_ports }}-1:0];
+	{%- for i in range(forward_ports) %}
+	assign next_stages_ready[{{ i }}] = next_stage_ready_{{ i }}_i;
+	{%- endfor %}
+
+	// wire that merges all target_ids from the issue_buffer to make 
+	// it possible to iterate over them
+	wire [{{ target_id_length }}-1:0] issue_buffer_target_ids [{{ issue_buffer_size }}-1:0];
+	{%- for j in range(issue_buffer_size) %}
+	assign issue_buffer_target_ids[{{ j }}] = issue_buffer[{{ j }}][{{ target_id_start_bit }}+{{ target_id_length }}-1:{{ target_id_start_bit }}];
+	{%- endfor %}
+
 	// returns how much space there is in the issue buffer
 	{{ name }}_PopCount
 	#(
@@ -86,6 +99,7 @@ module {{ name }}_InstructionFetchStage
 	assign issue_buffer_available_slots = ISSUE_BUFFER_SIZE - issue_buffer_valid_pop_count;
 
 	integer i;
+	integer j;
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
@@ -156,6 +170,19 @@ module {{ name }}_InstructionFetchStage
 				address_valid <= 1'b0;
 				read_in_progress <= 1'b0;
 				program_counter <= program_counter + PORT_WIDTH;
+			end
+
+			// check each next_stage_ready_i if a subsequent stage is ready
+			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
+				if(next_stages_ready[i] == 1'b1) begin
+					$display("t=%0t: %m next_stage_ready_%d_i", $time, i);
+					// if a next stage is ready, check the issue buffer 
+					// from [0] to [issue_buffer_size] if there is an instruction
+					// that can be forwarded to this port that is not already assigned
+					// to another port
+					for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
+					end
+				end
 			end
 		end
 	end
