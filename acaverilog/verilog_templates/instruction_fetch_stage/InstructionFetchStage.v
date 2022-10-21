@@ -201,9 +201,10 @@ module {{ name }}_InstructionFetchStage
 					// that can be forwarded to this port that is not already assigned
 					// to another port
 					for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
-						$display("target_id of issue_buffer[%d]: %d", j, issue_buffer_target_ids[j]);
-						{%- for key, value in forward_port_map.items() %}
-						{% endfor %}
+						$display("target_id of issue_buffer[%d]: %d, forward_port: %d", j, issue_buffer_target_ids[j], issue_buffer_forward_port[j]);
+						if(issue_buffer_forward_port[j] == i[$clog2({{ forward_ports }})-1:0]) begin
+							$display("cadidate");
+						end
 					end
 				end
 			end
