@@ -72,7 +72,8 @@ class InstructionFetchStageVerilogTemplate(ACADLObjectVerilogTemplate):
             address_width,
             issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0,
-            forward_ports=len(self.forward_port_map))
+            forward_ports=len(self.forward_port_map),
+            forward_port_map=self.forward_port_map)
 
         # generate pop count verilog
         read_write_template(self.pop_count_verilog_template_path,

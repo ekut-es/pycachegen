@@ -67,6 +67,22 @@ module {{ name }}_InstructionFetchStage
 		.pop_count_o(issue_buffer_valid_pop_count)
 	);
 
+	// valid registers for forward ports
+	{%- for i in range(forward_ports) %}
+	reg instruction_valid_{{ i }};
+	{%- endfor %}
+
+	// MUX from each issue buffer slot to a forward port
+	{%- for i in range(forward_ports) %}	
+	// MUX for forward port {{i}}
+	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_to_forward_port_mux_select_{{ i }};
+	assign instruction_{{ i }}_o = 
+	{% for j in range(issue_buffer_size) -%}	
+		(issue_buffer_slot_to_forward_port_mux_select_{{ i }} == {{j}}) ? issue_buffer[{{j}}] : 
+	{% endfor -%}
+	{INSTRUCTION_SIZE{1'b0}};
+	{% endfor %}
+
 	assign issue_buffer_available_slots = ISSUE_BUFFER_SIZE - issue_buffer_valid_pop_count;
 
 	integer i;
@@ -86,6 +102,11 @@ module {{ name }}_InstructionFetchStage
 
 			issue_buffer_valid <= {ISSUE_BUFFER_SIZE{1'b0}};
 			issue_buffer_first_free_slot <= 0;
+
+			// reset select registers for MUXes
+			{%- for i in range(forward_ports) %}	
+			issue_buffer_slot_to_forward_port_mux_select_{{ i }} <= 0;
+			{% endfor -%}
 		end
 		else begin
 			// initialize a read from memory if:
