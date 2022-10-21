@@ -75,6 +75,13 @@ module {{ name }}_InstructionFetchStage
 	reg issue_buffer_slot_assigned [{{ issue_buffer_size }}-1:0];
 	reg forward_port_in_use [{{ forward_ports }}-1:0];
 	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_assigned_to_forward_port [{{ forward_ports }}-1:0];
+
+	// registers that track which issue buffer slot has been freed after a forward
+	reg issue_buffer_slot_freed [{{ issue_buffer_size }}-1:0];
+
+	// registers that track how many slots an instruction has to be moved forward
+	// after instruction in a slot before it was removed
+	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_move_up [{{ issue_buffer_size }}-1:0];
 	
 	// returns how much space there is in the issue buffer
 	{{ name }}_PopCount
@@ -122,6 +129,8 @@ module {{ name }}_InstructionFetchStage
 
 	integer i;
 	integer j;
+	integer k;
+	integer freed_counter;
 	
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
@@ -199,6 +208,7 @@ module {{ name }}_InstructionFetchStage
 			// assigned in the next for loop
 			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
 				issue_buffer_slot_assigned[j] = 1'b0;
+				issue_buffer_slot_freed[j] = 1'b0;
 			end
 
 			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
@@ -249,10 +259,30 @@ module {{ name }}_InstructionFetchStage
 
 						// TODO instead of deleting contents of issue buffer slot move next
 						// slot forward and adjust issue_buffer_first_free_slot
-						issue_buffer[issue_buffer_slot_assigned_to_forward_port[i]] <= { {{ data_width }}{1'b0}};
-						issue_buffer_valid[issue_buffer_slot_assigned_to_forward_port[i]] <= 1'b0;
+						//issue_buffer[issue_buffer_slot_assigned_to_forward_port[i]] <= { {{ data_width }}{1'b0}};
+						//issue_buffer_valid[issue_buffer_slot_assigned_to_forward_port[i]] <= 1'b0;
+						issue_buffer_slot_freed[issue_buffer_slot_assigned_to_forward_port[i]] = 1'b1;  
 					end
 				end
+			end
+
+			// determine how many slots an instruction in the issue buffer has to move up
+			// after an instruction in a slot before it was removed (the first slot can be skipped
+			// because it can not move up)
+			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
+				$display("%d: %d", j, issue_buffer_slot_freed[j]);
+			end
+
+			for(j = 1; j < {{ issue_buffer_size }}; j = j + 1) begin
+				freed_counter = 0;
+				// iterate over all issue buffer slots infront of current issue buffer slot
+				for(k = j-1; k >= 0; k = k - 1) begin
+					if(issue_buffer_first_free_slot[k] == 1'b1) begin
+						freed_counter = freed_counter + 1;
+					end
+					$display("current: %d, before: %d, freed: %d", j ,k, issue_buffer_first_free_slot[k]);
+				end
+				$display("freed_counter: %d\n", freed_counter);
 			end
 		end
 	end
