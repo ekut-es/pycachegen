@@ -38,6 +38,11 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 	wire issued_instruction_valid_{{ i }};
 	{% endfor %}
 
+	{%- for i in range(forward_ports) %}
+	assign instruction_{{ i }}_o = issued_instruction_{{ i }};
+	assign instruction_valid_{{ i }}_o = issued_instruction_valid_{{ i }};
+	{% endfor %}
+
 	{{ instruction_memory_name }}_Memory imem(
 		.clk_i(clk_i),
 		.reset_n_i(reset_n_i),
@@ -73,8 +78,8 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 
 		{%- for i in range(forward_ports) %}
 		.next_stage_ready_{{ i }}_i(next_stage_ready_{{ i }}_i),
-		.instruction_{{ i }}_o(instruction_{{ i }}_o),
-		.instruction_valid_{{ i }}_o(instruction_valid_{{ i }}_o){{ "," if not loop.last }}
+		.instruction_{{ i }}_o(issued_instruction_{{ i }}),
+		.instruction_valid_{{ i }}_o(issued_instruction_valid_{{ i }}){{ "," if not loop.last }}
 		{% endfor %}
 	);
 

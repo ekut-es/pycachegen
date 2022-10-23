@@ -20,10 +20,20 @@ module {{ name }}_Scoreboard
 	output full_o
 );
 
+	typedef enum[1:0] {ISSUE = 0, READ_REGISTERS = 1, EXECUTION = 2, WRITE_REGSISTER = 3} instruction_state;
+
 	reg full;
 	assign full_o = full;
 
-	typedef enum[1:0] {ISSUE = 0, READ_REGISTERS = 1, EXECUTION = 2, WRITE_REGSISTER = 3} instruction_state;
+	// bundle instruction inputs into a wire to be able to iterate over them
+	wire [INSTRUCTION_SIZE-1:0] issued_instruction [MAX_INSTRUCTION_ISSUES-1:0];
+	wire issued_instruction_valid [MAX_INSTRUCTION_ISSUES-1:0];
+
+	{%- for i in range(max_instruction_issues) %}
+	assign issued_instruction[{{ i }}] = issued_instruction_{{ i }}_i;
+	assign issued_instruction_valid[{{ i }}] = issued_instruction_valid_{{ i }}_i;
+	{% endfor -%}
+
 
 	// registers for tracking instruction states 
 	reg [1:0] instruction_status [MAX_INSTRUCTIONS-1:0];
