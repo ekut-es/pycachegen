@@ -72,7 +72,7 @@ int sc_main(int argc, char** argv) {
 
     // read from all ports at once
     {%- for i in range(forward_ports) %}
-    next_stage_ready_is[{{ i }}].write(1);
+    //next_stage_ready_is[{{ i }}].write(1);
     {% endfor -%}
 
     sc_start(10, SC_NS);

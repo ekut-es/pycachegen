@@ -42,6 +42,7 @@ module {{ name }}_InstructionFetchStage
 	reg read_last_instruction;
 	reg[DATA_WIDTH-1:0] issue_buffer [ISSUE_BUFFER_SIZE-1:0];
 	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid;
+	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_tmp;
 	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_pop_count;
 	// signed is needed here to protect against an underflow when the number
 	// of available buffer slots is calculated
@@ -146,7 +147,7 @@ module {{ name }}_InstructionFetchStage
 
 			// reset issue buffer
 			for(i = 0; i < ISSUE_BUFFER_SIZE; i = i + 1) begin
-				issue_buffer[i] = {DATA_WIDTH{1'b0}};
+				issue_buffer[i] <= {DATA_WIDTH{1'b0}};
 			end
 
 			issue_buffer_valid <= {ISSUE_BUFFER_SIZE{1'b0}};
@@ -200,7 +201,12 @@ module {{ name }}_InstructionFetchStage
 				end
 
 				//issue_buffer_first_free_slot <= issue_buffer_first_free_slot + PORT_WIDTH;
-				issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp + PORT_WIDTH;
+				if(read_last_instruction == 1'b0) begin
+					issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp + PORT_WIDTH;
+				end
+				else begin
+					issue_buffer_first_free_slot_tmp = {{ issue_buffer_size }};
+				end
 
 				// initialize a read from memory if:
 				// - the issue buffer has space left
@@ -223,6 +229,7 @@ module {{ name }}_InstructionFetchStage
 			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
 				issue_buffer_slot_assigned[j] = 1'b0;
 				issue_buffer_slot_freed[j] = 1'b0;
+				issue_buffer_valid_tmp[j] = issue_buffer_valid[j];
 			end
 
 			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
@@ -292,15 +299,17 @@ module {{ name }}_InstructionFetchStage
 			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
 				if(issue_buffer_slot_freed[j] == 1'b0 && issue_buffer_slot_move_up[j] != 0) begin
 					new_issue_buffer_slot = j[$clog2({{ issue_buffer_size }})-1:0]-issue_buffer_slot_move_up[j];
+
 					issue_buffer[new_issue_buffer_slot] <= issue_buffer[j];
-					issue_buffer_valid[new_issue_buffer_slot] <= 1'b1;
 					issue_buffer[j] <= 0;
 				end
 			end
 
 			// set last issue buffer slot valids according to the amount of freed slots
-			for(j = {{ issue_buffer_size }}-1; j >= {{ issue_buffer_size }}-1-freed_counter; j = j - 1) begin
-				issue_buffer_valid[j] <= 1'b0;
+			if(freed_counter != 0) begin
+				issue_buffer_valid_tmp = issue_buffer_valid;
+				issue_buffer_valid_tmp = issue_buffer_valid_tmp >> freed_counter;
+				issue_buffer_valid <= issue_buffer_valid_tmp;
 			end
 
 			issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp-freed_counter;
