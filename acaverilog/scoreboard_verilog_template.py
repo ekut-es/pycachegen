@@ -5,12 +5,12 @@ from .utils import read_write_template
 
 class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self, size: int, max_source_registers: int,
+    def __init__(self, max_instructions: int, max_source_registers: int,
                  max_target_registers: int) -> None:
         scoreboard = ACADLObject(name="scoreboard")
         super().__init__(scoreboard)
 
-        self.size = size
+        self.max_instructions = max_instructions
         self.max_source_registers = max_source_registers
         self.max_target_registers = max_target_registers
 
@@ -30,7 +30,7 @@ class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
             target_dir_path +
             f"/{self.name}_{self.scoreboard_verilog_file_name}",
             name=self.name,
-            size=self.size,
+            max_instructions=self.max_instructions,
             max_source_registers=self.max_source_registers,
             max_target_registers=self.max_target_registers)
 
