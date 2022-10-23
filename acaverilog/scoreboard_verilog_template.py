@@ -5,9 +5,11 @@ from .utils import read_write_template
 
 class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self) -> None:
+    def __init__(self, size: int) -> None:
         scoreboard = ACADLObject(name="scoreboard")
         super().__init__(scoreboard)
+
+        self.size = size
 
         self.scoreboard_verilog_file_name = "Scoreboard.v"
         self.tb_file_name = "Scoreboard_tb.cc"
@@ -24,7 +26,8 @@ class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
             self.scoreboard_verilog_template_path,
             target_dir_path +
             f"/{self.name}_{self.scoreboard_verilog_file_name}",
-            name=self.name)
+            name=self.name,
+            size=self.size)
 
     def generate_test_bench(self,
                             target_dir_path: str,

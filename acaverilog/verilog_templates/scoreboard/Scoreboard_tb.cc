@@ -20,11 +20,14 @@ int sc_main(int argc, char** argv) {
 	sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
 	sc_signal<bool> reset_n_i;
 
+	sc_signal<bool> full_o;
+
     //const std::unique_ptr<V{{ name }}_Memory> memory{new V{{ name }}_Memory{"{{ name }}_Memory"}};
     const std::unique_ptr<V{{ name }}_Scoreboard> scoreboard{new V{{ name }}_Scoreboard{"{{ name }}_Scoreboard"}};
 
 	scoreboard->clk_i(clk_i);
 	scoreboard->reset_n_i(reset_n_i);
+	scoreboard->full_o(full_o);
 	
 	// start simulation and trace
     std::cout << "{{ name }}_Memory start!" << std::endl;

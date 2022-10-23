@@ -1,18 +1,21 @@
 module {{ name }}_Scoreboard
 #(
+	parameter SIZE = {{ size }}
 ) (
 	input clk_i,
-	input reset_n_i
+	input reset_n_i,
+
+	output full_o
 );
 
-	reg [3:0] counter;
+	reg full;
+	assign full_o = full;
 
 	always @(posedge clk_i, negedge reset_n_i) begin
 		if(reset_n_i == 1'b0) begin
-			counter <= 0;
+			full <= 0;
 		end
 		else begin
-			counter <= counter + 1;
 		end
 	end
 endmodule
