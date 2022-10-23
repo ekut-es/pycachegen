@@ -45,6 +45,7 @@ module {{ name }}_InstructionFetchStage
 	// signed is needed here to protect against an underflow when the number
 	// of available buffer slots is calculated
 	wire signed[ISSUE_BUFFER_SIZE-1:0] issue_buffer_available_slots;
+	integer issue_buffer_first_free_slot_tmp;
 	integer issue_buffer_first_free_slot;
 
 	// instruction fetch stage only reads from instruction memory
@@ -82,6 +83,7 @@ module {{ name }}_InstructionFetchStage
 	// registers that track how many slots an instruction has to be moved forward
 	// after instruction in a slot before it was removed
 	reg [$clog2({{ issue_buffer_size }})-1:0] issue_buffer_slot_move_up [{{ issue_buffer_size }}-1:0];
+	reg [$clog2({{ issue_buffer_size }})-1:0] new_issue_buffer_slot;
 	
 	// returns how much space there is in the issue buffer
 	{{ name }}_PopCount
@@ -155,6 +157,8 @@ module {{ name }}_InstructionFetchStage
 			{% endfor -%}
 		end
 		else begin
+			issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot;
+
 			// initialize a read from memory if:
 			// - a read is done
 			// - no read has been initialized yet
@@ -187,7 +191,8 @@ module {{ name }}_InstructionFetchStage
 					issue_buffer_valid[i] <= 1'b1;
 				end
 
-				issue_buffer_first_free_slot <= issue_buffer_first_free_slot + PORT_WIDTH;
+				//issue_buffer_first_free_slot <= issue_buffer_first_free_slot + PORT_WIDTH;
+				issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp + PORT_WIDTH;
 
 				// initialize a read from memory if:
 				// - the issue buffer has space left
@@ -271,19 +276,38 @@ module {{ name }}_InstructionFetchStage
 			// because it can not move up)
 			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
 				$display("%d: %d", j, issue_buffer_slot_freed[j]);
+				//issue_buffer_valid[j] <= 1'b0;
 			end
 
 			for(j = 1; j < {{ issue_buffer_size }}; j = j + 1) begin
 				freed_counter = 0;
-				// iterate over all issue buffer slots infront of current issue buffer slot
+
 				for(k = j-1; k >= 0; k = k - 1) begin
-					if(issue_buffer_first_free_slot[k] == 1'b1) begin
+					if(issue_buffer_slot_freed[k] == 1'b1) begin
 						freed_counter = freed_counter + 1;
 					end
-					$display("current: %d, before: %d, freed: %d", j ,k, issue_buffer_first_free_slot[k]);
 				end
-				$display("freed_counter: %d\n", freed_counter);
+				issue_buffer_slot_move_up[j] = freed_counter[$clog2({{ issue_buffer_size }})-1:0];
 			end
+
+			// move up instructions in issue buffer if it wasn't freed
+			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
+				if(issue_buffer_slot_freed[j] == 1'b0 && issue_buffer_slot_move_up[j] != 0) begin
+					new_issue_buffer_slot = j[$clog2({{ issue_buffer_size }})-1:0]-issue_buffer_slot_move_up[j];
+					issue_buffer[new_issue_buffer_slot] <= issue_buffer[j];
+					issue_buffer_valid[new_issue_buffer_slot] <= 1'b1;
+					issue_buffer[j] <= 0;
+					//$display("move up %d by %d to %d", j, issue_buffer_slot_move_up[j], j[$clog2({{ issue_buffer_size }})-1:0]-issue_buffer_slot_move_up[j]);
+				end
+			end
+
+			// set last issue buffer slot valids according to the amount of freed slots
+			for(j = {{ issue_buffer_size }}-1; j >= {{ issue_buffer_size }}-1-freed_counter; j = j - 1) begin
+				issue_buffer_valid[j] <= 1'b0;
+			end
+
+			issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp-freed_counter;
+			issue_buffer_first_free_slot <= issue_buffer_first_free_slot_tmp;
 		end
 	end
 endmodule
