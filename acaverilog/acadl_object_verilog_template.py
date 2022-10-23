@@ -1,7 +1,6 @@
 import os
 
 from acadl import ACADLObject
-import acadl
 
 
 class TargetDirNotEmptyException(Exception):

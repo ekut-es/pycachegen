@@ -8,6 +8,15 @@ from math import ceil, log2
 from typing import Dict
 
 
+class TargetIdEqualOrLessThan0(Exception):
+
+    def __init__(self, forward_port_map):
+        self.forward_port_map = forward_port_map
+
+    def __str__(self):
+        return f"Forward port map: {self.forward_port_map} contains target id that is equal or less than 0!"
+
+
 class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
     def __init__(self, pipeline_stage: PipelineStage, instruction_size: int,
@@ -28,6 +37,11 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         if self.acadl_object.latency.int_latency == -1:
             raise LatencyIsNotAnInteger(self.acadl_object,
                                         self.acadl_object.latency)
+
+        # check if forward_port_map target ids are all greater than 0
+        # because a target_id = 0 could lead to an instruction only containing 0
+        if min(forward_port_map.keys()) <= 0:
+            raise TargetIdEqualOrLessThan0(forward_port_map)
 
         self.pipeline_stage_template_dir_path = f"{self.verilog_template_dir_path}/pipeline_stage"
         self.pipeline_stage_verilog_template_path = f"{self.pipeline_stage_template_dir_path}/{self.pipeline_stage_verilog_file_name}"
@@ -69,6 +83,14 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         # generate verilog
         self.generate_verilog(target_dir_path)
 
+        instruction_generation_map = {}
+
+        for forward_port in self.forward_port_map.values():
+            for target_id in self.forward_port_map.keys():
+                if self.forward_port_map[target_id] == forward_port:
+                    instruction_generation_map[forward_port] = target_id
+                    break
+
         # generate SystemC testbench
         read_write_template(
             self.tb_template_path,
@@ -79,7 +101,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             target_id_start_bit=self.target_id_config.start_bit,
             target_id_length=self.target_id_config.length,
             forward_ports=self.forward_ports,
-            forward_port_map=self.forward_port_map)
+            forward_port_map=self.forward_port_map,
+            instruction_generation_map=instruction_generation_map)
 
         # generate CMakeLists.txt
         read_write_template(self.pipeline_stage_template_dir_path +

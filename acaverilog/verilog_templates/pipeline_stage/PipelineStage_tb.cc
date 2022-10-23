@@ -90,25 +90,25 @@ int sc_main(int argc, char** argv) {
     }
 
     // for each forward port insert one instruction
-    {%- for i in range(forward_ports) %}
-    uint32_t instruction_{{ i }} = 0x0 | 0xF << ({{ instruction_size }}-4) | {{ i }} << {{ target_id_start_bit }};
-    
-    instruction_i.write(instruction_{{ i }});
+    {%- for forward_port, target_id in instruction_generation_map.items() %}
+    uint32_t instruction_{{ forward_port }} = 0x0 | 0xF << ({{ instruction_size }}-4) | {{ target_id }} << {{ target_id_start_bit }};
+
+    instruction_i.write(instruction_{{ forward_port }});
     instruction_valid_i.write(1);
 
     // make corresponding next stage ready
-    next_stage_ready_is[{{ forward_port_map[i] }}].write(1);
+    next_stage_ready_is[{{ forward_port }}].write(1);
 
     for(int i = 0; i <= latency; i++) {
-        assert(instruction_os[{{ forward_port_map[i] }}].read() == 0);
-        assert(instruction_valid_os[{{ forward_port_map[i] }}].read() == 0);
+        assert(instruction_os[{{ forward_port }}].read() == 0);
+        assert(instruction_valid_os[{{ forward_port }}].read() == 0);
         sc_start(1, SC_NS);
         instruction_i.write(0);
         instruction_valid_i.write(0);
     }
 
-    assert(instruction_os[{{ forward_port_map[i] }}].read() == instruction_{{ i }});
-    assert(instruction_valid_os[{{ forward_port_map[i] }}].read() == 1);
+    assert(instruction_os[{{ forward_port }}].read() == instruction_{{ forward_port }});
+    assert(instruction_valid_os[{{ forward_port }}].read() == 1);
 
     {% endfor -%}
     sc_start(1, SC_NS);

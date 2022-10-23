@@ -5,7 +5,6 @@ import subprocess
 
 from bitarray import bitarray
 from typing import List
-from .instruction.instruction import Instruction
 from jinja2 import Template
 
 __verilator_root_path__ = os.path.dirname(
