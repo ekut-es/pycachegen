@@ -165,7 +165,6 @@ module {{ name }}_InstructionFetchStage
 			// - the issue buffer has space left
 			// - the instruction memory is ready
 			if(read_done == 1'b1 && initialize_read == 1'b0 && issue_buffer_available_slots >= PORT_WIDTH && instruction_memory_ready_i == 1'b1) begin
-				$display("t=%0t: HERE %d >= ", $time, issue_buffer_available_slots, PORT_WIDTH);
 				initialize_read <= 1'b1;
 				read_done <= 1'b0;
 			end
@@ -174,7 +173,7 @@ module {{ name }}_InstructionFetchStage
 			// - a read was initialized
 			// - the instruction memory is ready
 			if(instruction_memory_ready_i == 1'b1 && initialize_read == 1'b1) begin
-				$display("t=%0t: %m read initialized from address=%d.", $time, program_counter);
+				$display("t=%0t: %m read initialized from address=%0d.", $time, program_counter);
 				address_valid <= 1'b1;
 				read_in_progress <= 1'b1;
 				initialize_read <= 1'b0;
@@ -183,7 +182,7 @@ module {{ name }}_InstructionFetchStage
 
 			// a read is in progress and the instruction memory has valid data
 			if(read_in_progress == 1'b1 && initialize_read == 1'b0 && read_data_valid_i > 0) begin
-				$display("t=%0t: %m read from address=%d with data=%h.", $time, program_counter, read_data_i);
+				$display("t=%0t: %m read from address=%0d with data=%h.", $time, program_counter, read_data_i);
 				read_data <= read_data_i;
 
 				for(i = issue_buffer_first_free_slot; i < issue_buffer_first_free_slot+PORT_WIDTH; i = i + 1) begin
@@ -223,7 +222,7 @@ module {{ name }}_InstructionFetchStage
 			// check each next_stage_ready_i if a subsequent stage is ready
 			for(i = 0; i < {{ forward_ports }}; i = i + 1) begin
 				if(next_stages_ready[i] == 1'b1) begin
-					$display("t=%0t: %m next_stage_ready_%d_i", $time, i);
+					$display("t=%0t: %m next_stage_ready_%0d_i", $time, i);
 					// if a next stage is ready, check the issue buffer 
 					// from [0] to [issue_buffer_size] if there is an instruction
 					// that can be forwarded to this port that is not already assigned
@@ -245,7 +244,7 @@ module {{ name }}_InstructionFetchStage
 							instruction_valid[i] <= 1'b1;
 							instruction_valid_unassign_delay[i] <= 1'b1;
 
-							$display("t=%0t: %m assigned issue_buffer[%d] to forward_port: %d", $time, j, issue_buffer_forward_port[j]);
+							$display("t=%0t: %m assigned issue_buffer[%0d] to forward_port: %0d", $time, j, issue_buffer_forward_port[j]);
 						end
 					end
 				end
@@ -260,12 +259,6 @@ module {{ name }}_InstructionFetchStage
 					end
 					else begin
 						instruction_valid[i] <= 1'b0;
-						$display("t=%0t: %m remove instruction from issue buffer slot %d", $time, issue_buffer_slot_assigned_to_forward_port[i]);
-
-						// TODO instead of deleting contents of issue buffer slot move next
-						// slot forward and adjust issue_buffer_first_free_slot
-						//issue_buffer[issue_buffer_slot_assigned_to_forward_port[i]] <= { {{ data_width }}{1'b0}};
-						//issue_buffer_valid[issue_buffer_slot_assigned_to_forward_port[i]] <= 1'b0;
 						issue_buffer_slot_freed[issue_buffer_slot_assigned_to_forward_port[i]] = 1'b1;  
 					end
 				end
@@ -274,11 +267,6 @@ module {{ name }}_InstructionFetchStage
 			// determine how many slots an instruction in the issue buffer has to move up
 			// after an instruction in a slot before it was removed (the first slot can be skipped
 			// because it can not move up)
-			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
-				$display("%d: %d", j, issue_buffer_slot_freed[j]);
-				//issue_buffer_valid[j] <= 1'b0;
-			end
-
 			for(j = 1; j < {{ issue_buffer_size }}; j = j + 1) begin
 				freed_counter = 0;
 
@@ -297,7 +285,6 @@ module {{ name }}_InstructionFetchStage
 					issue_buffer[new_issue_buffer_slot] <= issue_buffer[j];
 					issue_buffer_valid[new_issue_buffer_slot] <= 1'b1;
 					issue_buffer[j] <= 0;
-					//$display("move up %d by %d to %d", j, issue_buffer_slot_move_up[j], j[$clog2({{ issue_buffer_size }})-1:0]-issue_buffer_slot_move_up[j]);
 				end
 			end
 
