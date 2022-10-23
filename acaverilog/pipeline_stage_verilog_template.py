@@ -21,7 +21,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         self.instruction_size = instruction_size
         self.target_id_config = target_id_config
-        self.forward_ports = len(set(forward_port_map.values()))
+        self.forward_ports = max(forward_port_map.values()) + 1
         self.forward_port_map = forward_port_map
 
         # check if latency is an integer

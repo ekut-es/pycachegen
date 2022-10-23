@@ -59,24 +59,22 @@ int sc_main(int argc, char** argv) {
 
     // run test bench
     sc_start(15, SC_NS);
-    //next_stage_ready_is[0].write(1);
-    //next_stage_ready_is[2].write(1);
 
-    // wait until first instruction arrives at forward port 0
-    /*
-    while(instruction_valid_os[0].read() == 0) {
+    // read once from each forward port
+    {%- for i in range(forward_ports) %}
+    next_stage_ready_is[{{ i }}].write(1);
+
+    while(instruction_valid_os[{{ i }}].read() == 0) {
         sc_start(1, SC_NS);
     }
-    next_stage_ready_is[0].write(0);
-    */
-    /*
-    // wait until first instruction arrives at forward port 0
-    while(instruction_valid_os[2].read() == 0) {
-        sc_start(1, SC_NS);
-    }
-    */
+    next_stage_ready_is[{{ i }}].write(0);
+    {% endfor -%}
 
-    std::cout << "t=" << sc_time_stamp() << ": received instruction" << std::endl;
+    // read from all ports at once
+    {%- for i in range(forward_ports) %}
+    next_stage_ready_is[{{ i }}].write(1);
+    {% endfor -%}
+
     sc_start(10, SC_NS);
 
     // end simulation with reset

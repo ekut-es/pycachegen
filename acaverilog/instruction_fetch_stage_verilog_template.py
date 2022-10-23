@@ -25,6 +25,16 @@ class IssueBufferSmallerThanPortWidth(Exception):
         return f"InstructionFetchStage '{self.instruction_fetch_stage.name}'.issue_buffer_size = {self.instruction_fetch_stage.issue_buffer_size}! smaller than Memory '{self.instruction_memory.name}.'.port_width = {self.instruction_memory.port_width}!"
 
 
+class NotAllForwardPortsUsedForTestBench(Exception):
+
+    def __init__(self, forward_port_map, forward_ports):
+        self.forward_port_map = forward_port_map
+        self.forward_ports = forward_ports
+
+    def __str__(self):
+        return f"forward_port_map: {self.forward_port_map} does not use all {self.forward_ports} forward ports!"
+
+
 class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
 
     def __init__(self, instruction_fetch_stage: InstructionFetchStage,
@@ -79,7 +89,6 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             target_id_length=self.target_id_config.length,
             issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0,
-            last_address=3,
             forward_ports=self.forward_ports,
             forward_port_map=self.forward_port_map)
 
@@ -106,6 +115,13 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
                             ignore_target_dir_contents: bool = False) -> None:
         super().generate_test_bench(target_dir_path,
                                     ignore_target_dir_contents)
+
+        # check if forward_port_map assigns at least one target id to a forward_port
+        forward_port_map_values = set(self.forward_port_map.values())
+        for i in range(self.forward_ports):
+            if i not in forward_port_map_values:
+                raise NotAllForwardPortsUsedForTestBench(
+                    self.forward_port_map, self.forward_ports)
 
         # generate verilog for instruction fetch stage itself
         self.generate_verilog(target_dir_path)

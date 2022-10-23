@@ -39,16 +39,15 @@ module {{ name }}_InstructionFetchStage
 	reg initialize_read;
 	reg read_in_progress;
 	reg read_done;
+	reg read_last_instruction;
 	reg[DATA_WIDTH-1:0] issue_buffer [ISSUE_BUFFER_SIZE-1:0];
 	reg[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid;
 	wire[ISSUE_BUFFER_SIZE-1:0] issue_buffer_valid_pop_count;
-
 	// signed is needed here to protect against an underflow when the number
 	// of available buffer slots is calculated
 	wire signed[ISSUE_BUFFER_SIZE-1:0] issue_buffer_available_slots;
 	integer issue_buffer_first_free_slot_tmp;
 	integer issue_buffer_first_free_slot;
-	reg read_last_instruction;
 
 	// instruction fetch stage only reads from instruction memory
 	assign read_write_select_o = 1'b0;
@@ -167,7 +166,7 @@ module {{ name }}_InstructionFetchStage
 			// - no read has been initialized yet
 			// - the issue buffer has space left
 			// - the instruction memory is ready
-			// - the last instruction (only 0) wasn't read yet
+			// - the last instruction wasn't read yet
 			if(read_done == 1'b1 && initialize_read == 1'b0 && issue_buffer_available_slots >= PORT_WIDTH && instruction_memory_ready_i == 1'b1 && read_last_instruction == 1'b0) begin
 				initialize_read <= 1'b1;
 				read_done <= 1'b0;
@@ -190,11 +189,8 @@ module {{ name }}_InstructionFetchStage
 				read_data <= read_data_i;
 
 				for(i = issue_buffer_first_free_slot; i < issue_buffer_first_free_slot+PORT_WIDTH; i = i + 1) begin
-					// check if the instruction consists of only zeros
-					// if that is the case the last instruction was reached
 					issue_buffer[i] = read_data_i[i*DATA_WIDTH +: DATA_WIDTH];
-
-					if(issue_buffer[i] == 0) begin
+					if(issue_buffer[i] == {DATA_WIDTH{1'b0}}) begin
 						issue_buffer_valid[i] <= 1'b0;
 						read_last_instruction = 1'b1;
 					end
@@ -209,9 +205,8 @@ module {{ name }}_InstructionFetchStage
 				// initialize a read from memory if:
 				// - the issue buffer has space left
 				// - the instruction memory is ready
-				// - the last instruction (only 0) wasn't read yet
+				// - the last instruction wasn't read yet
 				if((issue_buffer_available_slots - PORT_WIDTH >= PORT_WIDTH) && instruction_memory_ready_i == 1'b1 && read_last_instruction == 1'b0) begin
-					$display("HERE PC:  %d", program_counter);
 					initialize_read <= 1'b1;
 				end
 				else begin
@@ -297,7 +292,7 @@ module {{ name }}_InstructionFetchStage
 			for(j = 0; j < {{ issue_buffer_size }}; j = j + 1) begin
 				if(issue_buffer_slot_freed[j] == 1'b0 && issue_buffer_slot_move_up[j] != 0) begin
 					new_issue_buffer_slot = j[$clog2({{ issue_buffer_size }})-1:0]-issue_buffer_slot_move_up[j];
-					issue_buffer[new_issue_buffer_slot] = issue_buffer[j];
+					issue_buffer[new_issue_buffer_slot] <= issue_buffer[j];
 					issue_buffer_valid[new_issue_buffer_slot] <= 1'b1;
 					issue_buffer[j] <= 0;
 				end
