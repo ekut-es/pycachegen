@@ -79,6 +79,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             target_id_length=self.target_id_config.length,
             issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0,
+            last_address=3,
             forward_ports=self.forward_ports,
             forward_port_map=self.forward_port_map)
 
@@ -150,7 +151,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             write_addresses_config=write_addresses_config,
             immediates_config=immediates_config)
 
-        num_instructions = 10
+        num_instructions = 6
 
         add_0 = ACADLInstruction(id=0,
                                  size=16,
