@@ -6,8 +6,8 @@ from .utils import read_write_template
 class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
 
     def __init__(self, max_instructions: int, functional_units: int,
-                 max_source_registers: int,
-                 max_destination_registers: int) -> None:
+                 max_source_registers: int, max_destination_registers: int,
+                 max_instruction_issues: int, instruction_size: int) -> None:
         scoreboard = ACADLObject(name="scoreboard")
         super().__init__(scoreboard)
 
@@ -15,6 +15,8 @@ class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
         self.functional_units = functional_units
         self.max_source_registers = max_source_registers
         self.max_destination_registers = max_destination_registers
+        self.max_instruction_issues = max_instruction_issues
+        self.instruction_size = instruction_size
 
         self.scoreboard_verilog_file_name = "Scoreboard.v"
         self.tb_file_name = "Scoreboard_tb.cc"
@@ -35,7 +37,9 @@ class ScoreboardVerilogTemplate(ACADLObjectVerilogTemplate):
             max_instructions=self.max_instructions,
             functional_units=self.functional_units,
             max_source_registers=self.max_source_registers,
-            max_destination_registers=self.max_destination_registers)
+            max_destination_registers=self.max_destination_registers,
+            max_instruction_issues=self.max_instruction_issues,
+            instruction_size=self.instruction_size)
 
     def generate_test_bench(self,
                             target_dir_path: str,

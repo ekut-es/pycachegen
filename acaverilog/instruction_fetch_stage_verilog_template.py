@@ -204,13 +204,17 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
         imem0v.generate_verilog(target_dir_path)
 
         # generate verilog for scoreboard
-        s0 = ScoreboardVerilogTemplate(max_instructions=8,
-                                       functional_units=2,
-                                       max_source_registers=2,
-                                       max_destination_registers=1)
+        s0 = ScoreboardVerilogTemplate(
+            max_instructions=8,
+            functional_units=2,
+            max_source_registers=2,
+            max_destination_registers=1,
+            max_instruction_issues=self.forward_ports,
+            instruction_size=self.instruction_memory_verilog_template.
+            acadl_object.data_width)
         s0.generate_verilog(target_dir_path)
 
-        # generate verilog for mem-ifs wrapper
+        # generate verilog for mem-ifs-scoreboard wrapper
         imfsw_name = "imfsw0"
 
         read_write_template(

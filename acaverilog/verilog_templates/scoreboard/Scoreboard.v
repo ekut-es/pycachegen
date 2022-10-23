@@ -4,11 +4,19 @@ module {{ name }}_Scoreboard
 	parameter FUNCTIONAL_UNITS = {{ functional_units }},
 	parameter MAX_SOURCE_REGISTERS = {{ max_source_registers }},
 	parameter MAX_DESTINATION_REGISTERS = {{ max_destination_registers }},
-	parameter REGISTER_SIZE = {{ register_size|default(32, true)}}
+	parameter REGISTER_SIZE = {{ register_size|default(32, true)}},
+	parameter MAX_INSTRUCTION_ISSUES = {{ max_instruction_issues }},
+	parameter INSTRUCTION_SIZE = {{ instruction_size }}
 ) (
 	input clk_i,
 	input reset_n_i,
 
+	{%- for i in range(max_instruction_issues) %}
+	input [INSTRUCTION_SIZE-1:0] issued_instruction_{{ i }}_i,
+	input issued_instruction_valid_{{ i }}_i,
+	{% endfor -%}
+
+	// 0 if there are enough instruction slots available for MAX_INSTRUCTION_ISSUES
 	output full_o
 );
 
