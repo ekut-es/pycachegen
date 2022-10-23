@@ -16,6 +16,7 @@ verilate(VInstructionFetchStage_tb
 		{%- for j in range(issue_buffer_size) %}
 		{{ instruction_fetch_stage_name }}_{{ j }}_ForwardLookupTable.v
 		{%- endfor %}
+		{{ scoreboard_name }}_Scoreboard.v
 	TRACE SYSTEMC COVERAGE
 	INCLUDE_DIRECTORIES "."
 )

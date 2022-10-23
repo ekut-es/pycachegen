@@ -31,6 +31,8 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 	wire port_ready;
 	wire instruction_memory_ready;
 
+	wire scoreboard_full;
+
 	{{ instruction_memory_name }}_Memory imem(
 		.clk_i(clk_i),
 		.reset_n_i(reset_n_i),
@@ -62,11 +64,19 @@ module {{ name }}_InstructionMemoryFetchStageWrapper
 		.port_ready_i(port_ready),
 		.instruction_memory_ready_i(instruction_memory_ready),
 
+		.scoreboard_full_i(scoreboard_full),
+
 		{%- for i in range(forward_ports) %}
 		.next_stage_ready_{{ i }}_i(next_stage_ready_{{ i }}_i),
 		.instruction_{{ i }}_o(instruction_{{ i }}_o),
 		.instruction_valid_{{ i }}_o(instruction_valid_{{ i }}_o){{ "," if not loop.last }}
 		{% endfor %}
+	);
+
+	{{ scoreboard_name }}_Scoreboard s(
+		.clk_i(clk_i),
+		.reset_n_i(reset_n_i),
+		.full_o(scoreboard_full)
 	);
 
 endmodule

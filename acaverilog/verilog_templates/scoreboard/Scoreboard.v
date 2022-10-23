@@ -3,7 +3,7 @@ module {{ name }}_Scoreboard
 	parameter MAX_INSTRUCTIONS = {{ max_instructions }},
 	parameter FUNCTIONAL_UNITS = {{ functional_units }},
 	parameter MAX_SOURCE_REGISTERS = {{ max_source_registers }},
-	parameter MAX_TARGET_REGISTERS = {{ max_target_registers }},
+	parameter MAX_DESTINATION_REGISTERS = {{ max_destination_registers }},
 	parameter REGISTER_SIZE = {{ register_size|default(32, true)}}
 ) (
 	input clk_i,
@@ -22,8 +22,30 @@ module {{ name }}_Scoreboard
 
 	reg busy [FUNCTIONAL_UNITS-1:0];
 	reg [REGISTER_SIZE-1:0] operation [FUNCTIONAL_UNITS-1:0]; // TODO check if it is really needed
-	// TODO add data structure
-	//reg [REGISTER_SIZE-1:0] 
+
+	// content is the register id
+	// first index is the register number, 
+	// second index is the target id of the functional unit
+	// F_i
+	reg [REGISTER_SIZE-1:0] destination_register [$clog2(MAX_DESTINATION_REGISTERS):0][FUNCTIONAL_UNITS-1:0];
+	// F_j, F_k
+	reg [REGISTER_SIZE-1:0] source_register [$clog2(MAX_SOURCE_REGISTERS):0][FUNCTIONAL_UNITS-1:0];
+
+	// content is the functional unit target id that produces the value
+	// first index is the register
+	// second index is the target id of the functional unit
+	// Q_j, Q_k
+	reg [REGISTER_SIZE-1:0] source_functional_unit [$clog2(MAX_SOURCE_REGISTERS):0][FUNCTIONAL_UNITS-1:0];
+
+	// content is the functional unit target id that produces the value is ready
+	// first index is the register
+	// second index is the target id of the functional unit
+	// R_j, R_k
+	reg [REGISTER_SIZE-1:0] functional_unit_ready [$clog2(MAX_SOURCE_REGISTERS):0][FUNCTIONAL_UNITS-1:0];
+
+	// content is the functional unit target id that writes into register
+	// Result
+	reg [REGISTER_SIZE-1:0] register_writer [$clog2(MAX_SOURCE_REGISTERS):0];
 
 	integer i;
 

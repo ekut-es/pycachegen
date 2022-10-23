@@ -1,8 +1,8 @@
 from typing import Dict
 
 from acaverilog.pipeline_stage_verilog_template import PipelineStageVerilogTemplate
-from .acadl_object_verilog_template import ACADLObjectVerilogTemplate
 from .instruction_memory_verilog_template import InstructionMemoryVerilogTemplate
+from .scoreboard_verilog_template import ScoreboardVerilogTemplate
 from acadl import Memory, InstructionFetchStage, latency_t
 from acadl import Instruction as ACADLInstruction
 from .instruction.instruction import Instruction, create_memory_file_from_instructions
@@ -51,6 +51,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
 
         self.instruction_fetch_stage_verilog_file_name = "InstructionFetchStage.v"
         self.pop_count_verilog_file_name = "PopCount.v"
+        self.scoreboard_verilog_file_name = "Scoreboard.v"
         self.tb_file_name = "InstructionFetchStage_tb.cc"
         self.instruction_memory_fetch_stage_wrapper_verilog_file_name = "InstructionMemoryFetchStageWrapper.v"
 
@@ -67,6 +68,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
         self.instruction_fetch_stage_template_dir_path = f"{self.verilog_template_dir_path}/instruction_fetch_stage"
         self.instruction_fetch_stage_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_fetch_stage_verilog_file_name}"
         self.pop_count_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.pop_count_verilog_file_name}"
+        self.scoreboard_verilog_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.scoreboard_verilog_file_name}"
         self.instruction_memory_fetch_stage_wrapper_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.instruction_memory_fetch_stage_wrapper_verilog_file_name}"
         self.tb_template_path = f"{self.instruction_fetch_stage_template_dir_path}/{self.tb_file_name}"
 
@@ -98,8 +100,8 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
                             f"/{self.name}_{self.pop_count_verilog_file_name}",
                             name=self.name)
 
+        # generate forward lookup tables verilog
         for i in range(self.acadl_object.issue_buffer_size):
-            # generate forward lookup tables verilog
             read_write_template(
                 self.forward_lookup_table_verilog_template_path,
                 target_dir_path +
@@ -201,6 +203,13 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             memory_file_path)
         imem0v.generate_verilog(target_dir_path)
 
+        # generate verilog for scoreboard
+        s0 = ScoreboardVerilogTemplate(max_instructions=8,
+                                       functional_units=2,
+                                       max_source_registers=2,
+                                       max_destination_registers=1)
+        s0.generate_verilog(target_dir_path)
+
         # generate verilog for mem-ifs wrapper
         imfsw_name = "imfsw0"
 
@@ -220,7 +229,8 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             port_width,
             address_width=self.instruction_memory_verilog_template.
             address_width,
-            forward_ports=self.forward_ports)
+            forward_ports=self.forward_ports,
+            scoreboard_name=s0.acadl_object.name)
 
         # generate systemc test bench
         read_write_template(
@@ -237,4 +247,5 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             instruction_memory_name=self.instruction_memory_verilog_template.
             acadl_object.name,
             instruction_memory_fetch_stage_wrapper_name=imfsw_name,
-            issue_buffer_size=self.acadl_object.issue_buffer_size)
+            issue_buffer_size=self.acadl_object.issue_buffer_size,
+            scoreboard_name=s0.acadl_object.name)

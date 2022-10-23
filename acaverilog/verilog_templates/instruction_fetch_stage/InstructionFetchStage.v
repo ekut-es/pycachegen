@@ -25,12 +25,15 @@ module {{ name }}_InstructionFetchStage
 	input port_ready_i,
 	input instruction_memory_ready_i,
 
+	input scoreboard_full_i,
+
 	// forward ports
 	{%- for i in range(forward_ports) %}
 	input next_stage_ready_{{ i }}_i,
 	output[DATA_WIDTH-1:0] instruction_{{ i }}_o,
 	output instruction_valid_{{ i }}_o{{ "," if not loop.last }}
 	{% endfor %}
+
 );
 
 	reg[ADDRESS_WIDTH-1:0] program_counter;
