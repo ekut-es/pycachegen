@@ -312,6 +312,8 @@ module {{ name }}_InstructionFetchStage
 				issue_buffer_valid <= issue_buffer_valid_tmp;
 			end
 
+			// adjust the first free issue buffer slot according to the amount of
+			// freed slots
 			issue_buffer_first_free_slot_tmp = issue_buffer_first_free_slot_tmp-freed_counter;
 			issue_buffer_first_free_slot <= issue_buffer_first_free_slot_tmp;
 		end

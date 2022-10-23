@@ -167,7 +167,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             write_addresses_config=write_addresses_config,
             immediates_config=immediates_config)
 
-        num_instructions = 6
+        num_instructions = 2 * self.forward_ports
 
         add_0 = ACADLInstruction(id=0,
                                  size=16,
