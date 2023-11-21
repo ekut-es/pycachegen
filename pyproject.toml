@@ -24,7 +24,7 @@ dependencies = [
     "bitarray>=2.6.0"
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = ["yapf", "bumpver", "isort", "pip-tools", "unittest", "pre-commit"]

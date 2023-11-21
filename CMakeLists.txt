@@ -60,7 +60,7 @@ add_custom_target(
     COMMAND
         cmake -GNinja -DENABLE_PTHREADS=ON -DENABLE_PHASE_CALLBACKS_TRACING=OFF
         -DCMAKE_CXX_STANDARD=17
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_LIST_DIR}/systemc-2.3.3 ..
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_LIST_DIR}/external/systemc/build ..
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/external/systemc/build)
 
 add_custom_target(
