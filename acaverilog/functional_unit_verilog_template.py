@@ -2,25 +2,23 @@ import os
 
 from acadl_object_verilog_template import ACADLObjectVerilogTemplate, LatencyIsNotAnInteger
 from utils import read_write_template
-from acadl import PipelineStage
+from acadl import FunctionalUnit
 from math import ceil, log2
 from typing import Dict
 from veriloggen import *
 
 
-class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
+class FunctionalUnitVerilogTemplate(ACADLObjectVerilogTemplate):
 
-    def __init__(self, pipeline_stage: PipelineStage,
+    def __init__(self, functional_unit: FunctionalUnit,
                 instruction_size: int = 32) -> None:
-        super().__init__(pipeline_stage)
+        super().__init__(functional_unit)
 
-        self.pipeline_stage_verilog_file_name = "PipelineStage.v"
-        self.tb_file_name = "PipelineStage_tb.cc"
-        self.pipeline_stage_template_dir_path = f"{self.verilog_template_dir_path}/pipeline_stage"
-        self.pipeline_stage_verilog_template_path = f"{self.pipeline_stage_template_dir_path}/{self.pipeline_stage_verilog_file_name}"
-        self.tb_template_path = f"{self.pipeline_stage_template_dir_path}/{self.tb_file_name}"
-
-        self.instruction_size = instruction_size
+        self.functional_unit_verilog_file_name = "FunctionalUnit.v"
+        self.tb_file_name = "FunctionalUnit_tb.cc"
+        self.functional_unit_template_dir_path = f"{self.verilog_template_dir_path}/functional_unit"
+        self.functional_unit_verilog_template_path = f"{self.functional_unit_template_dir_path}/{self.functional_unit_verilog_file_name}"
+        self.tb_template_path = f"{self.functional_unit_template_dir_path}/{self.tb_file_name}"
 
         # check if latency is an integer
         if self.acadl_object.latency.int_latency == -1:
@@ -29,12 +27,13 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         
         if self.acadl_object.latency.int_latency == 0:
             self.acadl_object.latency.int_latency = 1
-        
+
+        self.instruction_size = instruction_size
 
     def generate_module(self) -> Module:
-        # generate pipeline stage module
+        # generate execute stage module
     
-        m = Module(f"{self.name}_PipelineStage")
+        m = Module(f"{self.name}_FunctionalUnit")
             
         LATENCY = m.Parameter('LATENCY', self.acadl_object.latency.int_latency - 1)
 
@@ -43,14 +42,6 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
 
         instruction_i = m.Input('instruction_i', self.instruction_size)
         instruction_valid_i = m.Input('instruction_valid_i')
-        next_stage_ready_i = m.Input('next_stage_ready_i')
-
-        instruction_o = m.Output('instruction_o', self.instruction_size)
-        instruction_valid_o = m.Output('instruction_valid_o')
-        """for i in range(self.forward_ports):
-            next_stage_ready_i.append(m.Input(f'next_stage_ready_{i}_i'))
-            instruction_o.append(m.Output(f'instruction_{i}_o', self.instruction_size))
-            instruction_valid_o.append(m.Output(f'instruction_valid_{i}_o'))"""
         
         ready_o = m.Output('ready_o')
 
@@ -61,27 +52,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
         instruction_valid = m.Reg('instruction_valid')
         ready = m.Reg('ready')
         
-        instruction_cond = m.Wire('instruction_cond')
-        m.Assign(instruction_cond(Cond(AndList(instruction_valid == 1, latency_counter == 0, next_stage_ready_i == 1), 1, 0)))
-        m.Assign(instruction_o(Cond(instruction_cond, instruction, 0)))
-        m.Assign(instruction_valid_o(instruction_cond))
         m.Assign(ready_o(ready))
 
-        # !!
-        # target id ....
-        # !!
-
-        #forward_port_select = m.Wire('forward_port_select', ceil(log2(self.forward_ports)))
-
-        # !!
-        # forward lookup table
-        # !!
-
-        # DEMUX from instruction to forward_port
-        """instruction_cond = []
-        for key, value in self.forward_port_map.items():
-            instruction_cond.append(m.Wire(f'instruction_{value}_cond'))
-            m.Assign(instruction_cond[value](instruction[self.target_id_config.start_bit:self.target_id_config.start_bit + self.target_id_config.length] == key))"""
         
         m.Always(Posedge(clk_i), Negedge(reset_n_i))(
             If(reset_n_i == 0)(
@@ -102,8 +74,8 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
                     latency_counter(latency_counter - 1)
                 ),
 
-                # forward instruction (i.e. reset) if latency counter is 0 and next stage is ready
-                If(AndList(latency_counter == 0, ready == 0, next_stage_ready_i == 1))(
+                # reset if latency counter is 0 and next stage is ready
+                If(AndList(latency_counter == 0, ready == 0))(
                     ready(1),
                     instruction(0),
                     instruction_valid(0),
@@ -124,15 +96,7 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             os.mkdir(target_dir_path)
 
         # generate verilog
-        self.generate_module().to_verilog(filename = target_dir_path + f"/{self.name}_{self.pipeline_stage_verilog_file_name}", for_verilator = True)
-
-        """instruction_generation_map = {}
-
-        for forward_port in self.forward_port_map.values():
-            for target_id in self.forward_port_map.keys():
-                if self.forward_port_map[target_id] == forward_port:
-                    instruction_generation_map[forward_port] = target_id
-                    break"""
+        self.generate_module().to_verilog(filename = target_dir_path + f"/{self.name}_{self.functional_unit_verilog_file_name}", for_verilator = True)
 
         # generate SystemC testbench
         read_write_template(
@@ -142,14 +106,9 @@ class PipelineStageVerilogTemplate(ACADLObjectVerilogTemplate):
             name=self.name,
             latency=self.acadl_object.latency.int_latency,
             instruction_size=self.instruction_size,)
-            #target_id_start_bit=self.target_id_config.start_bit,
-            #target_id_length=self.target_id_config.length,
-            #forward_ports=self.forward_ports,
-            #forward_port_map=self.forward_port_map,
-            #instruction_generation_map=instruction_generation_map)
 
         # generate CMakeLists.txt
-        read_write_template(self.pipeline_stage_template_dir_path +
+        read_write_template(self.functional_unit_template_dir_path +
                             "/CMakeLists.txt",
                             target_dir_path + f"/CMakeLists.txt",
                             name=self.name)

@@ -7,7 +7,7 @@ set_property(
 )
 
 verilate(VMemory_tb 
-	SOURCES {{name}}_Memory.v {{name}}_AddressTranslator.v
+	SOURCES {{name}}_Memory.v
 	TRACE SYSTEMC COVERAGE
 	INCLUDE_DIRECTORIES "."
 )

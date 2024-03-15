@@ -12,6 +12,7 @@ from .instruction.data_field_config import DataFieldConfig, DataFieldType
 from .instruction.instruction_format import InstructionFormat
 from .utils import read_write_template
 from math import ceil, log2
+from veriloggen import *
 
 
 class IssueBufferSmallerThanPortWidth(Exception):
@@ -40,8 +41,8 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
     def __init__(self, instruction_fetch_stage: InstructionFetchStage,
                  instruction_memory_verilog_template:
                  InstructionMemoryVerilogTemplate,
-                 target_id_config: TargetIdConfig,
-                 forward_port_map: Dict[int, int]) -> None:
+                 target_id_config: TargetIdConfig = None,
+                 forward_port_map: Dict[int, int] = None) -> None:
 
         super().__init__(pipeline_stage=instruction_fetch_stage,
                          instruction_size=instruction_memory_verilog_template.
@@ -58,10 +59,10 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
         self.instruction_memory_verilog_template = instruction_memory_verilog_template
 
         # issue_buffer_size has to be at least as large as the port_width
-        if self.acadl_object.issue_buffer_size < instruction_memory_verilog_template.acadl_object.port_width:
+        """if self.acadl_object.issue_buffer_size < instruction_memory_verilog_template.acadl_object.port_width:
             raise IssueBufferSmallerThanPortWidth(
                 self.acadl_object,
-                self.instruction_memory_verilog_template.acadl_object)
+                self.instruction_memory_verilog_template.acadl_object)"""
 
         # TODO checks
 
@@ -74,7 +75,109 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
 
     def generate_verilog(self, target_dir_path: str) -> None:
         # generate instruction fetch stage verilog
-        read_write_template(
+        
+        m = Module(f"{self.name}_InstructionFetchStage")
+        
+        data_width = Parameter('DATA_WIDTH', self.instruction_memory_verilog_template.acadl_object.data_width)
+        instruction_width = Parameter('INSTRUCTION_WIDTH', data_width)
+        max_data_word_distance = Parameter('MAX_DATA_WORD_DISTANCE', self.instruction_memory_verilog_template.max_data_word_distance)
+        address_width = Parameter('ADDRESS_WIDTH', self.instruction_memory_verilog_template.address_width)
+
+        clk_i = m.Input('clk_i')
+        reset_n_i = m.Input('reset_n_i')
+
+        read_write_select_o = m.Output('read_write_select_o')
+        address_o = m.Output('address_o', address_width)
+        data_word_distace_o = m.Output('data_word_distace_o', ceil(log2(max_data_word_distance)))
+        address_valid_o = m.Output('address_valid_o')
+        write_data_o = m.Output('write_data_o', data_width)
+        write_data_valid_o = m.Output('write_data_valid_o')
+        write_done_i = m.Input('write_done_i')
+        read_data_i = m.Input('read_data_i', data_width)
+        read_data_valid_i = m.Input('read_data_valid_i')
+        instruction_memory_ready_i = m.Input('instruction_memory_ready_i')
+
+        next_stage_ready_i = m.Input('next_stage_ready_i')
+        instruction_o = m.Output('instruction_o', instruction_width)
+        instruction_valid_o = m.Output('instruction_valid_o')
+
+
+        address_valid = m.Reg('address_valid')
+        read_data = m.Reg('read_data', data_width)
+        initialize_read = m.Reg('initialize_read')
+        read_in_progress = m.Reg('read_in_progress')
+        read_done = m.Reg('read_done')
+        read_last_instruction = m.Reg('read_last_instruction')
+        instruction_valid = m.Reg('instruction_valid')
+        
+        # instruction fetch stage only reads from instruction memory
+        m.Assign(read_write_select_o(0))
+        m.Assign(address_o(0)) # TODO PROGRAM_COUNTER !!!!!!!!!
+        m.Assign(data_word_distace_o(1))
+        m.Assign(address_valid_o(address_valid))
+        m.Assign(write_data_o(0))
+        m.Assign(write_data_valid_o(0))
+        m.Assign(instruction_valid_o(instruction_valid))
+        m.Assign(instruction_o(0))   # TODO
+
+        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+            If(reset_n_i == 0)(
+                # TODO reset PC
+                address_valid(0),
+                initialize_read(1),
+                read_in_progress(0),
+                read_done(0),
+                read_last_instruction(0),
+                instruction_valid(0)
+            ).Else(
+                # initialize read from memory
+                If(AndList(read_done == 1, initialize_read == 0, instruction_memory_ready_i == 1, read_last_instruction == 0))(
+                    initialize_read(1),
+                    read_done(0)
+                ),
+
+                # start read from memory
+                If(AndList(initialize_read == 1, instruction_memory_ready_i == 1))( 
+                    address_valid(1),
+                    initialize_read(0),
+                    read_in_progress(1),
+                    read_done(0)
+                ),
+
+                # read in progress and memory has valid data
+                If(AndList(read_in_progress == 1, initialize_read == 0, read_data_valid_i == 1))(
+                    read_data(read_data_i),
+                    If(read_data_i == 0)(
+                        read_last_instruction(1)
+                    ).Else(
+                        read_last_instruction(0)
+                    ),
+                    If(AndList(read_last_instruction == 0, instruction_memory_ready_i == 1)(
+                        initialize_read(1)
+                    )).Else(
+                        read_done(1)
+                    ),
+
+                    address_valid(0),
+                    read_in_progress(0)
+                    # TODO PC++
+                ),
+
+                If(next_stage_ready_i == 1)(
+                    instruction_valid(1)
+                ).Else(
+                    instruction_valid(0)
+                ),
+
+                
+            )
+        )
+
+
+
+
+        
+        """read_write_template(
             self.instruction_fetch_stage_verilog_template_path,
             target_dir_path +
             f"/{self.name}_{self.instruction_fetch_stage_verilog_file_name}",
@@ -92,7 +195,7 @@ class InstructionFetchStageVerilogTemplate(PipelineStageVerilogTemplate):
             issue_buffer_size=self.acadl_object.issue_buffer_size,
             initial_address=0,
             forward_ports=self.forward_ports,
-            forward_port_map=self.forward_port_map)
+            forward_port_map=self.forward_port_map)"""
 
         # generate pop count verilog
         read_write_template(self.pop_count_verilog_template_path,

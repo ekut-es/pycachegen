@@ -26,11 +26,11 @@ class ACADLObjectVerilogTemplate():
 
     def __init__(self, acadl_object: ACADLObject) -> None:
         self.acadl_object = acadl_object
-        dir_path = os.path.dirname(os.path.realpath(__file__))
+        self.dir_path = os.path.dirname(os.path.realpath(__file__))
         self.name = acadl_object.name
-        self.verilog_template_dir_path = dir_path + "/verilog_templates/"
+        self.verilog_template_dir_path = self.dir_path + "/tb_templates/"
 
-    def generate_verilog(self, target_dir_path: str) -> None:
+    def generate_module(self) -> None:
         pass
 
     def generate_test_bench(self,

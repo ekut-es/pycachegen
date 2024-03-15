@@ -4,24 +4,26 @@
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
 
+#define USE_CASSERT 0
+#include "assertv.h"
+
 #include "V{{ name }}_Memory.h"
 
 // signals
 sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
 sc_signal<bool> reset_n_i;
 
-sc_vector<sc_signal<bool>> read_write_select_is("read_write_select_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> address_is("address_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> data_word_distance_is("data_word_distance_is", {{ read_write_ports }});
-sc_vector<sc_signal<bool>> address_valid_is("address_valid_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> write_data_is("write_data_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> read_data_os("read_data_os", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> write_data_valid_is("write_data_valid_is", {{ read_write_ports }});
-sc_vector<sc_signal<uint32_t>> read_data_valid_os("read_data_valid_os", {{ read_write_ports }});
-sc_vector<sc_signal<bool>> write_done_os("write_done_os", {{ read_write_ports }});
-sc_vector<sc_signal<bool>> port_ready_os("port_ready_os", {{ read_write_ports }});
+sc_signal<uint32_t> address_i;
+sc_signal<bool> address_valid_i;
+sc_signal<uint32_t> write_data_i;
+sc_signal<bool> write_data_valid_i;
+sc_signal<bool> read_write_select_i;
 
+sc_signal<uint32_t> read_data_o;
+sc_signal<bool> read_data_valid_o;
+sc_signal<bool> write_done_o;
 sc_signal<bool> ready_o;
+
 
 void reset() {
     sc_start(1, SC_NS);
@@ -30,16 +32,14 @@ void reset() {
     reset_n_i.write(1);
     sc_start(1, SC_NS);   
 
-    // check that all output are 0 except for port_ready
-	{%- for i in range(read_write_ports) %}
-    assert(ready_o.read() == 1);
-    assert(write_done_os[{{ i }}].read() == 0);
-    assert(read_data_os[{{ i }}].read() == 0);
-    assert(read_data_valid_os[{{ i }}].read() == 0);
-    assert(port_ready_os[{{ i }}].read() == 1);
-	{% endfor %}
+    // check all outputs
+    assertv(read_data_o.read(), 0);
+    assertv(read_data_valid_o.read(), 0);
+    assertv(write_done_o.read(), 0);
+    assertv(ready_o.read(), 1);
 }
 
+/*
 void set_init_write_signals(int port, int address, int data, int data_word_distance, int valid_bits) {
     read_write_select_is[port].write(1);
     address_is[port].write(address);
@@ -71,6 +71,7 @@ void unset_read_signals(int port) {
     address_valid_is[port].write(0);
     data_word_distance_is[port].write(0);
 }
+*/
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -88,29 +89,16 @@ int sc_main(int argc, char** argv) {
 	memory->clk_i(clk_i);
 	memory->reset_n_i(reset_n_i);
 
-	{%- for i in range(read_write_ports) %}
-	memory->read_write_select_{{ i }}_i(read_write_select_is[{{ i }}]);
-	memory->address_{{ i }}_i(address_is[{{ i }}]);
-	memory->data_word_distance_{{ i }}_i(data_word_distance_is[{{ i }}]);
-	memory->address_valid_{{ i }}_i(address_valid_is[{{ i }}]);
-	memory->write_data_{{ i }}_i(write_data_is[{{ i }}]);
-	memory->write_data_valid_{{ i }}_i(write_data_valid_is[{{ i }}]);
-	memory->write_done_{{ i }}_o(write_done_os[{{ i }}]);
-	memory->read_data_{{ i }}_o(read_data_os[{{ i }}]);
-	memory->read_data_valid_{{ i }}_o(read_data_valid_os[{{ i }}]);
-    memory->port_ready_{{ i }}_o(port_ready_os[{{ i }}]);
-	{% endfor %}
+    memory->address_i(address_i);
+    memory->address_valid_i(address_valid_i);
+    memory->write_data_i(write_data_i);
+    memory->write_data_valid_i(write_data_valid_i);
+    memory->read_write_select_i(read_write_select_i);
 
+    memory->read_data_o(read_data_o);
+    memory->read_data_valid_o(read_data_valid_o);
+    memory->write_done_o(write_done_o);
 	memory->ready_o(ready_o);
-
-    // set bits from 0 to data_width-1 in data_mask
-    uint32_t data_mask = 0;
-    for(int i = 0; i < {{ data_width }}; i++) {
-        data_mask = data_mask << 1;
-        data_mask = data_mask | 0x1;
-    }
-
-    uint32_t data = 0;
 
 	// start simulation and trace
     std::cout << "{{ name }}_Memory start!" << std::endl;
@@ -121,7 +109,7 @@ int sc_main(int argc, char** argv) {
     memory->trace(trace, 99);
 
     if(vcd_file_path.empty()) {
-        trace->open("{{ name }}_Memory.vcd");
+        trace->open("{{ vcd_dir_path }}/{{ name }}_Memory.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -131,13 +119,46 @@ int sc_main(int argc, char** argv) {
 
     sc_start(1, SC_NS);
 
-    data = 42 & data_mask;
+    uint32_t data = 42;
 
-    // write into memory at port 0 to first address in address range
-    set_init_write_signals(0, {{ address_ranges[0][0] }}, data, 1, 0x1);
+    // write into memory to first address in address range
+    address_i.write({{ address_ranges[0][0] }});
+    address_valid_i.write(1);
+    write_data_i.write(data);
+    write_data_valid_i.write(1);
+    read_write_select_i.write(1);
+
     sc_start(2, SC_NS);
-    unset_write_signals(0);
 
+    assertv(read_data_valid_o.read(), 0);
+    assertv(write_done_o.read(), 0);
+    assertv(ready_o.read(), 0);
+
+    sc_start(2, SC_NS);
+
+    assertv(write_done_o.read(), 1);
+    assertv(ready_o.read(), 1);
+
+    address_i.write({{ address_ranges[0][0] }});
+    address_valid_i.write(1);
+    read_write_select_i.write(0);
+
+    sc_start(2, SC_NS);
+
+    assertv(read_data_valid_o.read(), 0);
+    assertv(read_data_o.read(), 0);
+    assertv(ready_o.read(), 0);
+
+    sc_start(3, SC_NS);
+
+    assertv(read_data_valid_o.read(), 1);
+    assertv(read_data_o.read(), data);
+    assertv(ready_o.read(), 1);
+
+
+
+    
+    /*
     // wait until port is ready again
     while(port_ready_os[0].read() != 1) {
         sc_start(1, SC_NS);
@@ -222,6 +243,9 @@ int sc_main(int argc, char** argv) {
         }
     }
     {% endfor %}
+    */
+
+    sc_start(2, SC_NS);
 
 	memory->final();
 

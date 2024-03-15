@@ -171,3 +171,6 @@ systemc-2.3.3
 # macOS
 .DS_Store
 *.dylib
+
+# external
+external/
