@@ -4,7 +4,7 @@
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
 
-#define USE_CASSERT 0
+#define USE_CASSERT {{ '1' if use_cassert else '0' }}
 #include "assertv.h"
 
 #include "V{{ name }}_PipelineStage.h"
@@ -27,12 +27,21 @@ int sc_main(int argc, char** argv) {
     // CAUTION!
     // when input/output wire of verilog module has less than 32 bits
     // sc_signal<uint32_t> is inferred instead of sc_signal<sc_bv<X>>
+
+    // inputs
     sc_signal<uint32_t> instruction_i;
     sc_signal<bool> instruction_valid_i;
-    sc_signal<bool> next_stage_ready_i;
+    {%- for i in range(num_forward_ports) %}
+    sc_signal<bool> next_stage_ready_{{ i }}_i;
+    {%- endfor %}
 
-    sc_signal<uint32_t> instruction_o;
-    sc_signal<bool> instruction_valid_o;
+    // outputs
+    {%- for i in range(num_forward_ports) %}
+    sc_signal<uint32_t> instruction_{{ i }}_o;
+    {%- endfor %}
+    {%- for i in range(num_forward_ports) %}
+    sc_signal<bool> instruction_valid_{{ i }}_o;
+    {%- endfor %}
     sc_signal<bool> ready_o;
 
     const std::unique_ptr<V{{ name }}_PipelineStage> pipeline_stage{new V{{ name }}_PipelineStage{"{{ name }}_PipelineStage"}};
@@ -42,13 +51,19 @@ int sc_main(int argc, char** argv) {
 
     pipeline_stage->instruction_i(instruction_i);
     pipeline_stage->instruction_valid_i(instruction_valid_i);
-    pipeline_stage->next_stage_ready_i(next_stage_ready_i);
+    {%- for i in range(num_forward_ports) %}
+    pipeline_stage->next_stage_ready_{{ i }}_i(next_stage_ready_{{ i }}_i);
+    {%- endfor %}
 
-    pipeline_stage->instruction_o(instruction_o);
-    pipeline_stage->instruction_valid_o(instruction_valid_o);
+    {%- for i in range(num_forward_ports) %}
+    pipeline_stage->instruction_{{ i }}_o(instruction_{{ i }}_o);
+    {%- endfor %}
+    {%- for i in range(num_forward_ports) %}
+    pipeline_stage->instruction_valid_{{ i }}_o(instruction_valid_{{ i }}_o);
+    {%- endfor %}
     pipeline_stage->ready_o(ready_o);
 
-    int latency = {{ latency }}; 
+    int latency = {{ latency }};
 
     // start simulation and trace
     std::cout << "{{ name }}_PipelineStage start!" << std::endl;
@@ -59,11 +74,11 @@ int sc_main(int argc, char** argv) {
     pipeline_stage->trace(trace, 99);
 
     if(vcd_file_path.empty()) {
-        trace->open("{{ vcd_dir_path }}/{{ name }}_PipelineStage.vcd");
+        trace->open("{{ default_vcd_dir_path }}/{{ name }}_PipelineStage.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
-    
+
     // reset
     sc_start(1, SC_NS);
     reset_n_i.write(0);
@@ -71,40 +86,49 @@ int sc_main(int argc, char** argv) {
     reset_n_i.write(1);
     sc_start(1, SC_NS);
 
-    // check whether pipeline stage is ready
+    // check reset status
     assertv(ready_o.read(), 1);
-    assertv(instruction_o.read(), 0);
-    assertv(instruction_valid_o.read(), 0);
+    {%- for i in range(num_forward_ports) %}
+    assertv(instruction_{{ i }}_o.read(), 0);
+    assertv(instruction_valid_{{ i }}_o.read(), 0);
+    {%- endfor %}
 
     // insert instruction
-    uint32_t instruction = 42;
+    uint32_t instruction = 0b10001;
 
     instruction_i.write(instruction);
     instruction_valid_i.write(1);
-    next_stage_ready_i.write(0);
+    {%- for i in range(num_forward_ports) %}
+    next_stage_ready_{{ i }}_i.write(1);
+    {%- endfor %}
 
-    sc_start(2, SC_NS);
+    sc_start(1, SC_NS);
 
     instruction_i.write(0);
     instruction_valid_i.write(0);
 
+    sc_start(1, SC_NS);
+
     // ensure that instruction is not forwarded until the latency is reached and the next stage is ready
     for(int i = latency; i >= 0; i--) {
         assertv(ready_o.read(), 0);
-        assertv(instruction_o.read(), 0);
-        assertv(instruction_valid_o.read(), 0);
+        assertv(instruction_1_o.read(), 0);
+        assertv(instruction_valid_1_o.read(), 0);
         sc_start(1, SC_NS);
     }
-    next_stage_ready_i.write(1);
-    sc_start(1, SC_NS);
-    assertv(instruction_o.read(), instruction);
-    assertv(instruction_valid_o.read(), 1);
+    next_stage_ready_1_i.write(1);
+    sc_start(2, SC_NS);
+    assertv(instruction_1_o.read(), instruction);
+    assertv(instruction_valid_1_o.read(), 1);
 
-    sc_start(1, SC_NS);
+    sc_start(2, SC_NS);
 
+    // instruction is no longer forwarded when next stage is no longer ready
+    next_stage_ready_1_i.write(0);
+    sc_start(2, SC_NS);
     assertv(ready_o.read(), 1);
-    assertv(instruction_o.read(), 0);
-    assertv(instruction_valid_o.read(), 0);
+    assertv(instruction_1_o.read(), 0);
+    assertv(instruction_valid_1_o.read(), 0);
 
     sc_start(1, SC_NS);
     assertv(ready_o.read(), 1);
