@@ -8,7 +8,7 @@ To create the source files for the cache, you need to clone the [IOb-soc](https:
 
 You then need to install [Nix](https://nixos.org/download/#nix-install-linux) locally, because IOb use the `nix-shell` in their build process.
 
-Then, go to `submodules/CACHE` in the IOb-soc repository and call `make sim-build [BE_IF=AXI4|IOb] [BE_DATA_W=32|64|128|256|etc]`. `BE_IF` determines the type of interface between the cache and the main memory. `BE_DATA_W` determines the word size of the main memory, but I hope that this can still be changed after the build process.
+Then, go to `submodules/CACHE` in the IOb-soc repository and call `make sim-build BE_IF=AXI4`. `BE_IF` determines the type of interface between the cache and the main memory. Choosing AXI4 will create all the files you need for the native (IOb) interface plus the ones needed for AXI4. Note: `BE_DATA_W` only changes stuff in `iob_cache_conf.vh`, which is where I plan to configure all the other cache options anyway, so specifying it during the build process shouldn't be necessary, I hope.
 
 After that, there will be a directory `submodules/iob_cache_VX.XX`. From there you will need all files inside `hardware/src` as well as `bsp.vh`, `iob_cache_sim_wrapper.v`, `iob_ram_2p.v`, `iob_ram_sp_be.v` and `iob_ram_sp.v` from `hardware/simulation/src`. Those are the files that I copied into `iob_cache/src` of this repository.
 
