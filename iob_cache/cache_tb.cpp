@@ -71,48 +71,38 @@ int sc_main(int argc, char **argv)
     {
         trace->open(vcd_file_path.c_str());
     }
+        // Reset
     arst_i.write(1);
     sc_start(1, SC_NS);
     arst_i.write(0);
     sc_start(1, SC_NS);
 
-    iob_valid_i.write(1);
-    iob_wstrb_i.write(15);
-    iob_addr_i.write(16);
-    iob_wdata_i.write(100);
-    sc_start(1, SC_NS);
-    iob_addr_i.write(20);
-    iob_wdata_i.write(200);
-    sc_start(1, SC_NS);
-    iob_addr_i.write(24);
-    iob_wdata_i.write(300);
-    sc_start(1, SC_NS);
-    iob_addr_i.write(28);
-    iob_wdata_i.write(400);
-    sc_start(1, SC_NS);
-    iob_addr_i.write(32);
-    iob_wdata_i.write(500);
-    sc_start(1, SC_NS);
-    iob_valid_i.write(0);
-    iob_wstrb_i.write(0);
-    iob_addr_i.write(0);
-    iob_wdata_i.write(0);
-    sc_start(10, SC_NS);
+    // Write several words
+    for(uint32_t i = 1; i <= 6; i++) {
+        iob_valid_i.write(0);
+        while(iob_ready_o.read() == 0) {
+            sc_start(1, SC_NS);
+        }
+        iob_valid_i.write(1);
+        iob_wstrb_i.write(0b1111);
+        iob_addr_i.write(4 * i);
+        iob_wdata_i.write(0x1111 * i);
+        sc_start(2, SC_NS);
+    }
 
-    iob_valid_i.write(1);
-    iob_wstrb_i.write(0);
-    iob_addr_i.write(16);
-    // sc_start(1, SC_NS);
-    // iob_valid_i.write(0);
-    // sc_start(1, SC_NS);
-    // iob_addr_i.write(24);
-    // sc_start(2, SC_NS);
-    // iob_addr_i.write(28);
-    // sc_start(2, SC_NS);
-    // iob_addr_i.write(32);
-    // sc_start(2, SC_NS);
-    
-    sc_start(10, SC_NS);
+    // Read the words check that they are correct
+    for(uint32_t i = 1; i <= 6; i++) {
+        iob_valid_i.write(1);
+        iob_wstrb_i.write(0);
+        iob_addr_i.write(4 * i);
+        sc_start(2, SC_NS);
+        while(iob_rvalid_o.read() == 0) {
+            sc_start(1, SC_NS);
+        }
+        assert(iob_rdata_o.read() == 0x1111 * i);
+    }
+
+    sc_start(5, SC_NS);
 
     cache->final();
 
