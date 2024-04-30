@@ -20,8 +20,8 @@ I hope that all configuration to the cache (aside from the back end interface, p
 
 This is a very experimental documentation of the parameters that can be configured.
 
-- `IOB_CACHE_NWAYS_W`: log_2(associativity)
-- `IOB_CACHE_NLINES_W`: log_2(number of lines)
+- `IOB_CACHE_NWAYS_W`: log_2(associativity) (confirmed)
+- `IOB_CACHE_NLINES_W`: log_2(number of lines) ???
 - `IOB_CACHE_WORD_OFFSET_W`: Has something to do with the number of words per block/way, but I don't know how they are related
 - `IOB_CACHE_WTBUF_DEPTH_W`: log_2(number of positions in the write buffer for write-through)
 - `IOB_CACHE_REP_POLICY`: 0: LRU, 1: PLRU_MRU, 2: PLRU_TREE
