@@ -29,6 +29,16 @@ All the configuration to the cache can be done from `src/iob_cache_conf.vh`. The
 - `IOB_CACHE_WTBUF_DEPTH_W`: log_2(number of positions in the write buffer for write-through)
 - `IOB_CACHE_REP_POLICY`: 0: LRU, 1: PLRU_MRU, 2: PLRU_TREE
 - `IOB_CACHE_WRITE_POL`: 0: Write-through with write no-allocate, 1: Write-back with write allocate
+- `USE_CTRL`: Adds a "Cache-Control" unit that adds memory mapped registers to the cache. The cache input address will get one bit wider and if the MSB is 1, the Cache-Control registers will get accessed. The registers allow invalidating the cache contents and monitoring the write through buffers.
+- `USE_CTRL_CNT`: This setting adds Cache-Control registers that contain
+    - read and write hits (address 0x4)
+    - read and write misses (address 0x8)
+    - read hits (address 0xC)
+    - read misses (address 0x10)
+    - write hits (address 0x14)
+    - write misses (address 0x18)
+    
+    Note that these addresses are the full addresses including the bits for the byte offset. The verilog cache model doesn't include those bits, so the addresses have to be shifted right by 2 bits. I'm not sure if the functions added by only using `USE_CTRL` will still work after also using this option.
 
 ## Building and running the cache
 

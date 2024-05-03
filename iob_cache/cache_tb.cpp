@@ -79,7 +79,6 @@ int sc_main(int argc, char **argv)
 
     // Write several words
     for(uint32_t i = 1; i <= 6; i++) {
-        iob_valid_i.write(0);
         while(iob_ready_o.read() == 0) {
             sc_start(1, SC_NS);
         }
@@ -87,7 +86,9 @@ int sc_main(int argc, char **argv)
         iob_wstrb_i.write(0b1111);
         iob_addr_i.write(i);
         iob_wdata_i.write(0x1111 * i);
-        sc_start(2, SC_NS);
+        sc_start(1, SC_NS);
+        iob_valid_i.write(0);
+        sc_start(1, SC_NS);
     }
 
     // Read the words check that they are correct
@@ -95,12 +96,31 @@ int sc_main(int argc, char **argv)
         iob_valid_i.write(1);
         iob_wstrb_i.write(0);
         iob_addr_i.write(i);
-        sc_start(2, SC_NS);
+        sc_start(1, SC_NS);
+        iob_valid_i.write(0);
+        sc_start(1, SC_NS);
         while(iob_rvalid_o.read() == 0) {
             sc_start(1, SC_NS);
         }
         assert(iob_rdata_o.read() == 0x1111 * i);
     }
+
+    // This block will read from the hit and miss counters if they are enabled
+    iob_valid_i.write(1);
+    iob_wstrb_i.write(0);
+    iob_addr_i.write(0x400001);
+    sc_start(1, SC_NS);
+    iob_addr_i.write(0x400002);
+    sc_start(1, SC_NS);
+    iob_addr_i.write(0x400003);
+    sc_start(1, SC_NS);
+    iob_addr_i.write(0x400004);
+    sc_start(1, SC_NS);
+    iob_addr_i.write(0x400005);
+    sc_start(1, SC_NS);
+    iob_addr_i.write(0x400006);
+    sc_start(1, SC_NS);
+    iob_valid_i.write(0);
 
     sc_start(5, SC_NS);
 
