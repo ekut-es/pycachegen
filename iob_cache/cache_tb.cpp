@@ -85,7 +85,7 @@ int sc_main(int argc, char **argv)
         }
         iob_valid_i.write(1);
         iob_wstrb_i.write(0b1111);
-        iob_addr_i.write(4 * i);
+        iob_addr_i.write(i);
         iob_wdata_i.write(0x1111 * i);
         sc_start(2, SC_NS);
     }
@@ -94,7 +94,7 @@ int sc_main(int argc, char **argv)
     for(uint32_t i = 1; i <= 6; i++) {
         iob_valid_i.write(1);
         iob_wstrb_i.write(0);
-        iob_addr_i.write(4 * i);
+        iob_addr_i.write(i);
         sc_start(2, SC_NS);
         while(iob_rvalid_o.read() == 0) {
             sc_start(1, SC_NS);
