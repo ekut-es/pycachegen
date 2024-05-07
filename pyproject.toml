@@ -21,7 +21,8 @@ keywords = ["computer architecture", "simulation"]
 dependencies = [
     "acadl>=2.0.0",
     "Jinja2>=3.1.2",
-    "bitarray>=2.6.0"
+    "bitarray>=2.6.0",
+    "veriloggen>=2.3.0"
 ]
 
 requires-python = ">=3.10"

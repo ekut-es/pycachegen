@@ -20,6 +20,13 @@ def ba_to_little_endian_str(bits: bitarray) -> str:
     return str(bits.to01())[::-1]
 
 
+def load_file_to_string(file_path: str) -> str:
+    if not os.path.exists(file_path):
+        return ""
+    with open(file_path, 'r') as f:
+        return f.read()
+
+
 def read_write_template(path_to_template_file: str, path_to_target_file: str,
                         **kwargs):
     # open template file
@@ -93,7 +100,7 @@ def verilate(build_dir_path: str,
         'cmake', '-GNinja', f'-DVERILATOR_ROOT="{__verilator_root_path__}"',
         f'-DSYSTEMC_HOME="{__systemc_home_path__}"',
         f'-DVERILOG_OUT_DIR_PATH="{verilog_out_dir_path}"',
-        __verilator_cmakelists_dir_path__
+        os.getcwd() + '/' + build_dir_path
     ]
     cmake_command = ' '.join(cmake_command)
 

@@ -1,3 +1,5 @@
+# V{{tb_base_file_name}}
+
 cmake_minimum_required(VERSION 3.16)
 project(test CXX)
 
@@ -16,4 +18,18 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS ${SYSTEMC_HOME})
 
-add_subdirectory(${VERILOG_OUT_DIR_PATH} sim)
+# Verilate
+add_executable(V{{tb_base_file_name}} {{tb_file_name}})
+
+set_property(
+	TARGET V{{tb_base_file_name}}
+	PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
+)
+
+verilate(V{{tb_base_file_name}}
+	SOURCES {{verilog_file_name}}
+	TRACE SYSTEMC COVERAGE
+	INCLUDE_DIRECTORIES "."
+)
+
+verilator_link_systemc(V{{tb_base_file_name}})

@@ -1,5 +1,10 @@
-from typing import Tuple
+from __future__ import annotations
+from typing import Tuple, Optional, List
+
+from acadl import Instruction as ACADLInstruction
+
 from .instruction_format_config import InstructionFormatConfig
+from .id_config import IdConfig
 from .data_field_config import DataFieldConfig, DataFieldType
 from .target_id_config import TargetIdConfig
 from .opcode_config import OpcodeConfig
@@ -7,38 +12,41 @@ from .opcode_config import OpcodeConfig
 
 class MissingInstructionFormatConfig(Exception):
 
-    def __init__(self, instruction_format: "InstructionFormat",
+    def __init__(self, instruction_format: InstructionFormat,
                  missing_config: str):
         self.instruction_format = instruction_format
         self.missing_config = missing_config
 
     def __str__(self):
-        return f"InstructionFormat: '{self.instruction_format.name}' is missing config '{self.missing_config}'"
+        return f"'{self.instruction_format}' is missing config '{self.missing_config}'"
 
 
 class InstructionFormatConfigsOverlap(Exception):
 
-    def __init__(self, instruction_format: "InstructionFormat",
-                 overlapping_configs: Tuple[InstructionFormatConfig]):
+    def __init__(self, instruction_format: InstructionFormat,
+                 overlapping_config_1: InstructionFormatConfig,
+                 overlapping_config_2: InstructionFormatConfig):
         self.instruction_format = instruction_format
-        self.overlapping_configs = overlapping_configs
+        self.overlapping_config_1 = overlapping_config_1
+        self.overlapping_config_2 = overlapping_config_2
 
     def __str__(self):
-        return f"InstructionFormat '{self.instruction_format}' has overlapping configs: {self.overlapping_configs[0]}, {self.overlapping_configs[1]}]"
+        return f"'{self.instruction_format}' has overlapping configs: {self.overlapping_config_1}, {self.overlapping_config_2}]"
 
 
 class InstructionFormat:
 
-    def __init__(self, name: str, length: int,
-                 target_id_config: TargetIdConfig, opcode_config: OpcodeConfig,
-                 read_registers_config: DataFieldConfig,
-                 write_registers_config: DataFieldConfig,
-                 read_addresses_config: DataFieldConfig,
-                 write_addresses_config: DataFieldConfig,
-                 immediates_config: DataFieldConfig):
+    def __init__(self,
+                 id_config: IdConfig,
+                 target_id_config: TargetIdConfig,
+                 opcode_config: Optional[OpcodeConfig] = None,
+                 read_registers_config: Optional[DataFieldConfig] = None,
+                 write_registers_config: Optional[DataFieldConfig] = None,
+                 read_addresses_config: Optional[DataFieldConfig] = None,
+                 write_addresses_config: Optional[DataFieldConfig] = None,
+                 immediates_config: Optional[DataFieldConfig] = None):
 
-        self.name = name
-        self.length = length
+        self.id_config = id_config
         self.target_id_config = target_id_config
         self.opcode_config = opcode_config
         self.read_registers_config = read_registers_config
@@ -47,13 +55,29 @@ class InstructionFormat:
         self.write_addresses_config = write_addresses_config
         self.immediates_config = immediates_config
 
-        self.configs = [
-            self.target_id_config, self.opcode_config,
-            self.read_registers_config, self.write_registers_config,
-            self.read_addresses_config, self.write_addresses_config,
-            self.immediates_config
+        self.length: int = id_config.length + target_id_config.length
+        self.configs: List[InstructionFormatConfig] = [
+            self.id_config, self.target_id_config
         ]
-
+        if opcode_config is not None:
+            self.length += opcode_config.length
+            self.configs.append(opcode_config)
+        if read_registers_config is not None:
+            self.length += read_registers_config.length
+            self.configs.append(read_registers_config)
+        if write_registers_config is not None:
+            self.length += write_registers_config.length
+            self.configs.append(write_registers_config)
+        if read_addresses_config is not None:
+            self.length += read_addresses_config.length
+            self.configs.append(read_addresses_config)
+        if write_addresses_config is not None:
+            self.length += write_addresses_config.length
+            self.configs.append(write_addresses_config)
+        if immediates_config is not None:
+            self.length += immediates_config.length
+            self.configs.append(immediates_config)
+        """
         # check format
         # check if all data field config types are present
         data_field_configs = [
@@ -72,18 +96,12 @@ class InstructionFormat:
         for data_field_type_to_check in data_field_types_to_check:
             if not data_field_type_to_check in set_data_field_types:
                 raise MissingInstructionFormatConfig(self,
-                                                     data_field_type_to_check)
+                                                     data_field_type_to_check)"""
 
         # insert each config into bits and check if bits are already set
-        self.bits = [None] * self.length
-
-        for i in range(target_id_config.start_bit,
-                       target_id_config.end_bit + 1):
-            self.bits[i] = target_id_config
-
-        configs_to_check = self.configs[1:]
-
-        for config_to_check in configs_to_check:
+        self.bits: List[Optional[InstructionFormatConfig]] = [None
+                                                              ] * self.length
+        for config_to_check in self.configs:
             for i in range(config_to_check.start_bit,
                            config_to_check.end_bit + 1):
                 if self.bits[i] is not None:
@@ -95,5 +113,4 @@ class InstructionFormat:
         configs_sorted_by_position = sorted(self.configs,
                                             key=lambda x: x.start_bit,
                                             reverse=True)
-        return self.name + ": " + ', '.join(
-            map(lambda x: x.__repr__(), configs_sorted_by_position))
+        return f"InstructionFormat=[{', '.join(map(str, configs_sorted_by_position))}]"

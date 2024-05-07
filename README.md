@@ -71,6 +71,7 @@ git clone git@es-git.cs.uni-tuebingen.de:es/genial/acadl.git PATH_TO_ACADL
 # Build project for development
 ```
 python -m venv .venv
+source .venv/bin/activate
 python -m pip install -e PATH_TO_ACADL
 python -m pip install -e .\[dev\]
 pre-commit install

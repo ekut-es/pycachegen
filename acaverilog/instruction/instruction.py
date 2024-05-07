@@ -1,5 +1,6 @@
 from acadl import Instruction as ACADLInstruction
 from .instruction_format import InstructionFormat
+from .instruction_format_config import InstructionFormatConfig
 from bitarray.util import int2ba, zeros, ba2hex, ba2int
 from typing import List
 
@@ -17,27 +18,38 @@ def create_memory_file_from_instructions(memory_file_path: str,
 class Instruction:
 
     def __init__(self, acadl_instruction: ACADLInstruction, target_id: int,
-                 instruction_format: InstructionFormat):
+                 instruction_format: InstructionFormat) -> None:
         self.acadl_instruction = acadl_instruction
-        # TODO infer target id from AG
         self.target_id = target_id
         self.instruction_format = instruction_format
 
-    def generate_bitarray(self):
-        # TODO generate bits for all config fields
-        #np_array = np.zeros(self.instruction_format.length, dtype=bool)
+        self.generate_data()
+        self.generate_bitarray()
 
-        target_id_bits = int2ba(self.target_id, endian='little')
+    def generate_data(self) -> None:
+        self.data: List[int] = []
 
-        bits = zeros(self.instruction_format.length, endian='little')
+        self.id = self.acadl_instruction.id
+        self.data.append(self.id)
+        self.data.append(self.target_id)
 
-        for target_id_i, bits_i in enumerate(
-                range(self.instruction_format.target_id_config.start_bit,
-                      self.instruction_format.target_id_config.end_bit + 1)):
-            if target_id_i < len(target_id_bits):
-                bits[bits_i] = target_id_bits[target_id_i]
+        if self.instruction_format.opcode_config is not None:
+            if self.acadl_instruction.operation == "store":
+                self.opcode = 1
+            else:
+                self.opcode = 0
+            self.data.append(self.opcode)
 
-        return bits
+    def generate_bitarray(self) -> None:
+        self.bits = zeros(self.instruction_format.length, endian='little')
 
-    def __repr__(self):
+        for i, data in enumerate(self.data):
+            start_bit = self.instruction_format.configs[i].start_bit
+            end_bit = self.instruction_format.configs[i].end_bit
+            self.bits[start_bit:end_bit] = int2ba(
+                data,
+                length=self.instruction_format.configs[i].length,
+                endian='little')
+
+    def __repr__(self) -> str:
         return f"{self.acadl_instruction.__repr__()}; target_id={self.target_id}"
