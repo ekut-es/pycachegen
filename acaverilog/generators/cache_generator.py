@@ -1,5 +1,5 @@
 from math import ceil, log2
-from veriloggen import Module, Submodule, Posedge, Negedge, If, For, AndList
+from veriloggen import Module, Submodule, Posedge, Negedge, If, For, AndList, OrList
 
 from acadl import ACADLObject
 
@@ -30,6 +30,10 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
         )
         INDEX_WIDTH = m.Localparam("INDEX_WIDTH", log2(NUM_SETS))
         TAG_WIDTH = m.Localparam("TAG_WIDTH", ADDRESS_WIDTH - INDEX_WIDTH)
+        # PHASE_READY = m.Localparam("PHASE_READY", 0)
+        # PHASE_HIT_LOOKUP = m.Localparam("PHASE_HIT_LOOKUP", 1)
+        # PHASE_MISS = m.Localparam("PHASE_BE_REQUEST", 2)
+        # PHASE_STALL = m.Localparam("PHASE_STALL", 3)
 
         # Front End Inputs
         clk_i = m.Input("clk_i")
@@ -102,7 +106,12 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
         latency_counter = m.Reg("read_latency_counter", LATENCY_COUNTER_SIZE)
         read_in_progress = m.Reg("read_in_progress")
         write_in_progress = m.Reg("write_in_progress")
-        hit_lookup_in_progress = m.Reg("hit_lookup_in_progress")
+        req_processed = m.Reg("req_processed")
+        hit_lookup_en = m.Reg("hit_lookup_en")
+        hit = m.Reg("hit")
+        hit_valid = m.Reg("hit_valid")
+        address_tag = m.Wire("address_tag", TAG_WIDTH)
+        address_index = m.Wire("address_index", INDEX_WIDTH)
         tag_memory = m.Reg("tag_memory", TAG_WIDTH, dims=NUM_SETS)
         valid_memory = m.Reg("valid_memory", 1, dims=NUM_SETS)
         data_memory = m.Reg("data_memory", DATA_WIDTH, dims=NUM_SETS)
@@ -110,20 +119,24 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
         m.Assign(
             port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
         )
+        m.Assign(address_tag(address_i_reg[: -(INDEX_WIDTH + 1)]))
+        m.Assign(address_index(address_i_reg[-INDEX_WIDTH:]))
 
         m.Always(Posedge(clk_i))(
-            # Cache is ready for a new request
             If(port_ready_o_reg == 1)(
-                # Read Request
+                # Cache is ready for a new request
                 If(AndList(read_write_select_i == 0, address_valid_i == 1))(
+                    # Read Request
                     read_in_progress(1),
-                    hit_lookup_in_progress(1),
+                    hit_lookup_en(1),
                     latency_counter(MISS_LATENCY),
                     address_i_reg(address_i),
                     read_data_valid_o_reg(0),
                     write_done_o_reg(0),
+                    hit(0),
+                    hit_valid(0),
+                    req_processed(0),
                 ),
-                # Write Request
                 If(
                     AndList(
                         read_write_select_i == 1,
@@ -131,28 +144,61 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
                         write_data_valid_i == 1,
                     )
                 )(
+                    # Write Request
                     write_in_progress(1),
-                    hit_lookup_in_progress(1),
+                    hit_lookup_en(1),
                     latency_counter(MISS_LATENCY),
                     address_i_reg(address_i),
+                    write_data_i_reg(write_data_i),
                     read_data_valid_o_reg(0),
                     write_done_o_reg(0),
-                    write_data_i_reg(write_data_i),
+                    hit(0),
+                    hit_valid(0),
                 ),
-            ).Else(
-                # If a request is in progress, decrement the latency
-                If(latency_counter != 0)(latency_counter.dec()),
-                # Latency is 0, time to do something
-                If(latency_counter == 0)(
-                    If(hit_lookup_in_progress == 1)(
-                        # do hit lookup (tag + valid memory)
+            )
+            .Elif(hit_lookup_en == 1)(
+                # Check whether we have a hit
+                hit(
+                    AndList(
+                        tag_memory[address_index] == address_tag,
+                        valid_memory[address_index] == 1,
                     )
-                    .Elif(read_in_progress == 1)(
-                        # do read stuff
-                    )
-                    .Elif(write_in_progress == 1)(
-                        # do write stuff
+                ),
+                hit_valid(1),
+                latency_counter.dec(),
+                hit_lookup_en(0),
+            )
+            .Elif(hit_valid == 1)(
+                # Hit lookup has finished
+                latency_counter.dec(),
+                hit_valid(0),
+                If(hit == 1)(
+                    # We have a hit
+                    If(read_in_progress == 1)(
+                        read_data_o_reg(data_memory[address_index]),
+                        read_data_valid_o(1),
+                    ).Elif(write_in_progress == 1)(
+                        data_memory[address_index](write_data_i_reg),
+                        # valid_memory[address_index](1),
+                        # tag_memory[address_index](address_tag),
+                        write_done_o_reg(1),
                     ),
+                    req_processed(1),
+                ).Else(
+                    # We have a miss
+                    # Request read/write from lower memory
+                    address_o_reg(address_i_reg),
+                    address_valid_o_reg(1),
+                    read_write_select_o_reg(read_write_select_i_reg),
+                    write_data_o_reg(write_data_i_reg),
                 ),
+            )
+            .Elif(
+                AndList(address_valid_o == 1, OrList(read_data_valid_i, write_done_i))
+            )(
+                # Request to main memory was processed, we can now hand the data out/write it to the cache
+            )
+            .Elif(req_processed)(
+                # Stall for the remaining time (or error if this took too much time...?)
             )
         )
