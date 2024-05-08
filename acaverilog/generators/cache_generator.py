@@ -1,5 +1,15 @@
 from math import ceil, log2
-from veriloggen import Module, Submodule, Posedge, Negedge, If, For, AndList, OrList
+from veriloggen import (
+    Module,
+    Submodule,
+    Posedge,
+    Negedge,
+    If,
+    For,
+    AndList,
+    OrList,
+    Not,
+)
 
 from acadl import ACADLObject
 
@@ -176,12 +186,10 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
                     # We have a hit
                     If(read_in_progress == 1)(
                         read_data_o_reg(data_memory[address_index]),
-                        read_data_valid_o(1),
                     ).Elif(write_in_progress == 1)(
                         data_memory[address_index](write_data_i_reg),
                         # valid_memory[address_index](1),
                         # tag_memory[address_index](address_tag),
-                        write_done_o_reg(1),
                     ),
                     req_processed(1),
                 ).Else(
@@ -196,9 +204,28 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
             .Elif(
                 AndList(address_valid_o == 1, OrList(read_data_valid_i, write_done_i))
             )(
-                # Request to main memory was processed, we can now hand the data out/write it to the cache
+                # Request to main memory was processed, we can now
+                # a) hand the data out and write it to the cache in case of a read
+                # b) do nothing in case of a write
+                req_processed(1),
+                address_valid_o(0),  # this might happen one cycle too late I think ._.
+                latency_counter.dec(),
+                If(read_write_select_i_reg == 0)(
+                    read_data_o_reg(read_data_i),
+                    data_memory[address_index](read_data_i),
+                    valid_memory[address_index](1),
+                    tag_memory[address_index](address_tag),
+                ),
             )
-            .Elif(req_processed)(
+            .Elif(AndList(req_processed, latency_counter != 0))(
                 # Stall for the remaining time (or error if this took too much time...?)
+                latency_counter.dec()
+            )
+            .Elif(latency_counter == 0)(
+                # We have stalled enough, finish the request
+                read_data_valid_o_reg(read_write_select_i_reg),
+                write_done_o_reg(Not(read_write_select_i_reg)),
+                read_in_progress(0),
+                write_in_progress(0),
             )
         )
