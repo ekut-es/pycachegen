@@ -25,14 +25,11 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
         MISS_LATENCY = m.Parameter("MISS_LATENCY", 2)
 
         # Local Parameters
-        READ_LATENCY_COUNTER_SIZE = m.Localparam(
-            "LATENCY_COUNTER_SIZE",
-            ceil(log2(self.acadl_object.read_latency.int_latency)),
+        LATENCY_COUNTER_SIZE = m.Localparam(
+            "LATENCY_COUNTER_SIZE", ceil(log2(max(HIT_LATENCY, MISS_LATENCY)))
         )
-        WRITE_LATENCY_COUNTER_SIZE = m.Localparam(
-            "LATENCY_COUNTER_SIZE",
-            ceil(log2(self.acadl_object.write_latency.int_latency)),
-        )
+        INDEX_WIDTH = m.Localparam("INDEX_WIDTH", log2(NUM_SETS))
+        TAG_WIDTH = m.Localparam("TAG_WIDTH", ADDRESS_WIDTH - INDEX_WIDTH)
 
         # Front End Inputs
         clk_i = m.Input("clk_i")
@@ -64,9 +61,9 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
 
         # Front End Input Buffers
         address_i_reg = m.Reg("address_i_reg", ADDRESS_WIDTH)
-        address_valid_i_reg = m.Reg("address_valid_i_reg")
+        # address_valid_i_reg = m.Reg("address_valid_i_reg")
         write_data_i_reg = m.Reg("write_data_i_reg", DATA_WIDTH)
-        write_data_valid_i_reg = m.Reg("write_data_valid_i_reg")
+        # write_data_valid_i_reg = m.Reg("write_data_valid_i_reg")
         read_write_select_i_reg = m.Reg("read_write_select_i_reg")
 
         # Front End Output Buffers
@@ -77,9 +74,9 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
 
         # Back End Input Buffers
         read_data_i_reg = m.Reg("read_data_i_reg", DATA_WIDTH)
-        read_data_valid_i_reg = m.Reg("read_data_valid_i_reg")
-        write_done_i_reg = m.Reg("write_done_i_reg")
-        port_ready_i_reg = m.Reg("port_ready_i_reg")
+        # read_data_valid_i_reg = m.Reg("read_data_valid_i_reg")
+        # write_done_i_reg = m.Reg("write_done_i_reg")
+        # port_ready_i_reg = m.Reg("port_ready_i_reg")
 
         # Back End Output Buffers
         address_o_reg = m.Output("address_o_reg", ADDRESS_WIDTH)
@@ -102,13 +99,60 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
         m.Assign(read_write_select_o(read_write_select_o_reg))
 
         # Internal
-        read_latency_counter = m.Reg("read_latency_counter", READ_LATENCY_COUNTER_SIZE)
-        write_latency_counter = m.Reg(
-            "write_latency_counter", WRITE_LATENCY_COUNTER_SIZE
-        )
+        latency_counter = m.Reg("read_latency_counter", LATENCY_COUNTER_SIZE)
         read_in_progress = m.Reg("read_in_progress")
         write_in_progress = m.Reg("write_in_progress")
-        tag_memory = m.Reg('tag_memory', ...)
+        hit_lookup_in_progress = m.Reg("hit_lookup_in_progress")
+        tag_memory = m.Reg("tag_memory", TAG_WIDTH, dims=NUM_SETS)
+        valid_memory = m.Reg("valid_memory", 1, dims=NUM_SETS)
+        data_memory = m.Reg("data_memory", DATA_WIDTH, dims=NUM_SETS)
+
         m.Assign(
             port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
+        )
+
+        m.Always(Posedge(clk_i))(
+            # Cache is ready for a new request
+            If(port_ready_o_reg == 1)(
+                # Read Request
+                If(AndList(read_write_select_i == 0, address_valid_i == 1))(
+                    read_in_progress(1),
+                    hit_lookup_in_progress(1),
+                    latency_counter(MISS_LATENCY),
+                    address_i_reg(address_i),
+                    read_data_valid_o_reg(0),
+                    write_done_o_reg(0),
+                ),
+                # Write Request
+                If(
+                    AndList(
+                        read_write_select_i == 1,
+                        address_valid_i == 1,
+                        write_data_valid_i == 1,
+                    )
+                )(
+                    write_in_progress(1),
+                    hit_lookup_in_progress(1),
+                    latency_counter(MISS_LATENCY),
+                    address_i_reg(address_i),
+                    read_data_valid_o_reg(0),
+                    write_done_o_reg(0),
+                    write_data_i_reg(write_data_i),
+                ),
+            ).Else(
+                # If a request is in progress, decrement the latency
+                If(latency_counter != 0)(latency_counter.dec()),
+                # Latency is 0, time to do something
+                If(latency_counter == 0)(
+                    If(hit_lookup_in_progress == 1)(
+                        # do hit lookup (tag + valid memory)
+                    )
+                    .Elif(read_in_progress == 1)(
+                        # do read stuff
+                    )
+                    .Elif(write_in_progress == 1)(
+                        # do write stuff
+                    ),
+                ),
+            )
         )
