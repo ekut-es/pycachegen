@@ -16,7 +16,7 @@ from acadl import ACADLObject
 from .acadl_object_generator import ACADLObjectGenerator
 
 
-class ExecuteStageGenerator(ACADLObjectGenerator):
+class CacheGenerator(ACADLObjectGenerator):
 
     def __init__(
         self,
@@ -229,3 +229,12 @@ class ExecuteStageGenerator(ACADLObjectGenerator):
                 write_in_progress(0),
             )
         )
+
+class FakeACADLCache:
+    def __init__(self):
+        self.name = "FakeObject"
+
+if __name__ == "__main__":
+    acadl_cache = FakeACADLCache()
+    cache_generator = CacheGenerator(acadl_cache)
+    cache_generator.generate_verilog()
