@@ -174,3 +174,6 @@ systemc-2.3.3
 
 # external
 external/
+
+# student/mueller
+acaverilog/generators/cache/src

@@ -11,21 +11,23 @@ from veriloggen import (
     Not,
 )
 
-from acadl import ACADLObject
+# from acadl import ACADLObject
 
-from .acadl_object_generator import ACADLObjectGenerator
+# from .acadl_object_generator import ACADLObjectGenerator
 
 
-class CacheGenerator(ACADLObjectGenerator):
+# class CacheGenerator(ACADLObjectGenerator):
+class CacheGenerator:
 
-    def __init__(
-        self,
-        acadl_object: ACADLObject,
-    ) -> None:
-        super().__init__(acadl_object)
+    # def __init__(
+    #     self,
+    #     acadl_object: ACADLObject,
+    # ) -> None:
+    #     super().__init__(acadl_object)
 
     def generate_module(self) -> Module:
-        m = Module(self.base_file_name)
+        # m = Module(self.base_file_name)
+        m = Module("cache")
 
         # Parameters
         DATA_WIDTH = m.Parameter("DATA_WIDTH", 32)
@@ -36,9 +38,9 @@ class CacheGenerator(ACADLObjectGenerator):
 
         # Local Parameters
         LATENCY_COUNTER_SIZE = m.Localparam(
-            "LATENCY_COUNTER_SIZE", ceil(log2(max(HIT_LATENCY, MISS_LATENCY)))
+            "LATENCY_COUNTER_SIZE", ceil(log2(max(HIT_LATENCY.value, MISS_LATENCY.value)))
         )
-        INDEX_WIDTH = m.Localparam("INDEX_WIDTH", log2(NUM_SETS))
+        INDEX_WIDTH = m.Localparam("INDEX_WIDTH", int(log2(NUM_SETS.value)))
         TAG_WIDTH = m.Localparam("TAG_WIDTH", ADDRESS_WIDTH - INDEX_WIDTH)
         # PHASE_READY = m.Localparam("PHASE_READY", 0)
         # PHASE_HIT_LOOKUP = m.Localparam("PHASE_HIT_LOOKUP", 1)
@@ -71,7 +73,7 @@ class CacheGenerator(ACADLObjectGenerator):
         address_valid_o = m.Output("address_valid_o")
         write_data_o = m.Output("write_data_o", DATA_WIDTH)
         write_data_valid_o = m.Output("write_data_valid_o")
-        read_write_select_o = m.Input("read_write_select_o")
+        read_write_select_o = m.Output("read_write_select_o")
 
         # Front End Input Buffers
         address_i_reg = m.Reg("address_i_reg", ADDRESS_WIDTH)
@@ -93,11 +95,11 @@ class CacheGenerator(ACADLObjectGenerator):
         # port_ready_i_reg = m.Reg("port_ready_i_reg")
 
         # Back End Output Buffers
-        address_o_reg = m.Output("address_o_reg", ADDRESS_WIDTH)
-        address_valid_o_reg = m.Output("address_valid_o_reg")
-        write_data_o_reg = m.Output("write_data_o_reg", DATA_WIDTH)
-        write_data_valid_o_reg = m.Output("write_data_valid_o_reg")
-        read_write_select_o_reg = m.Input("read_write_select_o_reg")
+        address_o_reg = m.Reg("address_o_reg", ADDRESS_WIDTH)
+        address_valid_o_reg = m.Reg("address_valid_o_reg")
+        write_data_o_reg = m.Reg("write_data_o_reg", DATA_WIDTH)
+        write_data_valid_o_reg = m.Reg("write_data_valid_o_reg")
+        read_write_select_o_reg = m.Reg("read_write_select_o_reg")
 
         # Frontend Output Buffer Assignments
         m.Assign(read_data_o(read_data_o_reg))
@@ -129,8 +131,8 @@ class CacheGenerator(ACADLObjectGenerator):
         m.Assign(
             port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
         )
-        m.Assign(address_tag(address_i_reg[: -(INDEX_WIDTH + 1)]))
-        m.Assign(address_index(address_i_reg[-INDEX_WIDTH:]))
+        m.Assign(address_tag(address_i_reg[INDEX_WIDTH: ]))
+        m.Assign(address_index(address_i_reg[:INDEX_WIDTH]))
 
         m.Always(Posedge(clk_i))(
             If(port_ready_o_reg == 1)(
@@ -208,7 +210,7 @@ class CacheGenerator(ACADLObjectGenerator):
                 # a) hand the data out and write it to the cache in case of a read
                 # b) do nothing in case of a write
                 req_processed(1),
-                address_valid_o(0),  # this might happen one cycle too late I think ._.
+                address_valid_o_reg(0),  # this might happen one cycle too late I think ._.
                 latency_counter.dec(),
                 If(read_write_select_i_reg == 0)(
                     read_data_o_reg(read_data_i),
@@ -229,12 +231,10 @@ class CacheGenerator(ACADLObjectGenerator):
                 write_in_progress(0),
             )
         )
+        return m
 
-class FakeACADLCache:
-    def __init__(self):
-        self.name = "FakeObject"
 
 if __name__ == "__main__":
-    acadl_cache = FakeACADLCache()
-    cache_generator = CacheGenerator(acadl_cache)
-    cache_generator.generate_verilog()
+    cache_generator = CacheGenerator()
+    m = cache_generator.generate_module()
+    m.to_verilog("../src/cache.v", for_verilator=True)
