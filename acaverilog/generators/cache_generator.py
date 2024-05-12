@@ -44,69 +44,64 @@ class CacheGenerator:
         # Front End Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
-        address_i = m.Input("address_i", self.ADDRESS_WIDTH)
-        address_valid_i = m.Input("address_valid_i")
-        write_data_i = m.Input("write_data_i", self.DATA_WIDTH)
-        write_data_valid_i = m.Input("write_data_valid_i")
-        read_write_select_i = m.Input("read_write_select_i")
+        fe_address_i = m.Input("fe_address_i", self.ADDRESS_WIDTH)
+        fe_address_valid_i = m.Input("fe_address_valid_i")
+        fe_write_data_i = m.Input("fe_write_data_i", self.DATA_WIDTH)
+        fe_write_data_valid_i = m.Input("fe_write_data_valid_i")
+        fe_read_write_select_i = m.Input("fe_read_write_select_i")
 
         # Front End Outputs
-        read_data_o = m.Output("read_data_o", self.DATA_WIDTH)
-        read_data_valid_o = m.Output("read_data_valid_o")
-        write_done_o = m.Output("write_done_o")
-        port_ready_o = m.Output("port_ready_o")
+        fe_read_data_o = m.Output("fe_read_data_o", self.DATA_WIDTH)
+        fe_read_data_valid_o = m.Output("fe_read_data_valid_o")
+        fe_write_done_o = m.Output("fe_write_done_o")
+        fe_port_ready_o = m.Output("fe_port_ready_o")
 
         # Back End Inputs
-        read_data_i = m.Input("read_data_i", self.DATA_WIDTH)
-        read_data_valid_i = m.Input("read_data_valid_i")
-        write_done_i = m.Input("write_done_i")
-        port_ready_i = m.Input("port_ready_i")
+        be_read_data_i = m.Input("be_read_data_i", self.DATA_WIDTH)
+        be_read_data_valid_i = m.Input("be_read_data_valid_i")
+        be_write_done_i = m.Input("be_write_done_i")
+        be_port_ready_i = m.Input("be_port_ready_i")
 
         # Back End Outputs
-        address_o = m.Output("address_o", self.ADDRESS_WIDTH)
-        address_valid_o = m.Output("address_valid_o")
-        write_data_o = m.Output("write_data_o", self.DATA_WIDTH)
-        write_data_valid_o = m.Output("write_data_valid_o")
-        read_write_select_o = m.Output("read_write_select_o")
+        be_address_o = m.Output("be_address_o", self.ADDRESS_WIDTH)
+        be_address_valid_o = m.Output("be_address_valid_o")
+        be_write_data_o = m.Output("be_write_data_o", self.DATA_WIDTH)
+        be_write_data_valid_o = m.Output("be_write_data_valid_o")
+        be_read_write_select_o = m.Output("be_read_write_select_o")
 
         # Front End Input Buffers
-        address_i_reg = m.Reg("address_i_reg", self.ADDRESS_WIDTH)
-        # address_valid_i_reg = m.Reg("address_valid_i_reg")
-        write_data_i_reg = m.Reg("write_data_i_reg", self.DATA_WIDTH)
-        # write_data_valid_i_reg = m.Reg("write_data_valid_i_reg")
-        read_write_select_i_reg = m.Reg("read_write_select_i_reg")
+        fe_address_i_reg = m.Reg("fe_address_i_reg", self.ADDRESS_WIDTH)
+        fe_write_data_i_reg = m.Reg("fe_write_data_i_reg", self.DATA_WIDTH)
+        fe_read_write_select_i_reg = m.Reg("fe_read_write_select_i_reg")
 
         # Front End Output Buffers
-        read_data_o_reg = m.Reg("read_data_o_reg", self.DATA_WIDTH)
-        read_data_valid_o_reg = m.Reg("read_data_valid_o_reg")
-        write_done_o_reg = m.Reg("write_done_o_reg")
-        port_ready_o_reg = m.Reg("port_ready_o_reg")
+        fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
+        fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
+        fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
+        fe_port_ready_o_reg = m.Reg("fe_port_ready_o_reg")
 
         # Back End Input Buffers
-        read_data_i_reg = m.Reg("read_data_i_reg", self.DATA_WIDTH)
-        # read_data_valid_i_reg = m.Reg("read_data_valid_i_reg")
-        # write_done_i_reg = m.Reg("write_done_i_reg")
-        # port_ready_i_reg = m.Reg("port_ready_i_reg")
+        be_read_data_i_reg = m.Reg("be_read_data_i_reg", self.DATA_WIDTH)
 
         # Back End Output Buffers
-        address_o_reg = m.Reg("address_o_reg", self.ADDRESS_WIDTH)
-        address_valid_o_reg = m.Reg("address_valid_o_reg")
-        write_data_o_reg = m.Reg("write_data_o_reg", self.DATA_WIDTH)
-        write_data_valid_o_reg = m.Reg("write_data_valid_o_reg")
-        read_write_select_o_reg = m.Reg("read_write_select_o_reg")
+        be_address_o_reg = m.Reg("be_address_o_reg", self.ADDRESS_WIDTH)
+        be_address_valid_o_reg = m.Reg("be_address_valid_o_reg")
+        be_write_data_o_reg = m.Reg("be_write_data_o_reg", self.DATA_WIDTH)
+        be_write_data_valid_o_reg = m.Reg("be_write_data_valid_o_reg")
+        be_read_write_select_o_reg = m.Reg("be_read_write_select_o_reg")
 
         # Frontend Output Buffer Assignments
-        m.Assign(read_data_o(read_data_o_reg))
-        m.Assign(read_data_valid_o(read_data_valid_o_reg))
-        m.Assign(write_done_o(write_done_o_reg))
-        m.Assign(port_ready_o(port_ready_o_reg))
+        m.Assign(fe_read_data_o(fe_read_data_o_reg))
+        m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
+        m.Assign(fe_write_done_o(fe_write_done_o_reg))
+        m.Assign(fe_port_ready_o(fe_port_ready_o_reg))
 
         # Backend Output Buffer Assignments
-        m.Assign(address_o(address_o_reg))
-        m.Assign(address_valid_o(address_valid_o_reg))
-        m.Assign(write_data_o(write_data_o_reg))
-        m.Assign(write_data_valid_o(write_data_valid_o_reg))
-        m.Assign(read_write_select_o(read_write_select_o_reg))
+        m.Assign(be_address_o(be_address_o_reg))
+        m.Assign(be_address_valid_o(be_address_valid_o_reg))
+        m.Assign(be_write_data_o(be_write_data_o_reg))
+        m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
+        m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
         # Internal
         latency_counter = m.Reg("read_latency_counter", self.LATENCY_COUNTER_SIZE)
@@ -123,41 +118,41 @@ class CacheGenerator:
         data_memory = m.Reg("data_memory", self.DATA_WIDTH, dims=self.NUM_SETS)
 
         m.Assign(
-            port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
+            fe_port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
         )
-        m.Assign(address_tag(address_i_reg[self.INDEX_WIDTH: ]))
-        m.Assign(address_index(address_i_reg[:self.INDEX_WIDTH]))
+        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH: ]))
+        m.Assign(address_index(fe_address_i_reg[:self.INDEX_WIDTH]))
 
         m.Always(Posedge(clk_i))(
-            If(port_ready_o_reg == 1)(
+            If(fe_port_ready_o_reg == 1)(
                 # Cache is ready for a new request
-                If(AndList(read_write_select_i == 0, address_valid_i == 1))(
+                If(AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1))(
                     # Read Request
                     read_in_progress(1),
                     hit_lookup_en(1),
                     latency_counter(self.MISS_LATENCY),
-                    address_i_reg(address_i),
-                    read_data_valid_o_reg(0),
-                    write_done_o_reg(0),
+                    fe_address_i_reg(fe_address_i),
+                    fe_read_data_valid_o_reg(0),
+                    fe_write_done_o_reg(0),
                     hit(0),
                     hit_valid(0),
                     req_processed(0),
                 ),
                 If(
                     AndList(
-                        read_write_select_i == 1,
-                        address_valid_i == 1,
-                        write_data_valid_i == 1,
+                        fe_read_write_select_i == 1,
+                        fe_address_valid_i == 1,
+                        fe_write_data_valid_i == 1,
                     )
                 )(
                     # Write Request
                     write_in_progress(1),
                     hit_lookup_en(1),
                     latency_counter(self.MISS_LATENCY),
-                    address_i_reg(address_i),
-                    write_data_i_reg(write_data_i),
-                    read_data_valid_o_reg(0),
-                    write_done_o_reg(0),
+                    fe_address_i_reg(fe_address_i),
+                    fe_write_data_i_reg(fe_write_data_i),
+                    fe_read_data_valid_o_reg(0),
+                    fe_write_done_o_reg(0),
                     hit(0),
                     hit_valid(0),
                 ),
@@ -181,9 +176,9 @@ class CacheGenerator:
                 If(hit == 1)(
                     # We have a hit
                     If(read_in_progress == 1)(
-                        read_data_o_reg(data_memory[address_index]),
+                        fe_read_data_o_reg(data_memory[address_index]),
                     ).Elif(write_in_progress == 1)(
-                        data_memory[address_index](write_data_i_reg),
+                        data_memory[address_index](fe_write_data_i_reg),
                         # valid_memory[address_index](1),
                         # tag_memory[address_index](address_tag),
                     ),
@@ -191,24 +186,24 @@ class CacheGenerator:
                 ).Else(
                     # We have a miss
                     # Request read/write from lower memory
-                    address_o_reg(address_i_reg),
-                    address_valid_o_reg(1),
-                    read_write_select_o_reg(read_write_select_i_reg),
-                    write_data_o_reg(write_data_i_reg),
+                    be_address_o_reg(fe_address_i_reg),
+                    be_address_valid_o_reg(1),
+                    be_read_write_select_o_reg(fe_read_write_select_i_reg),
+                    be_write_data_o_reg(fe_write_data_i_reg),
                 ),
             )
             .Elif(
-                AndList(address_valid_o == 1, OrList(read_data_valid_i, write_done_i))
+                AndList(be_address_valid_o == 1, OrList(be_read_data_valid_i, be_write_done_i))
             )(
                 # Request to main memory was processed, we can now
                 # a) hand the data out and write it to the cache in case of a read
                 # b) do nothing in case of a write
                 req_processed(1),
-                address_valid_o_reg(0),  # this might happen one cycle too late I think ._.
+                be_address_valid_o_reg(0),  # this might happen one cycle too late I think ._.
                 latency_counter.dec(),
-                If(read_write_select_i_reg == 0)(
-                    read_data_o_reg(read_data_i),
-                    data_memory[address_index](read_data_i),
+                If(fe_read_write_select_i_reg == 0)(
+                    fe_read_data_o_reg(be_read_data_i),
+                    data_memory[address_index](be_read_data_i),
                     valid_memory[address_index](1),
                     tag_memory[address_index](address_tag),
                 ),
@@ -219,8 +214,8 @@ class CacheGenerator:
             )
             .Elif(latency_counter == 0)(
                 # We have stalled enough, finish the request
-                read_data_valid_o_reg(read_write_select_i_reg),
-                write_done_o_reg(Not(read_write_select_i_reg)),
+                fe_read_data_valid_o_reg(fe_read_write_select_i_reg),
+                fe_write_done_o_reg(Not(fe_read_write_select_i_reg)),
                 read_in_progress(0),
                 write_in_progress(0),
             )
