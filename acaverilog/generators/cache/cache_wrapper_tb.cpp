@@ -79,22 +79,22 @@ int sc_main(int argc, char **argv)
     address_valid_i.write(0);
     sc_start(1, SC_NS);
 
-    while(!write_done_o.read()){
-        sc_start(1, SC_NS);
-    }
-    sc_start(1, SC_NS);
+    // while(!write_done_o.read()){
+    //     sc_start(1, SC_NS);
+    // }
+    // sc_start(1, SC_NS);
 
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
+    // address_valid_i.write(1);
+    // read_write_select_i.write(0);
+    // sc_start(1, SC_NS);
 
-    address_valid_i.write(0);
-    sc_start(1, SC_NS);
+    // address_valid_i.write(0);
+    // sc_start(1, SC_NS);
 
-    while(!read_data_valid_o.read()){
-        sc_start(1, SC_NS);
-    }
-    sc_start(1, SC_NS);
+    // while(!read_data_valid_o.read()){
+    //     sc_start(1, SC_NS);
+    // }
+    // sc_start(1, SC_NS);
 
 
     sc_start(10, SC_NS);
