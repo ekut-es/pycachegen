@@ -49,7 +49,7 @@ class FunctionalMemoryGenerator:
 
     # def __init__(self, memory: Memory) -> None:
     #     super().__init__(memory)
-    
+
         # self.read_write_ports = memory.read_write_ports
 
         # # check if latencies are integers
@@ -268,6 +268,6 @@ class FunctionalMemoryGenerator:
 
 
 if __name__ == "__main__":
-    memory_generator = FunctionalMemoryGenerator()
+    memory_generator = FunctionalMemoryGenerator(data_width=16, address_width=8)
     m = memory_generator.generate_module()
     m.to_verilog("../src/functional_memory.v", for_verilator=True)
