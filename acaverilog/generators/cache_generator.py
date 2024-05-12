@@ -1,4 +1,5 @@
 from math import ceil, log2
+from enum import Enum
 from veriloggen import (
     Module,
     Submodule,
@@ -14,6 +15,14 @@ from veriloggen import (
 # from acadl import ACADLObject
 
 # from .acadl_object_generator import ACADLObjectGenerator
+
+
+class States(Enum):
+    READY = 0
+    HIT_LOOKUP = 1
+    HIT_LOOKUP_DONE = 2
+    WAIT_FOR_LOWER_MEM = 3
+    STALL = 4
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -32,10 +41,12 @@ class CacheGenerator:
         self.NUM_SETS = 4
         self.HIT_LATENCY = 8
         self.MISS_LATENCY = 10
-        
+
+        # Internal Constants
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH
+        self.STATE_REG_WIDTH = ceil(log2(len(States)))
 
     def generate_module(self) -> Module:
         # m = Module(self.base_file_name)
@@ -78,10 +89,6 @@ class CacheGenerator:
         fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
         fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
-        fe_port_ready_o_reg = m.Reg("fe_port_ready_o_reg")
-
-        # Back End Input Buffers
-        be_read_data_i_reg = m.Reg("be_read_data_i_reg", self.DATA_WIDTH)
 
         # Back End Output Buffers
         be_address_o_reg = m.Reg("be_address_o_reg", self.ADDRESS_WIDTH)
@@ -94,7 +101,6 @@ class CacheGenerator:
         m.Assign(fe_read_data_o(fe_read_data_o_reg))
         m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
-        m.Assign(fe_port_ready_o(fe_port_ready_o_reg))
 
         # Backend Output Buffer Assignments
         m.Assign(be_address_o(be_address_o_reg))
@@ -104,11 +110,8 @@ class CacheGenerator:
         m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
         # Internal
+        state_reg = m.Reg("state_reg", self.STATE_REG_WIDTH)
         latency_counter = m.Reg("read_latency_counter", self.LATENCY_COUNTER_SIZE)
-        read_in_progress = m.Reg("read_in_progress")
-        write_in_progress = m.Reg("write_in_progress")
-        req_processed = m.Reg("req_processed")
-        hit_lookup_en = m.Reg("hit_lookup_en")
         hit = m.Reg("hit")
         hit_valid = m.Reg("hit_valid")
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
@@ -117,47 +120,37 @@ class CacheGenerator:
         valid_memory = m.Reg("valid_memory", 1, dims=self.NUM_SETS)
         data_memory = m.Reg("data_memory", self.DATA_WIDTH, dims=self.NUM_SETS)
 
-        m.Assign(
-            fe_port_ready_o_reg(AndList(read_in_progress == 0, write_in_progress == 0))
-        )
-        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH: ]))
-        m.Assign(address_index(fe_address_i_reg[:self.INDEX_WIDTH]))
+        m.Assign(fe_port_ready_o(state_reg == States.READY.value))
+        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
+        m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
 
         m.Always(Posedge(clk_i))(
-            If(fe_port_ready_o_reg == 1)(
+            If(state_reg == States.READY.value)(
                 # Cache is ready for a new request
-                If(AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1))(
-                    # Read Request
-                    read_in_progress(1),
-                    hit_lookup_en(1),
-                    latency_counter(self.MISS_LATENCY),
-                    fe_address_i_reg(fe_address_i),
-                    fe_read_data_valid_o_reg(0),
-                    fe_write_done_o_reg(0),
-                    hit(0),
-                    hit_valid(0),
-                    req_processed(0),
-                ),
                 If(
-                    AndList(
-                        fe_read_write_select_i == 1,
-                        fe_address_valid_i == 1,
-                        fe_write_data_valid_i == 1,
+                    OrList(
+                        AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1),
+                        AndList(
+                            fe_read_write_select_i == 1,
+                            fe_write_data_valid_i == 1,
+                            fe_address_valid_i == 1,
+                        ),
                     )
                 )(
-                    # Write Request
-                    write_in_progress(1),
-                    hit_lookup_en(1),
-                    latency_counter(self.MISS_LATENCY),
-                    fe_address_i_reg(fe_address_i),
-                    fe_write_data_i_reg(fe_write_data_i),
+                    # Read Request
+                    state_reg(States.HIT_LOOKUP.value),
                     fe_read_data_valid_o_reg(0),
                     fe_write_done_o_reg(0),
-                    hit(0),
-                    hit_valid(0),
-                ),
+                    # Buffer Inputs
+                    fe_address_i_reg(fe_address_i),
+                    fe_write_data_i_reg(fe_write_data_i),
+                    fe_read_write_select_i_reg(fe_read_write_select_i),
+                )
             )
-            .Elif(hit_lookup_en == 1)(
+        )
+
+        m.Always(Posedge(clk_i))(
+            If(state_reg == States.HIT_LOOKUP.value)(
                 # Check whether we have a hit
                 hit(
                     AndList(
@@ -166,23 +159,23 @@ class CacheGenerator:
                     )
                 ),
                 hit_valid(1),
-                latency_counter.dec(),
-                hit_lookup_en(0),
+                latency_counter.inc(),
+                state_reg(States.HIT_LOOKUP_DONE.value),
             )
-            .Elif(hit_valid == 1)(
+        )
+
+        m.Always(Posedge(clk_i))(
+            If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
-                latency_counter.dec(),
-                hit_valid(0),
+                latency_counter.inc(),
                 If(hit == 1)(
                     # We have a hit
-                    If(read_in_progress == 1)(
+                    If(fe_read_write_select_i_reg == 0)(
                         fe_read_data_o_reg(data_memory[address_index]),
-                    ).Elif(write_in_progress == 1)(
+                    ).Elif(fe_read_write_select_i_reg == 1)(
                         data_memory[address_index](fe_write_data_i_reg),
-                        # valid_memory[address_index](1),
-                        # tag_memory[address_index](address_tag),
                     ),
-                    req_processed(1),
+                    state_reg(States.STALL.value),
                 ).Else(
                     # We have a miss
                     # Request read/write from lower memory
@@ -190,34 +183,58 @@ class CacheGenerator:
                     be_address_valid_o_reg(1),
                     be_read_write_select_o_reg(fe_read_write_select_i_reg),
                     be_write_data_o_reg(fe_write_data_i_reg),
+                    be_write_data_valid_o_reg(fe_read_write_select_i_reg),
+                    If(be_port_ready_i == 1)(
+                        state_reg(States.WAIT_FOR_LOWER_MEM.value)
+                    ),
                 ),
             )
-            .Elif(
-                AndList(be_address_valid_o == 1, OrList(be_read_data_valid_i, be_write_done_i))
-            )(
-                # Request to main memory was processed, we can now
-                # a) hand the data out and write it to the cache in case of a read
-                # b) do nothing in case of a write
-                req_processed(1),
-                be_address_valid_o_reg(0),  # this might happen one cycle too late I think ._.
-                latency_counter.dec(),
-                If(fe_read_write_select_i_reg == 0)(
-                    fe_read_data_o_reg(be_read_data_i),
-                    data_memory[address_index](be_read_data_i),
-                    valid_memory[address_index](1),
-                    tag_memory[address_index](address_tag),
-                ),
+        )
+
+        m.Always(Posedge(clk_i))(
+            If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
+                # Waiting for the lower memory to fulfill the request
+                If(
+                    AndList(
+                        be_address_valid_o == 1, # FIXME Remove this part?
+                        OrList(be_read_data_valid_i, be_write_done_i),
+                    )
+                )(
+                    # Request to main memory was processed, we can now
+                    # a) hand the data out and write it to the cache in case of a read
+                    # b) do nothing in case of a write
+                    latency_counter.dec(),
+                    state_reg(States.STALL.value),
+                    If(fe_read_write_select_i_reg == 0)(
+                        fe_read_data_o_reg(be_read_data_i),
+                        data_memory[address_index](be_read_data_i),
+                        valid_memory[address_index](1),
+                        tag_memory[address_index](address_tag),
+                    ),
+                ).Else(
+                    # Invalidate the address so as to not send another request
+                    be_address_valid_o_reg(0)
+                )
             )
-            .Elif(AndList(req_processed, latency_counter != 0))(
+        )
+
+        m.Always(Posedge(clk_i))(
+            If(state_reg == States.STALL.value)(
                 # Stall for the remaining time (or error if this took too much time...?)
-                latency_counter.dec()
-            )
-            .Elif(latency_counter == 0)(
-                # We have stalled enough, finish the request
-                fe_read_data_valid_o_reg(fe_read_write_select_i_reg),
-                fe_write_done_o_reg(Not(fe_read_write_select_i_reg)),
-                read_in_progress(0),
-                write_in_progress(0),
+                latency_counter.inc(),
+                If(
+                    OrList(
+                        AndList(latency_counter == self.HIT_LATENCY, hit == 1),
+                        AndList(latency_counter == self.MISS_LATENCY, hit == 0),
+                    )
+                )(
+                    # We have stalled enough, finish the request
+                    fe_read_data_valid_o_reg(fe_read_write_select_i_reg),
+                    fe_write_done_o_reg(Not(fe_read_write_select_i_reg)),
+                    state_reg(States.READY.value),
+                    hit_valid(0),
+                    latency_counter(0),
+                ),
             )
         )
         return m
