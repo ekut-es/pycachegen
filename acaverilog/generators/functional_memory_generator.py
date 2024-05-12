@@ -39,17 +39,17 @@ class MemoryFileDoesNotExist(Exception):
 # class MemoryGenerator(ACADLObjectGenerator):
 class FunctionalMemoryGenerator:
 
-    # def __init__(self, memory: Memory) -> None:
-    #     super().__init__(memory)
-
-    def __init__(self) -> None:
-
+    def __init__(self, data_width: int, address_width: int) -> None:
+        self.data_width = data_width
+        self.address_width = address_width
+        # non configurable atm
         self.read_write_ports = 1
         self.read_latency = 10
         self.write_latency = 15
-        self.data_width = 32
-        self.address_width = 32
 
+    # def __init__(self, memory: Memory) -> None:
+    #     super().__init__(memory)
+    
         # self.read_write_ports = memory.read_write_ports
 
         # # check if latencies are integers
