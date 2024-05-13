@@ -137,15 +137,7 @@ int sc_main(int argc, char** argv) {
 
         tick(10);
     } catch (std::runtime_error& e) {
-        cache_wrapper->final();
-
-        trace->flush();
-        trace->close();
-
-        delete trace;
-
-        std::cout << "Vcache_wrapper done!" << std::endl;
-        throw;
+        std::cerr << e.what() << std::endl;
     }
 
     cache_wrapper->final();
