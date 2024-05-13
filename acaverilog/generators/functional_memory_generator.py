@@ -50,76 +50,74 @@ class FunctionalMemoryGenerator:
     # def __init__(self, memory: Memory) -> None:
     #     super().__init__(memory)
 
-        # self.read_write_ports = memory.read_write_ports
+    # self.read_write_ports = memory.read_write_ports
 
-        # # check if latencies are integers
-        # if self.acadl_object.read_latency.int_latency == -1:
-        #     raise LatencyIsNotAnInteger(self.acadl_object,
-        #                                 self.acadl_object.read_latency)
+    # # check if latencies are integers
+    # if self.acadl_object.read_latency.int_latency == -1:
+    #     raise LatencyIsNotAnInteger(self.acadl_object,
+    #                                 self.acadl_object.read_latency)
 
-        # if self.acadl_object.write_latency.int_latency == -1:
-        #     raise LatencyIsNotAnInteger(self.acadl_object,
-        #                                 self.acadl_object.write_latency)
+    # if self.acadl_object.write_latency.int_latency == -1:
+    #     raise LatencyIsNotAnInteger(self.acadl_object,
+    #                                 self.acadl_object.write_latency)
 
-        # if self.acadl_object.read_latency.int_latency == 0:
-        #     self.acadl_object.read_latency.int_latency = 1
+    # if self.acadl_object.read_latency.int_latency == 0:
+    #     self.acadl_object.read_latency.int_latency = 1
 
-        # if self.acadl_object.write_latency.int_latency == 0:
-        #     self.acadl_object.write_latency.int_latency = 1
+    # if self.acadl_object.write_latency.int_latency == 0:
+    #     self.acadl_object.write_latency.int_latency = 1
 
-        # # check parameters for testbench
-        # if self.acadl_object.port_width * self.acadl_object.data_width > 32:
-        #     raise MemoryTestbenchParameterException(
-        #         self.acadl_object, "port_bits_width",
-        #         self.acadl_object.port_width * self.acadl_object.data_width)
+    # # check parameters for testbench
+    # if self.acadl_object.port_width * self.acadl_object.data_width > 32:
+    #     raise MemoryTestbenchParameterException(
+    #         self.acadl_object, "port_bits_width",
+    #         self.acadl_object.port_width * self.acadl_object.data_width)
 
-        # # sort address ranges by first address of tuple
-        # self.address_ranges = sorted(self.acadl_object.address_ranges,
-        #                              key=lambda x: x[0])
+    # # sort address ranges by first address of tuple
+    # self.address_ranges = sorted(self.acadl_object.address_ranges,
+    #                              key=lambda x: x[0])
 
-        # # check that address ranges don't overlap
-        # previous_address_range = self.address_ranges[0]
-        # for current_address_range in self.address_ranges[1:]:
-        #     if previous_address_range[1] > current_address_range[0]:
-        #         raise MemoryAddressRangesOverlapException(self.acadl_object)
+    # # check that address ranges don't overlap
+    # previous_address_range = self.address_ranges[0]
+    # for current_address_range in self.address_ranges[1:]:
+    #     if previous_address_range[1] > current_address_range[0]:
+    #         raise MemoryAddressRangesOverlapException(self.acadl_object)
 
-        # # calculate memory lines
-        # self.memory_lines = 0
-        # for address_range in self.address_ranges:
-        #     self.memory_lines += len(range(address_range[0], address_range[1]))
+    # # calculate memory lines
+    # self.memory_lines = 0
+    # for address_range in self.address_ranges:
+    #     self.memory_lines += len(range(address_range[0], address_range[1]))
 
-        # self.address_translation_map = {}
-        # last_address_of_previous_translated_address_range = 0
-        # for address_range in self.address_ranges:
-        #     self.address_translation_map[address_range] = -address_range[
-        #         0] + last_address_of_previous_translated_address_range
-        #     last_address_of_previous_translated_address_range = address_range[
-        #         0] + self.address_translation_map[
-        #             address_range] + address_range[1] - address_range[0]
+    # self.address_translation_map = {}
+    # last_address_of_previous_translated_address_range = 0
+    # for address_range in self.address_ranges:
+    #     self.address_translation_map[address_range] = -address_range[
+    #         0] + last_address_of_previous_translated_address_range
+    #     last_address_of_previous_translated_address_range = address_range[
+    #         0] + self.address_translation_map[
+    #             address_range] + address_range[1] - address_range[0]
 
-        # # calculate address_width
-        # # collabs address ranges List[Tuple[int,int]] into List[int]
-        # min_max_addresses = [
-        #     address for address_range in self.address_ranges
-        #     for address in address_range
-        # ]
-        # self.address_width = ceil(log2(max(min_max_addresses)))
-        # self.max_data_word_distance = 1024  # TODO change
+    # # calculate address_width
+    # # collabs address ranges List[Tuple[int,int]] into List[int]
+    # min_max_addresses = [
+    #     address for address_range in self.address_ranges
+    #     for address in address_range
+    # ]
+    # self.address_width = ceil(log2(max(min_max_addresses)))
+    # self.max_data_word_distance = 1024  # TODO change
 
     def generate_module(self) -> Module:
 
         m = Module("functional_memory")
 
         # parameters
-        READ_LATENCY = m.Parameter(
-            'READ_LATENCY', self.read_latency - 1)
-        WRITE_LATENCY = m.Parameter(
-            'WRITE_LATENCY', self.write_latency - 1)
-        DATA_WIDTH = m.Parameter('DATA_WIDTH', self.data_width)
-        ADDRESS_WIDTH = m.Parameter('ADDRESS_WIDTH', self.address_width)
+        READ_LATENCY = m.Parameter("READ_LATENCY", self.read_latency - 1)
+        WRITE_LATENCY = m.Parameter("WRITE_LATENCY", self.write_latency - 1)
+        DATA_WIDTH = m.Parameter("DATA_WIDTH", self.data_width)
+        ADDRESS_WIDTH = m.Parameter("ADDRESS_WIDTH", self.address_width)
 
-        clk_i = m.Input('clk_i')
-        reset_n_i = m.Input('reset_n_i')
+        clk_i = m.Input("clk_i")
+        reset_n_i = m.Input("reset_n_i")
 
         # inputs
         address_i = []
@@ -128,11 +126,11 @@ class FunctionalMemoryGenerator:
         write_data_valid_i = []
         read_write_select_i = []
         for i in range(self.read_write_ports):
-            address_i.append(m.Input(f'address_{i}_i', ADDRESS_WIDTH))
-            address_valid_i.append(m.Input(f'address_valid_{i}_i'))
-            write_data_i.append(m.Input(f'write_data_{i}_i', DATA_WIDTH))
-            write_data_valid_i.append(m.Input(f'write_data_valid_{i}_i'))
-            read_write_select_i.append(m.Input(f'read_write_select_{i}_i'))
+            address_i.append(m.Input(f"address_{i}_i", ADDRESS_WIDTH))
+            address_valid_i.append(m.Input(f"address_valid_{i}_i"))
+            write_data_i.append(m.Input(f"write_data_{i}_i", DATA_WIDTH))
+            write_data_valid_i.append(m.Input(f"write_data_valid_{i}_i"))
+            read_write_select_i.append(m.Input(f"read_write_select_{i}_i"))
 
         # outputs
         read_data_o = []
@@ -140,26 +138,27 @@ class FunctionalMemoryGenerator:
         write_done_o = []
         port_ready_o = []
         for i in range(self.read_write_ports):
-            read_data_o.append(m.Output(f'read_data_{i}_o', DATA_WIDTH))
-            read_data_valid_o.append(m.Output(f'read_data_valid_{i}_o'))
-            write_done_o.append(m.Output(f'write_done_{i}_o'))
-            port_ready_o.append(m.Output(f'port_ready_{i}_o'))
+            read_data_o.append(m.Output(f"read_data_{i}_o", DATA_WIDTH))
+            read_data_valid_o.append(m.Output(f"read_data_valid_{i}_o"))
+            write_done_o.append(m.Output(f"write_done_{i}_o"))
+            port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
         READ_LATENCY_COUNTER_SIZE = m.Localparam(
-            'READ_LATENCY_COUNTER_SIZE',
-            ceil(log2(self.read_latency)))
+            "READ_LATENCY_COUNTER_SIZE", ceil(log2(self.read_latency))
+        )
         WRITE_LATENCY_COUNTER_SIZE = m.Localparam(
-            'WRITE_LATENCY_COUNTER_SIZE',
-            ceil(log2(self.write_latency)))
+            "WRITE_LATENCY_COUNTER_SIZE", ceil(log2(self.write_latency))
+        )
 
         read_latency_counter = []
         write_latency_counter = []
         for i in range(self.read_write_ports):
             read_latency_counter.append(
-                m.Reg(f'read_latency_counter_{i}', READ_LATENCY_COUNTER_SIZE))
+                m.Reg(f"read_latency_counter_{i}", READ_LATENCY_COUNTER_SIZE)
+            )
             write_latency_counter.append(
-                m.Reg(f'write_latency_counter_{i}',
-                      WRITE_LATENCY_COUNTER_SIZE))
+                m.Reg(f"write_latency_counter_{i}", WRITE_LATENCY_COUNTER_SIZE)
+            )
 
         # input buffer
         address = []
@@ -168,11 +167,11 @@ class FunctionalMemoryGenerator:
         write_data_valid = []
         read_write_select = []
         for i in range(self.read_write_ports):
-            address.append(m.Reg(f'address_{i}', ADDRESS_WIDTH))
-            address_valid.append(m.Reg(f'address_valid_{i}'))
-            write_data.append(m.Reg(f'write_data_{i}', DATA_WIDTH))
-            write_data_valid.append(m.Reg(f'write_data_valid_{i}'))
-            read_write_select.append(m.Reg(f'read_write_select_{i}'))
+            address.append(m.Reg(f"address_{i}", ADDRESS_WIDTH))
+            address_valid.append(m.Reg(f"address_valid_{i}"))
+            write_data.append(m.Reg(f"write_data_{i}", DATA_WIDTH))
+            write_data_valid.append(m.Reg(f"write_data_valid_{i}"))
+            read_write_select.append(m.Reg(f"read_write_select_{i}"))
 
         # output buffer
         read_data = []
@@ -180,22 +179,25 @@ class FunctionalMemoryGenerator:
         write_done = []
         port_ready = []
         for i in range(self.read_write_ports):
-            read_data.append(m.Reg(f'read_data_{i}', DATA_WIDTH))
-            read_data_valid.append(m.Reg(f'read_data_valid_{i}'))
-            write_done.append(m.Reg(f'write_done_{i}'))
-            port_ready.append(m.Reg(f'port_ready_{i}'))
+            read_data.append(m.Reg(f"read_data_{i}", DATA_WIDTH))
+            read_data_valid.append(m.Reg(f"read_data_valid_{i}"))
+            write_done.append(m.Reg(f"write_done_{i}"))
+            port_ready.append(m.Reg(f"port_ready_{i}"))
 
         # internal
         data_memory = m.Reg("data_memory", DATA_WIDTH, dims=pow(2, ADDRESS_WIDTH.value))
         read_in_progress = []
         write_in_progress = []
         for i in range(self.read_write_ports):
-            read_in_progress.append(m.Reg(f'read_in_progress_{i}'))
-            write_in_progress.append(m.Reg(f'write_in_progress_{i}'))
+            read_in_progress.append(m.Reg(f"read_in_progress_{i}"))
+            write_in_progress.append(m.Reg(f"write_in_progress_{i}"))
 
         for i in range(self.read_write_ports):
-            m.Assign(port_ready[i](AndList(read_in_progress[i] == 0,
-                                           write_in_progress[i] == 0)))
+            m.Assign(
+                port_ready[i](
+                    AndList(read_in_progress[i] == 0, write_in_progress[i] == 0)
+                )
+            )
 
         for i in range(self.read_write_ports):
             m.Assign(read_data_o[i](read_data[i]))
@@ -205,69 +207,94 @@ class FunctionalMemoryGenerator:
 
         for i in range(self.read_write_ports):
             m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-                If(reset_n_i == 0)
-                (read_latency_counter[i](READ_LATENCY),
-                 write_latency_counter[i](WRITE_LATENCY), address[i](0),
-                 address_valid[i](0), write_data[i](0), write_data_valid[i](0),
-                 read_write_select[i](0), read_data[i](0),
-                 read_data_valid[i](0), write_done[i](0)).Else(
-                     # nothing in progress
-                     If(port_ready[i] == 1)
-                     (
-                         # initialize read: buffer data and set latency counter
-                         If(
-                             AndList(read_write_select_i[i] == 0,
-                                     address_valid_i[i] == 1))
-                         (read_in_progress[i](1),
-                          read_latency_counter[i](READ_LATENCY),
-                          address[i](address_i[i]), address_valid[i](1),
-                          read_data_valid[i](0), write_done[i](0)),
-                         # initialize write
-                         If(
-                             AndList(read_write_select_i[i] == 1,
-                                     address_valid_i[i] == 1,
-                                     write_data_valid_i[i] == 1))
-                         (write_in_progress[i](1),
-                          write_latency_counter[i](WRITE_LATENCY),
-                          address[i](address_i[i]), address_valid[i](1),
-                          write_data[i](write_data_i[i]),
-                          read_data_valid[i](0), write_done[i](0))
-                     ).Else(
-                         # decrement read latency counter if read in progress
-                         If(
-                             AndList(read_in_progress[i] == 1,
-                                     read_latency_counter[i] != 0))
-                         (read_latency_counter[i](read_latency_counter[i] - 1)
-                          ),
-                         # decrement write latency counter if write in progress
-                         If(
-                             AndList(write_in_progress[i] == 1,
-                                     write_latency_counter[i] != 0))
-                         (write_latency_counter[i](write_latency_counter[i] -
-                                                   1)),
-                         # finish read
-                         If(
-                             AndList(read_in_progress[i] == 1,
-                                     read_latency_counter[i] == 0))
-                         (
-                             read_in_progress[i](0),
-                             address_valid[i](0),
-                             read_data[i](data_memory[address[i]]),
-                             read_data_valid[i](1)),
-                         # finish write
-                         If(
-                             AndList(write_in_progress[i] == 1,
-                                     write_latency_counter[i] == 0))
-                         (write_in_progress[i](0), address_valid[i](0),
-                          write_done[i](1)), data_memory[address[i]](write_data[i])),
-
-                     # reset write_done after one cycle
-                     If(write_done[i] == 1)(write_done[i](0))))
+                If(reset_n_i == 0)(
+                    read_latency_counter[i](READ_LATENCY),
+                    write_latency_counter[i](WRITE_LATENCY),
+                    address[i](0),
+                    address_valid[i](0),
+                    write_data[i](0),
+                    write_data_valid[i](0),
+                    read_write_select[i](0),
+                    read_data[i](0),
+                    read_data_valid[i](0),
+                    write_done[i](0),
+                ).Else(
+                    # nothing in progress
+                    If(port_ready[i] == 1)(
+                        # initialize read: buffer data and set latency counter
+                        If(
+                            AndList(
+                                read_write_select_i[i] == 0, address_valid_i[i] == 1
+                            )
+                        )(
+                            read_in_progress[i](1),
+                            read_latency_counter[i](READ_LATENCY),
+                            address[i](address_i[i]),
+                            address_valid[i](1),
+                            read_data_valid[i](0),
+                            write_done[i](0),
+                        ),
+                        # initialize write
+                        If(
+                            AndList(
+                                read_write_select_i[i] == 1,
+                                address_valid_i[i] == 1,
+                                write_data_valid_i[i] == 1,
+                            )
+                        )(
+                            write_in_progress[i](1),
+                            write_latency_counter[i](WRITE_LATENCY),
+                            address[i](address_i[i]),
+                            address_valid[i](1),
+                            write_data[i](write_data_i[i]),
+                            read_data_valid[i](0),
+                            write_done[i](0),
+                        ),
+                    ).Else(
+                        # decrement read latency counter if read in progress
+                        If(
+                            AndList(
+                                read_in_progress[i] == 1, read_latency_counter[i] != 0
+                            )
+                        )(read_latency_counter[i](read_latency_counter[i] - 1)),
+                        # decrement write latency counter if write in progress
+                        If(
+                            AndList(
+                                write_in_progress[i] == 1, write_latency_counter[i] != 0
+                            )
+                        )(write_latency_counter[i](write_latency_counter[i] - 1)),
+                        # finish read
+                        If(
+                            AndList(
+                                read_in_progress[i] == 1, read_latency_counter[i] == 0
+                            )
+                        )(
+                            read_in_progress[i](0),
+                            address_valid[i](0),
+                            read_data[i](data_memory[address[i]]),
+                            read_data_valid[i](1),
+                        ),
+                        # finish write
+                        If(
+                            AndList(
+                                write_in_progress[i] == 1, write_latency_counter[i] == 0
+                            )
+                        )(
+                            write_in_progress[i](0),
+                            address_valid[i](0),
+                            write_done[i](1),
+                            data_memory[address[i]](write_data[i]),
+                        ),
+                    )
+                ),
+                # reset write_done after one cycle
+                If(write_done[i] == 1)(write_done[i](0)),
+            )
 
         return m
 
 
 if __name__ == "__main__":
-    memory_generator = FunctionalMemoryGenerator(data_width=16, address_width=8)
+    memory_generator = FunctionalMemoryGenerator(data_width=16, address_width=3)
     m = memory_generator.generate_module()
     m.to_verilog("../src/functional_memory.v", for_verilator=True)

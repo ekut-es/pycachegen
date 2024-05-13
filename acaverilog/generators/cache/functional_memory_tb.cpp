@@ -48,9 +48,60 @@ int sc_main(int argc, char **argv)
     memory->write_done_0_o(write_done_o);
     memory->port_ready_0_o(port_ready_o);
 
+    const int MAX_SIMULATION_TIME = 1000;
+
+    auto tick = [&](int amount) {
+        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
+            throw std::runtime_error("Exceeded maximum simulation time");
+        }
+        sc_start(amount, SC_NS);
+    };
+
+    auto read_assert = [&](int expected) {
+        if (read_data_o.read() == expected) {
+            std::cout << "Read Successful at cycle "
+                      << sc_time_stamp().to_default_time_units() << std::endl;
+        } else {
+            cerr << "Read failed at "
+                 << sc_time_stamp().to_default_time_units() << "; expected "
+                 << std::to_string(expected) << " got "
+                 << std::to_string(read_data_o.read()) << "; continuing"
+                 << std::endl;
+        }
+    };
+
+    auto read = [&](int address, int expected) {
+        address_i.write(address);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        tick(1);
+        address_valid_i.write(0);
+        tick(1);
+        while (!port_ready_o.read()) {
+            tick(1);
+        }
+        read_assert(expected);
+    };
+
+    auto write = [&](int address, int data) {
+        address_i.write(address);
+        address_valid_i.write(1);
+        write_data_i.write(data);
+        write_data_valid_i.write(1);
+        read_write_select_i.write(1);
+        tick(1);
+        address_valid_i.write(0);
+        tick(1);
+        while (!port_ready_o.read()) {
+            tick(1);
+        }
+        std::cout << "Write to address " << std::to_string(address)
+                  << std::endl;
+    };
+
     std::cout << "Vfunctional_memory start!" << std::endl;
 
-    sc_start(0, SC_NS);
+    tick(0);
 
     VerilatedVcdSc *trace = new VerilatedVcdSc();
     memory->trace(trace, 99);
@@ -65,37 +116,18 @@ int sc_main(int argc, char **argv)
     }
 
     // do stuff
-    sc_start(1, SC_NS);
+    tick(1);
     reset_n_i.write(1);
-    sc_start(1, SC_NS);
+    tick(1);
 
-    address_i.write(4);
-    address_valid_i.write(1);
-    write_data_i.write(242);
-    write_data_valid_i.write(1);
-    read_write_select_i.write(1);
-    sc_start(1, SC_NS);
-
-    address_valid_i.write(0);
-    sc_start(1, SC_NS);
-
-    while(!write_done_o.read()){
-        sc_start(1, SC_NS);
-    }
-    sc_start(1, SC_NS);
-
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
-
-    address_valid_i.write(0);
-    sc_start(1, SC_NS);
-
-    while(!read_data_valid_o.read()){
-        sc_start(1, SC_NS);
-    }
-    sc_start(1, SC_NS);
-
+    read(0, 0);
+    read(1, 0);
+    read(2, 0);
+    read(3, 0);
+    
+    write(4, 333);
+    read(4, 333);
+    read(0, 0);
 
     sc_start(10, SC_NS);
 
