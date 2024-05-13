@@ -172,12 +172,13 @@ class CacheGenerator:
                     # We have a hit
                     If(fe_read_write_select_i_reg == 0)(
                         fe_read_data_o_reg(data_memory[address_index]),
+                        state_reg(States.STALL.value),
                     ).Elif(fe_read_write_select_i_reg == 1)(
                         data_memory[address_index](fe_write_data_i_reg),
-                    ),
-                    state_reg(States.STALL.value),
-                ).Else(
-                    # We have a miss
+                    )
+                ),
+                If(OrList(hit == 0, fe_read_write_select_i_reg == 1))(
+                    # We have a miss or we need to write
                     # Request read/write from lower memory
                     be_address_o_reg(fe_address_i_reg),
                     be_address_valid_o_reg(1),

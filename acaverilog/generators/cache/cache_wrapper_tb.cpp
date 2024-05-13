@@ -2,19 +2,17 @@
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
 
-#include "Vcache_wrapper.h"
-
 #include <iostream>
 
-int sc_main(int argc, char **argv)
-{
+#include "Vcache_wrapper.h"
+
+int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
     std::string vcd_file_path;
 
-    if (argc == 2)
-    {
+    if (argc == 2) {
         vcd_file_path = std::string(argv[1]);
     }
 
@@ -32,7 +30,8 @@ int sc_main(int argc, char **argv)
     sc_signal<bool> write_done_o;
     sc_signal<bool> port_ready_o;
 
-    const std::unique_ptr<Vcache_wrapper> cache_wrapper{new Vcache_wrapper{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper> cache_wrapper{
+        new Vcache_wrapper{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -48,66 +47,92 @@ int sc_main(int argc, char **argv)
     cache_wrapper->write_done_o(write_done_o);
     cache_wrapper->port_ready_o(port_ready_o);
 
+    const int MAX_SIMULATION_TIME = 500;
+
+    auto tick = [&](int amount) {
+        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
+            throw std::runtime_error("Exceeded maximum simulation time");
+        }
+        sc_start(amount, SC_NS);
+    };
+
+    auto read_assert = [&](int expected) {
+        if (read_data_o.read() == expected) {
+            std::cout << "Read Successful at cycle "
+                      << sc_time_stamp().to_default_time_units() << std::endl;
+        } else {
+            cerr << "Read failed at "
+                 << sc_time_stamp().to_default_time_units() << "; expected "
+                 << std::to_string(expected) << " got "
+                 << std::to_string(read_data_o.read()) << "; continuing"
+                 << std::endl;
+        }
+    };
+
+    auto read = [&](int address, int expected) {
+        address_i.write(address);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        tick(1);
+        address_valid_i.write(0);
+        tick(1);
+        while (!port_ready_o.read()) {
+            tick(1);
+        }
+        read_assert(expected);
+    };
+
+    auto write = [&](int address, int data) {
+        address_i.write(address);
+        address_valid_i.write(1);
+        write_data_i.write(data);
+        write_data_valid_i.write(1);
+        read_write_select_i.write(1);
+        tick(1);
+        address_valid_i.write(0);
+        tick(1);
+        while (!port_ready_o.read()) {
+            tick(1);
+        }
+    };
+
     std::cout << "Vcache_wrapper start!" << std::endl;
 
-    sc_start(0, SC_NS);
+    tick(0);
 
-    VerilatedVcdSc *trace = new VerilatedVcdSc();
+    VerilatedVcdSc* trace = new VerilatedVcdSc();
     cache_wrapper->trace(trace, 99);
 
-    if (vcd_file_path.empty())
-    {
+    if (vcd_file_path.empty()) {
         trace->open("Vcache_wrapper_tb.vcd");
-    }
-    else
-    {
+    } else {
         trace->open(vcd_file_path.c_str());
     }
 
-    // do stuff
-    sc_start(1, SC_NS);
-    reset_n_i.write(1);
-    sc_start(1, SC_NS);
+    try {
+        // do stuff
+        tick(1);
+        reset_n_i.write(1);
+        tick(1);
 
-    address_i.write(4);
-    address_valid_i.write(1);
-    write_data_i.write(242);
-    write_data_valid_i.write(1);
-    read_write_select_i.write(1);
-    sc_start(1, SC_NS);
+        write(4, 242);
+        read(4, 242);
+        read(4, 242);
+        write(4, 333);
+        read(4, 333);
 
-    address_valid_i.write(0);
-    sc_start(1, SC_NS);
+        tick(10);
+    } catch (std::runtime_error& e) {
+        cache_wrapper->final();
 
-    // while(!write_done_o.read()){
-    //     sc_start(1, SC_NS);
-    // }
-    // sc_start(1, SC_NS);
+        trace->flush();
+        trace->close();
 
-    // ####
-    sc_start(30, SC_NS);
+        delete trace;
 
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
-
-    address_valid_i.write(0);
-    sc_start(1, SC_NS);
-    
-    sc_start(30, SC_NS);
-    address_valid_i.write(1);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-
-    // ####
-
-    // while(!read_data_valid_o.read()){
-    //     sc_start(1, SC_NS);
-    // }
-    // sc_start(1, SC_NS);
-
-
-    sc_start(100, SC_NS);
+        std::cout << "Vcache_wrapper done!" << std::endl;
+        throw;
+    }
 
     cache_wrapper->final();
 
