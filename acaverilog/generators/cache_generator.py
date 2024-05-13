@@ -111,7 +111,7 @@ class CacheGenerator:
 
         # Internal
         state_reg = m.Reg("state_reg", self.STATE_REG_WIDTH)
-        latency_counter = m.Reg("read_latency_counter", self.LATENCY_COUNTER_SIZE)
+        latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
         hit = m.Reg("hit")
         hit_valid = m.Reg("hit_valid")
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
@@ -195,15 +195,15 @@ class CacheGenerator:
             If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
                 # Waiting for the lower memory to fulfill the request
                 If(
-                    AndList(
-                        be_address_valid_o == 1, # FIXME Remove this part?
-                        OrList(be_read_data_valid_i, be_write_done_i),
+                    OrList(
+                        AndList(be_read_data_valid_i, Not(fe_read_write_select_i_reg)),
+                        AndList(be_write_done_i, fe_read_write_select_i_reg),
                     )
                 )(
                     # Request to main memory was processed, we can now
                     # a) hand the data out and write it to the cache in case of a read
                     # b) do nothing in case of a write
-                    latency_counter.dec(),
+                    latency_counter.inc(),
                     state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg == 0)(
                         fe_read_data_o_reg(be_read_data_i),
@@ -224,13 +224,13 @@ class CacheGenerator:
                 latency_counter.inc(),
                 If(
                     OrList(
-                        AndList(latency_counter == self.HIT_LATENCY, hit == 1),
-                        AndList(latency_counter == self.MISS_LATENCY, hit == 0),
+                        AndList(latency_counter == self.HIT_LATENCY - 1, hit == 1),
+                        AndList(latency_counter == self.MISS_LATENCY - 1, hit == 0),
                     )
                 )(
                     # We have stalled enough, finish the request
-                    fe_read_data_valid_o_reg(fe_read_write_select_i_reg),
-                    fe_write_done_o_reg(Not(fe_read_write_select_i_reg)),
+                    fe_read_data_valid_o_reg(Not(fe_read_write_select_i_reg)),
+                    fe_write_done_o_reg(fe_read_write_select_i_reg),
                     state_reg(States.READY.value),
                     hit_valid(0),
                     latency_counter(0),

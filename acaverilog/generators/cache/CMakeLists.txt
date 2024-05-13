@@ -14,6 +14,8 @@ if(NOT verilator_FOUND)
     )
 endif()
 
+file(GLOB SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
+file(REMOVE ${SRC_FILES})
 execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../functional_memory_generator.py"
 )
