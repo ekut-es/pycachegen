@@ -43,6 +43,7 @@ class CacheWrapperGenerator:
         read_data_valid_o = m.Output("read_data_valid_o")
         write_done_o = m.Output("write_done_o")
         port_ready_o = m.Output("port_ready_o")
+        hit_o = m.Output("hit_o")
 
         # Backend Cache <- Memory
         be_read_data = m.Wire("be_read_data", DATA_WIDTH)
@@ -76,6 +77,7 @@ class CacheWrapperGenerator:
                 ("fe_read_data_valid_o", read_data_valid_o),
                 ("fe_write_done_o", write_done_o),
                 ("fe_port_ready_o", port_ready_o),
+                ("fe_hit_o", hit_o),
                 # Backend Cache <- Memory
                 ("be_read_data_i", be_read_data),
                 ("be_read_data_valid_i", be_read_data_valid),

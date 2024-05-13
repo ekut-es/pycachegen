@@ -29,6 +29,7 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> read_data_valid_o;
     sc_signal<bool> write_done_o;
     sc_signal<bool> port_ready_o;
+    sc_signal<bool> hit_o;
 
     const std::unique_ptr<Vcache_wrapper> cache_wrapper{
         new Vcache_wrapper{"cache_wrapper"}};
@@ -46,6 +47,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->read_data_valid_o(read_data_valid_o);
     cache_wrapper->write_done_o(write_done_o);
     cache_wrapper->port_ready_o(port_ready_o);
+    cache_wrapper->hit_o(hit_o);
 
     const int MAX_SIMULATION_TIME = 500;
 
@@ -69,7 +71,15 @@ int sc_main(int argc, char** argv) {
         }
     };
 
-    auto read = [&](int address, int expected) {
+    auto hit_assert = [&](bool expected) {
+        if (hit_o.read() != expected) {
+            std::cerr << "Error: Expected hit to be "
+                      << std::to_string(expected) << " but got "
+                      << std::to_string(hit_o.read()) << std::endl;
+        }
+    };
+
+    auto read = [&](int address, int expected, bool hit) {
         address_i.write(address);
         address_valid_i.write(1);
         read_write_select_i.write(0);
@@ -80,9 +90,10 @@ int sc_main(int argc, char** argv) {
             tick(1);
         }
         read_assert(expected);
+        hit_assert(hit);
     };
 
-    auto write = [&](int address, int data) {
+    auto write = [&](int address, int data, bool hit) {
         address_i.write(address);
         address_valid_i.write(1);
         write_data_i.write(data);
@@ -94,6 +105,9 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             tick(1);
         }
+        std::cout << "Write to address " << std::to_string(address)
+                  << std::endl;
+        hit_assert(hit);
     };
 
     std::cout << "Vcache_wrapper start!" << std::endl;
@@ -115,11 +129,11 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(4, 242);
-        read(4, 242);
-        read(4, 242);
-        write(4, 333);
-        read(4, 333);
+        write(4, 242, false);
+        read(4, 242, false);
+        read(4, 242, true);
+        write(4, 333, true);
+        read(4, 333, true);
 
         tick(10);
     } catch (std::runtime_error& e) {

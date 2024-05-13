@@ -66,6 +66,7 @@ class CacheGenerator:
         fe_read_data_valid_o = m.Output("fe_read_data_valid_o")
         fe_write_done_o = m.Output("fe_write_done_o")
         fe_port_ready_o = m.Output("fe_port_ready_o")
+        fe_hit_o = m.Output("fe_hit_o")
 
         # Back End Inputs
         be_read_data_i = m.Input("be_read_data_i", self.DATA_WIDTH)
@@ -89,6 +90,7 @@ class CacheGenerator:
         fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
         fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
+        fe_hit_o_reg = m.Reg("fe_hit_o_reg")
 
         # Back End Output Buffers
         be_address_o_reg = m.Reg("be_address_o_reg", self.ADDRESS_WIDTH)
@@ -101,6 +103,7 @@ class CacheGenerator:
         m.Assign(fe_read_data_o(fe_read_data_o_reg))
         m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
+        m.Assign(fe_hit_o(fe_hit_o_reg))
 
         # Backend Output Buffer Assignments
         m.Assign(be_address_o(be_address_o_reg))
@@ -112,7 +115,6 @@ class CacheGenerator:
         # Internal
         state_reg = m.Reg("state_reg", self.STATE_REG_WIDTH)
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
-        hit = m.Reg("hit")
         hit_valid = m.Reg("hit_valid")
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
@@ -152,7 +154,7 @@ class CacheGenerator:
         m.Always(Posedge(clk_i))(
             If(state_reg == States.HIT_LOOKUP.value)(
                 # Check whether we have a hit
-                hit(
+                fe_hit_o_reg(
                     AndList(
                         tag_memory[address_index] == address_tag,
                         valid_memory[address_index] == 1,
@@ -168,7 +170,7 @@ class CacheGenerator:
             If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
                 latency_counter.inc(),
-                If(hit == 1)(
+                If(fe_hit_o_reg == 1)(
                     # We have a hit
                     If(fe_read_write_select_i_reg == 0)(
                         fe_read_data_o_reg(data_memory[address_index]),
@@ -177,7 +179,7 @@ class CacheGenerator:
                         data_memory[address_index](fe_write_data_i_reg),
                     )
                 ),
-                If(OrList(hit == 0, fe_read_write_select_i_reg == 1))(
+                If(OrList(fe_hit_o_reg == 0, fe_read_write_select_i_reg == 1))(
                     # We have a miss or we need to write
                     # Request read/write from lower memory
                     be_address_o_reg(fe_address_i_reg),
@@ -225,8 +227,8 @@ class CacheGenerator:
                 latency_counter.inc(),
                 If(
                     OrList(
-                        AndList(latency_counter == self.HIT_LATENCY - 1, hit == 1),
-                        AndList(latency_counter == self.MISS_LATENCY - 1, hit == 0),
+                        AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o_reg == 1),
+                        AndList(latency_counter == self.MISS_LATENCY - 1, fe_hit_o_reg == 0),
                     )
                 )(
                     # We have stalled enough, finish the request
