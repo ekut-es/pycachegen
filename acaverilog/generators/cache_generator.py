@@ -21,8 +21,9 @@ class States(Enum):
     READY = 0
     HIT_LOOKUP = 1
     HIT_LOOKUP_DONE = 2
-    WAIT_FOR_LOWER_MEM = 3
-    STALL = 4
+    REQUEST_TO_LOWER_MEM_SENT = 3
+    WAIT_FOR_LOWER_MEM = 4
+    STALL = 5
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -188,9 +189,16 @@ class CacheGenerator:
                     be_write_data_o_reg(fe_write_data_i_reg),
                     be_write_data_valid_o_reg(fe_read_write_select_i_reg),
                     If(be_port_ready_i == 1)(
-                        state_reg(States.WAIT_FOR_LOWER_MEM.value)
+                        state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
                     ),
                 ),
+            )
+        )
+
+        m.Always(Posedge(clk_i))(
+            If(state_reg == States.REQUEST_TO_LOWER_MEM_SENT.value)(
+                # Stall one cycle so the lower memory can accept the request and switch to port not ready
+                state_reg(States.WAIT_FOR_LOWER_MEM.value)
             )
         )
 

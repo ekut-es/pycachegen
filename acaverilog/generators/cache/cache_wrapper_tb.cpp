@@ -49,7 +49,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->port_ready_o(port_ready_o);
     cache_wrapper->hit_o(hit_o);
 
-    const int MAX_SIMULATION_TIME = 500;
+    const int MAX_SIMULATION_TIME = 1000;
 
     auto tick = [&](int amount) {
         if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
@@ -129,11 +129,22 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(4, 242, false);
-        read(4, 242, false);
-        read(4, 242, true);
-        write(4, 333, true);
+        read(0, 0, false);
+        read(1, 0, false);
+        read(2, 0, false);
+        read(3, 0, false);
+
+        read(0, 0, true);
+        read(1, 0, true);
+        read(2, 0, true);
+        read(3, 0, true);
+
+        write(4, 333, false);
+        read(0, 0, true);
+        read(4, 333, false);
         read(4, 333, true);
+        read(0, 0, false);
+        read(0, 0, true);
 
         tick(10);
     } catch (std::runtime_error& e) {
