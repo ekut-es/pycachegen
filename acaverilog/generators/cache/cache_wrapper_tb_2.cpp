@@ -110,7 +110,7 @@ int sc_main(int argc, char** argv) {
         hit_assert(hit);
     };
 
-    std::cout << "Vcache_wrapper start!" << std::endl;
+    std::cout << "Vcache_wrapper_2 start!" << std::endl;
 
     tick(0);
 
@@ -118,7 +118,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb.vcd");
+        trace->open("Vcache_wrapper_tb_2.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -158,6 +158,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper done!" << std::endl;
+    std::cout << "Vcache_wrapper_2 done!" << std::endl;
     return 0;
 }
