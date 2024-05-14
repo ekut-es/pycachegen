@@ -39,6 +39,7 @@ class CacheGenerator:
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         # non configurable atm, because everything will be pulled from the acadl object anyway
+        self.NUM_WAYS = 1
         self.NUM_SETS = 4
         self.HIT_LATENCY = 8
         self.MISS_LATENCY = 10
@@ -119,9 +120,23 @@ class CacheGenerator:
         hit_valid = m.Reg("hit_valid")
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
-        tag_memory = m.Reg("tag_memory", self.TAG_WIDTH, dims=self.NUM_SETS)
-        valid_memory = m.Reg("valid_memory", 1, dims=self.NUM_SETS)
-        data_memory = m.Reg("data_memory", self.DATA_WIDTH, dims=self.NUM_SETS)
+        hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+        if self.NUM_WAYS > 1:
+            replacement_policy = m.Reg(
+                "replacement_policy", int(log2(self.NUM_WAYS)), dims=self.NUM_SETS
+            )
+
+        tag_memory = []
+        valid_memory = []
+        data_memory = []
+        for i in range(self.NUM_WAYS):
+            tag_memory.append(
+                m.Reg(f"tag_memory_{i}", self.TAG_WIDTH, dims=self.NUM_SETS)
+            )
+            valid_memory.append(m.Reg(f"valid_memory_{i}", 1, dims=self.NUM_SETS))
+            data_memory.append(
+                m.Reg(f"data_memory_{i}", self.DATA_WIDTH, dims=self.NUM_SETS)
+            )
 
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
         m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
@@ -154,13 +169,17 @@ class CacheGenerator:
 
         m.Always(Posedge(clk_i))(
             If(state_reg == States.HIT_LOOKUP.value)(
-                # Check whether we have a hit
-                fe_hit_o_reg(
-                    AndList(
-                        tag_memory[address_index] == address_tag,
-                        valid_memory[address_index] == 1,
+                [
+                    hit_vector[i](
+                        AndList(
+                            tag_memory[i][address_index] == address_tag,
+                            valid_memory[i][address_index] == 1,
+                        )
                     )
-                ),
+                    for i in range(self.NUM_WAYS)
+                ],
+                # Check whether we have a hit
+                fe_hit_o_reg(hit_vector != 0, blk=True),
                 hit_valid(1),
                 latency_counter.inc(),
                 state_reg(States.HIT_LOOKUP_DONE.value),
@@ -174,10 +193,19 @@ class CacheGenerator:
                 If(fe_hit_o_reg == 1)(
                     # We have a hit
                     If(fe_read_write_select_i_reg == 0)(
-                        fe_read_data_o_reg(data_memory[address_index]),
+                        [
+                            If(hit_vector[i] == 1)(
+                                fe_read_data_o_reg(data_memory[i][address_index])
+                            )
+                            for i in range(self.NUM_WAYS)
+                        ],
                         state_reg(States.STALL.value),
                     ).Elif(fe_read_write_select_i_reg == 1)(
-                        data_memory[address_index](fe_write_data_i_reg),
+                        [
+                            If(hit_vector[i] == 1)(
+                                data_memory[i][address_index](fe_write_data_i_reg)
+                            )
+                        ]
                     )
                 ),
                 If(OrList(fe_hit_o_reg == 0, fe_read_write_select_i_reg == 1))(
@@ -202,6 +230,7 @@ class CacheGenerator:
             )
         )
 
+        selected_way = m.Reg("selected_way", max(1, int(log2(self.NUM_WAYS))))
         m.Always(Posedge(clk_i))(
             If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
                 # Waiting for the lower memory to fulfill the request
@@ -217,10 +246,21 @@ class CacheGenerator:
                     latency_counter.inc(),
                     state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg == 0)(
+                        # Get the way to be used if the cache is set associative
+                        (
+                            [selected_way(0)]
+                            if self.NUM_WAYS == 1
+                            else [
+                                selected_way(
+                                    replacement_policy[address_index], blk=True
+                                ),
+                                replacement_policy[address_index].inc(),
+                            ]
+                        ),
                         fe_read_data_o_reg(be_read_data_i),
-                        data_memory[address_index](be_read_data_i),
-                        valid_memory[address_index](1),
-                        tag_memory[address_index](address_tag),
+                        data_memory[selected_way][address_index](be_read_data_i),
+                        valid_memory[selected_way][address_index](1),
+                        tag_memory[selected_way][address_index](address_tag),
                     ),
                 ).Else(
                     # Invalidate the address so as to not send another request
@@ -235,8 +275,12 @@ class CacheGenerator:
                 latency_counter.inc(),
                 If(
                     OrList(
-                        AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o_reg == 1),
-                        AndList(latency_counter == self.MISS_LATENCY - 1, fe_hit_o_reg == 0),
+                        AndList(
+                            latency_counter == self.HIT_LATENCY - 1, fe_hit_o_reg == 1
+                        ),
+                        AndList(
+                            latency_counter == self.MISS_LATENCY - 1, fe_hit_o_reg == 0
+                        ),
                     )
                 )(
                     # We have stalled enough, finish the request
