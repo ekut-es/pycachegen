@@ -35,12 +35,12 @@ class CacheGenerator:
     # ) -> None:
     #     super().__init__(acadl_object)
 
-    def __init__(self, data_width: int, address_width: int) -> None:
+    def __init__(self, data_width: int, address_width: int, num_ways: int, num_sets: int) -> None:
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
+        self.NUM_WAYS = num_ways
+        self.NUM_SETS = num_sets
         # non configurable atm, because everything will be pulled from the acadl object anyway
-        self.NUM_WAYS = 1
-        self.NUM_SETS = 4
         self.HIT_LATENCY = 8
         self.MISS_LATENCY = 10
 
@@ -236,7 +236,7 @@ class CacheGenerator:
                     If(fe_read_write_select_i_reg == 0)(
                         # Get the way to be used if the cache is set associative
                         If(self.NUM_WAYS > 1)(
-                            replacement_policy[address_index](replacement_policy[address_index + 1])
+                            replacement_policy[address_index](replacement_policy[address_index] + 1)
                         ),
                         fe_read_data_o_reg(be_read_data_i),
                         data_memory[replacement_policy[address_index]][address_index](be_read_data_i),
@@ -274,9 +274,3 @@ class CacheGenerator:
             )
         )
         return m
-
-
-if __name__ == "__main__":
-    cache_generator = CacheGenerator(data_width=16, address_width=8)
-    m = cache_generator.generate_module()
-    m.to_verilog("../src/cache.v", for_verilator=True)
