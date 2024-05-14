@@ -92,7 +92,6 @@ class CacheGenerator:
         fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
         fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
-        fe_hit_o_reg = m.Reg("fe_hit_o_reg")
 
         # Back End Output Buffers
         be_address_o_reg = m.Reg("be_address_o_reg", self.ADDRESS_WIDTH)
@@ -105,7 +104,6 @@ class CacheGenerator:
         m.Assign(fe_read_data_o(fe_read_data_o_reg))
         m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
-        m.Assign(fe_hit_o(fe_hit_o_reg))
 
         # Backend Output Buffer Assignments
         m.Assign(be_address_o(be_address_o_reg))
@@ -121,26 +119,18 @@ class CacheGenerator:
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
-        if self.NUM_WAYS > 1:
-            replacement_policy = m.Reg(
-                "replacement_policy", int(log2(self.NUM_WAYS)), dims=self.NUM_SETS
-            )
+        replacement_policy = m.Reg(
+            "replacement_policy", width=max(1, int(log2(self.NUM_WAYS))), dims=self.NUM_SETS
+        )
 
-        tag_memory = []
-        valid_memory = []
-        data_memory = []
-        for i in range(self.NUM_WAYS):
-            tag_memory.append(
-                m.Reg(f"tag_memory_{i}", self.TAG_WIDTH, dims=self.NUM_SETS)
-            )
-            valid_memory.append(m.Reg(f"valid_memory_{i}", 1, dims=self.NUM_SETS))
-            data_memory.append(
-                m.Reg(f"data_memory_{i}", self.DATA_WIDTH, dims=self.NUM_SETS)
-            )
+        tag_memory = m.Reg(f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS))
+        valid_memory = m.Reg(f"valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
+        data_memory = m.Reg(f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS))
 
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
         m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
         m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
+        m.Assign(fe_hit_o(hit_vector != 0))
 
         m.Always(Posedge(clk_i))(
             If(state_reg == States.READY.value)(
@@ -169,6 +159,7 @@ class CacheGenerator:
 
         m.Always(Posedge(clk_i))(
             If(state_reg == States.HIT_LOOKUP.value)(
+                # Check whether we have a hit
                 [
                     hit_vector[i](
                         AndList(
@@ -178,8 +169,6 @@ class CacheGenerator:
                     )
                     for i in range(self.NUM_WAYS)
                 ],
-                # Check whether we have a hit
-                fe_hit_o_reg(hit_vector != 0, blk=True),
                 hit_valid(1),
                 latency_counter.inc(),
                 state_reg(States.HIT_LOOKUP_DONE.value),
@@ -190,7 +179,7 @@ class CacheGenerator:
             If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
                 latency_counter.inc(),
-                If(fe_hit_o_reg == 1)(
+                If(fe_hit_o == 1)(
                     # We have a hit
                     If(fe_read_write_select_i_reg == 0)(
                         [
@@ -204,11 +193,11 @@ class CacheGenerator:
                         [
                             If(hit_vector[i] == 1)(
                                 data_memory[i][address_index](fe_write_data_i_reg)
-                            )
+                            ) for i in range(self.NUM_WAYS)
                         ]
                     )
                 ),
-                If(OrList(fe_hit_o_reg == 0, fe_read_write_select_i_reg == 1))(
+                If(OrList(fe_hit_o == 0, fe_read_write_select_i_reg == 1))(
                     # We have a miss or we need to write
                     # Request read/write from lower memory
                     be_address_o_reg(fe_address_i_reg),
@@ -230,7 +219,6 @@ class CacheGenerator:
             )
         )
 
-        selected_way = m.Reg("selected_way", max(1, int(log2(self.NUM_WAYS))))
         m.Always(Posedge(clk_i))(
             If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
                 # Waiting for the lower memory to fulfill the request
@@ -247,20 +235,13 @@ class CacheGenerator:
                     state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg == 0)(
                         # Get the way to be used if the cache is set associative
-                        (
-                            [selected_way(0)]
-                            if self.NUM_WAYS == 1
-                            else [
-                                selected_way(
-                                    replacement_policy[address_index], blk=True
-                                ),
-                                replacement_policy[address_index].inc(),
-                            ]
+                        If(self.NUM_WAYS > 1)(
+                            replacement_policy[address_index](replacement_policy[address_index + 1])
                         ),
                         fe_read_data_o_reg(be_read_data_i),
-                        data_memory[selected_way][address_index](be_read_data_i),
-                        valid_memory[selected_way][address_index](1),
-                        tag_memory[selected_way][address_index](address_tag),
+                        data_memory[replacement_policy[address_index]][address_index](be_read_data_i),
+                        valid_memory[replacement_policy[address_index]][address_index](1),
+                        tag_memory[replacement_policy[address_index]][address_index](address_tag),
                     ),
                 ).Else(
                     # Invalidate the address so as to not send another request
@@ -276,10 +257,10 @@ class CacheGenerator:
                 If(
                     OrList(
                         AndList(
-                            latency_counter == self.HIT_LATENCY - 1, fe_hit_o_reg == 1
+                            latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1
                         ),
                         AndList(
-                            latency_counter == self.MISS_LATENCY - 1, fe_hit_o_reg == 0
+                            latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
                         ),
                     )
                 )(
