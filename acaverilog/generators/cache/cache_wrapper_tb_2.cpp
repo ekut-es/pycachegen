@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper.h"
+#include "Vcache_wrapper_2.h"
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -31,8 +31,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper> cache_wrapper{
-        new Vcache_wrapper{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_2> cache_wrapper{
+        new Vcache_wrapper_2{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);

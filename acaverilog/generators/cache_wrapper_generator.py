@@ -1,3 +1,4 @@
+import sys
 from math import ceil, log2
 from veriloggen import (
     Module,
@@ -16,15 +17,22 @@ from acaverilog.generators.functional_memory_generator import FunctionalMemoryGe
 
 
 class CacheWrapperGenerator:
+    def __init__(self, *args) -> None:
+        self.DATA_WIDTH = int(args[0])
+        self.ADDRESS_WIDTH = int(args[1])
+        self.NUM_WAYS = int(args[2])
+        self.NUM_SETS = int(args[3])
+
     def generate_module(self) -> Module:
-        DATA_WIDTH = 16
-        ADDRESS_WIDTH = 8
         m = Module("cache_wrapper")
         cache = CacheGenerator(
-            data_width=DATA_WIDTH, address_width=ADDRESS_WIDTH
+            address_width=self.ADDRESS_WIDTH,
+            data_width=self.DATA_WIDTH,
+            num_ways=self.NUM_WAYS,
+            num_sets=self.NUM_SETS,
         ).generate_module()
         memory = FunctionalMemoryGenerator(
-            data_width=DATA_WIDTH, address_width=ADDRESS_WIDTH
+            data_width=self.DATA_WIDTH, address_width=self.ADDRESS_WIDTH
         ).generate_module()
 
         # Common Inputs
@@ -32,29 +40,29 @@ class CacheWrapperGenerator:
         reset_n_i = m.Input("reset_n_i")
 
         # Cache Inputs
-        address_i = m.Input("address_i", ADDRESS_WIDTH)
+        address_i = m.Input("address_i", self.ADDRESS_WIDTH)
         address_valid_i = m.Input("address_valid_i")
-        write_data_i = m.Input("write_data_i", DATA_WIDTH)
+        write_data_i = m.Input("write_data_i", self.DATA_WIDTH)
         write_data_valid_i = m.Input("write_data_valid_i")
         read_write_select_i = m.Input("read_write_select_i")
 
         # Cache Outputs
-        read_data_o = m.Output("read_data_o", DATA_WIDTH)
+        read_data_o = m.Output("read_data_o", self.DATA_WIDTH)
         read_data_valid_o = m.Output("read_data_valid_o")
         write_done_o = m.Output("write_done_o")
         port_ready_o = m.Output("port_ready_o")
         hit_o = m.Output("hit_o")
 
         # Backend Cache <- Memory
-        be_read_data = m.Wire("be_read_data", DATA_WIDTH)
+        be_read_data = m.Wire("be_read_data", self.DATA_WIDTH)
         be_read_data_valid = m.Wire("be_read_data_valid")
         be_write_done = m.Wire("be_write_done")
         be_port_ready = m.Wire("be_port_ready")
 
         # Backend Cache -> Memory
-        be_address = m.Wire("be_address", ADDRESS_WIDTH)
+        be_address = m.Wire("be_address", self.ADDRESS_WIDTH)
         be_address_valid = m.Wire("be_address_valid")
-        be_write_data = m.Wire("be_write_data", DATA_WIDTH)
+        be_write_data = m.Wire("be_write_data", self.DATA_WIDTH)
         be_write_data_valid = m.Wire("be_write_data_valid")
         be_read_write_select = m.Wire("be_read_write_select")
 
@@ -117,6 +125,7 @@ class CacheWrapperGenerator:
 
 
 if __name__ == "__main__":
-    cache_wrapper_generator = CacheWrapperGenerator()
+    # argv: (file name), number for output file suffix, data width, address width, num ways, num sets
+    cache_wrapper_generator = CacheWrapperGenerator(*sys.argv[2:])
     m = cache_wrapper_generator.generate_module()
-    m.to_verilog("../src/cache_wrapper.v", for_verilator=True)
+    m.to_verilog(f"../src/cache_wrapper_{sys.argv[1]}.v", for_verilator=True)
