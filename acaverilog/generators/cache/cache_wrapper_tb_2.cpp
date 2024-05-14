@@ -6,6 +6,10 @@
 
 #include "Vcache_wrapper_2.h"
 
+// Testbench for data_width=16, address_width=8, num_ways=2, num_sets=4,
+// write_policy=write_through_write_no_allocate,
+// replacement_policy=stupid_increment_overflow
+
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
@@ -129,22 +133,30 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        read(0, 0, false);
-        read(1, 0, false);
-        read(2, 0, false);
-        read(3, 0, false);
+        read(4, 0, false);
+        read(4, 0, true);
+        read(8, 0, false);
+        read(8, 0, true);
+        read(4, 0, true);
 
-        read(0, 0, true);
-        read(1, 0, true);
-        read(2, 0, true);
-        read(3, 0, true);
+        read(5, 0, false);
+        read(6, 0, false);
 
-        write(4, 333, false);
-        read(0, 0, true);
-        read(4, 333, false);
-        read(4, 333, true);
-        read(0, 0, false);
-        read(0, 0, true);
+        write(4, 111, true);
+        write(8, 222, true);
+
+        write(12, 333, false);
+
+        read(4, 111, true);
+        read(8, 222, true);
+
+        read(12, 333, false);
+        read(12, 333, true);
+        read(8, 222, true);
+        read(4, 111, false);
+
+        read(5, 0, true);
+        read(6, 0, true);
 
         tick(10);
     } catch (std::runtime_error& e) {
