@@ -12,6 +12,8 @@ from veriloggen import (
     Not,
 )
 
+from acaverilog.generators.one_hot_to_bin_generator import OneHotToBinGenerator
+
 # from acadl import ACADLObject
 
 # from .acadl_object_generator import ACADLObjectGenerator
@@ -43,6 +45,8 @@ class CacheGenerator:
         # non configurable atm, because everything will be pulled from the acadl object anyway
         self.HIT_LATENCY = 8
         self.MISS_LATENCY = 10
+        # derived
+        self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
 
         # Internal Constants
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
@@ -119,9 +123,14 @@ class CacheGenerator:
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+        hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
+
+        Submodule(m, OneHotToBinGenerator(self.NUM_WAYS).generate_module(), "hit_one_hot_to_bin", arg_ports=(('input', hit_vector), ("output", hit_index)))
+
         replacement_policy = m.Reg(
-            "replacement_policy", width=max(1, int(log2(self.NUM_WAYS))), dims=self.NUM_SETS
+            "replacement_policy", width=max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
         )
+        plru_bits = m.Reg("plru_bits", self.NUM_WAYS - 1)
 
         tag_memory = m.Reg(f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS))
         valid_memory = m.Reg(f"valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
@@ -181,7 +190,10 @@ class CacheGenerator:
                 latency_counter.inc(),
                 If(fe_hit_o == 1)(
                     # We have a hit
+                    # Set all the PLRU bits along the path to 1
+                    [plru_bits[(hit_index)/(2**i)+(2**(self.NUM_WAYS_W-i)-1)] for i in range(1, self.NUM_WAYS_W)],
                     If(fe_read_write_select_i_reg == 0)(
+                        # handle read
                         [
                             If(hit_vector[i] == 1)(
                                 fe_read_data_o_reg(data_memory[i][address_index])
@@ -190,6 +202,7 @@ class CacheGenerator:
                         ],
                         state_reg(States.STALL.value),
                     ).Elif(fe_read_write_select_i_reg == 1)(
+                        # handle write
                         [
                             If(hit_vector[i] == 1)(
                                 data_memory[i][address_index](fe_write_data_i_reg)
@@ -234,9 +247,8 @@ class CacheGenerator:
                     latency_counter.inc(),
                     state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg == 0)(
-                        # Get the way to be used if the cache is set associative
                         If(self.NUM_WAYS > 1)(
-                            replacement_policy[address_index](replacement_policy[address_index] + 1)
+                            replacement_policy[address_index](replacement_policy[address_index] + 1) # Change this to work for PLRU
                         ),
                         fe_read_data_o_reg(be_read_data_i),
                         data_memory[replacement_policy[address_index]][address_index](be_read_data_i),
