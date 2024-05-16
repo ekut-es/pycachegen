@@ -13,6 +13,9 @@ from veriloggen import (
 )
 
 from acaverilog.generators.one_hot_to_bin_generator import OneHotToBinGenerator
+from acaverilog.generators.replacement_policy_generator import (
+    ReplacementPolicyGenerator,
+)
 
 # from acadl import ACADLObject
 
@@ -37,7 +40,9 @@ class CacheGenerator:
     # ) -> None:
     #     super().__init__(acadl_object)
 
-    def __init__(self, data_width: int, address_width: int, num_ways: int, num_sets: int) -> None:
+    def __init__(
+        self, data_width: int, address_width: int, num_ways: int, num_sets: int
+    ) -> None:
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.NUM_WAYS = num_ways
@@ -123,23 +128,46 @@ class CacheGenerator:
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
-        hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
-
-        Submodule(m, OneHotToBinGenerator(self.NUM_WAYS).generate_module(), "hit_one_hot_to_bin", arg_ports=(('input', hit_vector), ("output", hit_index)))
-
-        replacement_policy = m.Reg(
-            "replacement_policy", width=max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
+        tag_memory = m.Reg(
+            f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
-        plru_bits = m.Reg("plru_bits", self.NUM_WAYS - 1)
-
-        tag_memory = m.Reg(f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS))
         valid_memory = m.Reg(f"valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
-        data_memory = m.Reg(f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS))
-
+        data_memory = m.Reg(
+            f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
+        )
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
         m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
         m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
         m.Assign(fe_hit_o(hit_vector != 0))
+
+        # Replacement policy
+        if self.NUM_WAYS > 1:
+            hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
+            update_repl_pol = m.Reg("update_repl_pol_o")
+            repl_pol_way = m.Reg("repl_pol_way_o", max(1, self.NUM_WAYS_W))
+            next_to_replace = m.Reg(
+                "next_to_replace", max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
+            )
+            Submodule(
+                m,
+                OneHotToBinGenerator(self.NUM_WAYS).generate_module(),
+                "hit_one_hot_to_bin",
+                arg_ports=(("one_hot_i", hit_vector), ("bin_o", hit_index)),
+            )
+            Submodule(
+                m,
+                ReplacementPolicyGenerator(
+                    self.NUM_WAYS, self.NUM_SETS
+                ).generate_module(),
+                "replacement_policy",
+                arg_ports=(
+                    ("clk_i", clk_i),
+                    ("access_valid_i", update_repl_pol),
+                    ("way_i", repl_pol_way),
+                    ("index_i", address_index),
+                    ("next_replacement_o", next_to_replace),
+                ),
+            )
 
         m.Always(Posedge(clk_i))(
             If(state_reg == States.READY.value)(
@@ -190,8 +218,15 @@ class CacheGenerator:
                 latency_counter.inc(),
                 If(fe_hit_o == 1)(
                     # We have a hit
-                    # Set all the PLRU bits along the path to 1
-                    [plru_bits[(hit_index)/(2**i)+(2**(self.NUM_WAYS_W-i)-1)] for i in range(1, self.NUM_WAYS_W)],
+                    # Update the PLRU Bits
+                    (
+                        [
+                            repl_pol_way(hit_index),
+                            update_repl_pol(1),
+                        ]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
                     If(fe_read_write_select_i_reg == 0)(
                         # handle read
                         [
@@ -206,9 +241,10 @@ class CacheGenerator:
                         [
                             If(hit_vector[i] == 1)(
                                 data_memory[i][address_index](fe_write_data_i_reg)
-                            ) for i in range(self.NUM_WAYS)
+                            )
+                            for i in range(self.NUM_WAYS)
                         ]
-                    )
+                    ),
                 ),
                 If(OrList(fe_hit_o == 0, fe_read_write_select_i_reg == 1))(
                     # We have a miss or we need to write
@@ -247,13 +283,24 @@ class CacheGenerator:
                     latency_counter.inc(),
                     state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg == 0)(
-                        If(self.NUM_WAYS > 1)(
-                            replacement_policy[address_index](replacement_policy[address_index] + 1) # Change this to work for PLRU
-                        ),
                         fe_read_data_o_reg(be_read_data_i),
-                        data_memory[replacement_policy[address_index]][address_index](be_read_data_i),
-                        valid_memory[replacement_policy[address_index]][address_index](1),
-                        tag_memory[replacement_policy[address_index]][address_index](address_tag),
+                        data_memory[
+                            next_to_replace[address_index] if self.NUM_WAYS > 1 else 0
+                        ][address_index](be_read_data_i),
+                        valid_memory[
+                            next_to_replace[address_index] if self.NUM_WAYS > 1 else 0
+                        ][address_index](1),
+                        tag_memory[
+                            next_to_replace[address_index] if self.NUM_WAYS > 1 else 0
+                        ][address_index](address_tag),
+                        (
+                            [  # Update the PLRU Bits
+                                repl_pol_way(next_to_replace[address_index]),
+                                update_repl_pol(1),
+                            ]
+                            if self.NUM_WAYS > 1
+                            else []
+                        ),
                     ),
                 ).Else(
                     # Invalidate the address so as to not send another request
@@ -266,11 +313,10 @@ class CacheGenerator:
             If(state_reg == States.STALL.value)(
                 # Stall for the remaining time (or error if this took too much time...?)
                 latency_counter.inc(),
+                update_repl_pol(0) if self.NUM_WAYS > 1 else [],
                 If(
                     OrList(
-                        AndList(
-                            latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1
-                        ),
+                        AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1),
                         AndList(
                             latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
                         ),

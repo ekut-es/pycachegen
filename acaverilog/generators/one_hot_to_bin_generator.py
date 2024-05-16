@@ -1,5 +1,5 @@
 from math import log2
-from veriloggen import Module, If
+from veriloggen import Module, If, Or
 
 
 class OneHotToBinGenerator:
@@ -9,9 +9,19 @@ class OneHotToBinGenerator:
 
     def generate_module(self) -> Module:
         m = Module("one_hot_to_bin")
-        input = m.Input("input", self.num_inputs)
-        output = m.Output("output", self.num_outputs)
+        one_hot_i = m.Input("one_hot_i", self.num_inputs)
+        bin_o = m.Output("bin_o", self.num_outputs)
 
-        m.Always(input)(
-            [If(output[i] == 1)(output(i, blk=True)) for i in range(self.num_inputs)]
+        bin_o_reg = m.Reg("bin_o_reg", self.num_outputs)
+
+        tmp_bin = m.Reg("tmp_bin", self.num_outputs)
+
+        m.Assign(bin_o(bin_o_reg))
+
+        m.Always(one_hot_i)(
+            tmp_bin(0, blk=True),
+            [If(one_hot_i[i] == 1)(bin_o_reg(Or(bin_o_reg, i), blk=True)) for i in range(self.num_inputs)],
+            bin_o_reg(tmp_bin, blk=True)
         )
+
+        return m
