@@ -47,6 +47,8 @@ class CacheGenerator:
         num_ways: int,
         num_sets: int,
         replacement_policy: str,
+        hit_latency: int,
+        miss_latency: int
     ) -> None:
         """Cache Generator.
 
@@ -56,19 +58,19 @@ class CacheGenerator:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
             replacement_policy (str): Either "fifo" or "plru_tree"
+            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 4.
+            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.NUM_WAYS = num_ways
         self.NUM_SETS = num_sets
         self.REPLACEMENT_POLICY = replacement_policy
-        # non configurable atm, because everything will be pulled from the acadl object anyway
-        self.HIT_LATENCY = 8
-        self.MISS_LATENCY = 10
-        # derived
-        self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
+        self.HIT_LATENCY = hit_latency
+        self.MISS_LATENCY = miss_latency
 
         # Internal Constants
+        self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH
