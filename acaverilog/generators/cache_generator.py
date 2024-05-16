@@ -282,7 +282,9 @@ class CacheGenerator:
         m.Always(Posedge(clk_i))(
             If(state_reg == States.REQUEST_TO_LOWER_MEM_SENT.value)(
                 # Stall one cycle so the lower memory can accept the request and switch to port not ready
-                state_reg(States.WAIT_FOR_LOWER_MEM.value)
+                state_reg(States.WAIT_FOR_LOWER_MEM.value),
+                # Add one cycle to the latency counter because we're only gonna react to the response of the lower memory one cycle later
+                latency_counter.inc()
             )
         )
 
