@@ -6,9 +6,10 @@
 
 #include "Vcache_wrapper_3.h"
 
-// Testbench for data_width=16, address_width=8, num_ways=4, num_sets=2,
+// Testbench for testing the FIFO replacement policy
+// data_width=16, address_width=8, num_ways=4, num_sets=2,
 // write_policy=write_through_write_no_allocate,
-// replacement_policy=fifo
+// replacement_policy=fifo, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

@@ -6,9 +6,10 @@
 
 #include "Vcache_wrapper_2.h"
 
-// Testbench for data_width=16, address_width=8, num_ways=2, num_sets=4,
+// Testbench for testing a set associative cache
+// data_width=16, address_width=8, num_ways=2, num_sets=4,
 // write_policy=write_through_write_no_allocate,
-// replacement_policy=fifo
+// replacement_policy=fifo, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

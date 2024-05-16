@@ -58,7 +58,7 @@ class CacheGenerator:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
             replacement_policy (str): Either "fifo" or "plru_tree"
-            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 4.
+            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
         """
         self.DATA_WIDTH = data_width
