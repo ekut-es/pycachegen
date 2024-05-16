@@ -20,7 +20,7 @@ class OneHotToBinGenerator:
 
         m.Always(one_hot_i)(
             tmp_bin(0, blk=True),
-            [If(one_hot_i[i] == 1)(bin_o_reg(Or(bin_o_reg, i), blk=True)) for i in range(self.num_inputs)],
+            [If(one_hot_i[i] == 1)(tmp_bin(Or(tmp_bin, i), blk=True)) for i in range(self.num_inputs)],
             bin_o_reg(tmp_bin, blk=True)
         )
 

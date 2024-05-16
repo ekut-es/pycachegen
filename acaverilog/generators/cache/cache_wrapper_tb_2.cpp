@@ -149,6 +149,7 @@ int sc_main(int argc, char** argv) {
 
         read(4, 111, true);
         read(8, 222, true);
+        read(4, 111, true);
 
         read(12, 333, false);
         read(12, 333, true);

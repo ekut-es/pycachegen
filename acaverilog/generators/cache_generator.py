@@ -41,7 +41,12 @@ class CacheGenerator:
     #     super().__init__(acadl_object)
 
     def __init__(
-        self, data_width: int, address_width: int, num_ways: int, num_sets: int, replacement_policy: str
+        self,
+        data_width: int,
+        address_width: int,
+        num_ways: int,
+        num_sets: int,
+        replacement_policy: str,
     ) -> None:
         """Cache Generator.
 
@@ -153,7 +158,8 @@ class CacheGenerator:
         # Replacement policy
         if self.NUM_WAYS > 1:
             hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
-            update_repl_pol = m.Reg("update_repl_pol_o")
+            repl_pol_access = m.Reg("update_repl_pol_o")
+            repl_pol_replace = m.Reg("repl_pol_replace")
             repl_pol_way = m.Reg("repl_pol_way_o", max(1, self.NUM_WAYS_W))
             next_to_replace = m.Reg(
                 "next_to_replace", max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
@@ -172,7 +178,8 @@ class CacheGenerator:
                 "replacement_policy",
                 arg_ports=(
                     ("clk_i", clk_i),
-                    ("access_valid_i", update_repl_pol),
+                    ("access_i", repl_pol_access),
+                    ("replace_i", repl_pol_replace),
                     ("way_i", repl_pol_way),
                     ("index_i", address_index),
                     ("next_replacement_o", next_to_replace),
@@ -232,7 +239,7 @@ class CacheGenerator:
                     (
                         [
                             repl_pol_way(hit_index),
-                            update_repl_pol(1),
+                            repl_pol_access(1),
                         ]
                         if self.NUM_WAYS > 1
                         else []
@@ -306,7 +313,8 @@ class CacheGenerator:
                         (
                             [  # Update the PLRU Bits
                                 repl_pol_way(next_to_replace[address_index]),
-                                update_repl_pol(1),
+                                repl_pol_access(1),
+                                repl_pol_replace(1),
                             ]
                             if self.NUM_WAYS > 1
                             else []
@@ -323,7 +331,7 @@ class CacheGenerator:
             If(state_reg == States.STALL.value)(
                 # Stall for the remaining time (or error if this took too much time...?)
                 latency_counter.inc(),
-                update_repl_pol(0) if self.NUM_WAYS > 1 else [],
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 If(
                     OrList(
                         AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1),

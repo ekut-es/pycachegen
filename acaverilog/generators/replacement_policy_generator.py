@@ -35,7 +35,9 @@ class ReplacementPolicyGenerator:
     def generate_module(self) -> Module:
         m = Module("replacement_policy")
         clk_i = m.Input("clk_i")
-        access_valid_i = m.Input("access_valid_i")
+        access_i = m.Input("access_i")
+        # some policies might only need to know of normal accesses, other might need to know if an access replaces a block
+        replace_i = m.Input("replace_i")
         index_i = m.Input("index_i", self.NUM_SETS_W)
         way_i = m.Input("way_i", self.NUM_WAYS_W)
 
@@ -51,8 +53,10 @@ class ReplacementPolicyGenerator:
 
         if self.POLICY == "fifo":
             m.Always(Posedge(clk_i))(
-                If(AndList(access_valid_i, way_i == next_replacement_o_reg[index_i]))(
-                    next_replacement_o_reg[index_i](next_replacement_o_reg[index_i] + 1, blk=True)
+                If(replace_i)(
+                    next_replacement_o_reg[index_i](
+                        next_replacement_o_reg[index_i] + 1, blk=True
+                    )
                 )
             )
         else:
@@ -60,7 +64,7 @@ class ReplacementPolicyGenerator:
             tmp_repl = m.Reg("tmp_repl", self.NUM_WAYS_W + 1)
 
             m.Always(Posedge(clk_i))(
-                If(access_valid_i)(
+                If(access_i)(
                     [
                         plru_bits[index_i][
                             ((way_i >> i)) + (2 ** (self.NUM_WAYS_W - i) - 1)
@@ -69,11 +73,18 @@ class ReplacementPolicyGenerator:
                     ],
                     tmp_repl(0, blk=True),
                     [
-                        tmp_repl(2 * tmp_repl + 2 - plru_bits[index_i][tmp_repl[:self.NUM_WAYS_W]], blk=True)
+                        tmp_repl(
+                            2 * tmp_repl
+                            + 2
+                            - plru_bits[index_i][tmp_repl[: self.NUM_WAYS_W]],
+                            blk=True,
+                        )
                         for _ in range(self.NUM_WAYS_W)
                     ],
                     tmp_repl(tmp_repl - self.NUM_WAYS + 1, blk=True),
-                    next_replacement_o_reg[index_i](tmp_repl[:self.NUM_WAYS_W], blk=True),
+                    next_replacement_o_reg[index_i](
+                        tmp_repl[: self.NUM_WAYS_W], blk=True
+                    ),
                 )
             )
 
