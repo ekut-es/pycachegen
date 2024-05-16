@@ -178,6 +178,7 @@ class CacheGenerator:
                 "replacement_policy",
                 arg_ports=(
                     ("clk_i", clk_i),
+                    ("reset_n_i", reset_n_i),
                     ("access_i", repl_pol_access),
                     ("replace_i", repl_pol_replace),
                     ("way_i", repl_pol_way),

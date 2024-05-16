@@ -9,6 +9,7 @@ from veriloggen import (
     AndList,
     OrList,
     Not,
+    Repeat,
 )
 
 from acaverilog.generators.one_hot_to_bin_generator import OneHotToBinGenerator
@@ -34,6 +35,7 @@ class ReplacementPolicyGenerator:
 
     def generate_module(self) -> Module:
         m = Module("replacement_policy")
+        reset_n_i = m.Input("reset_n_i")
         clk_i = m.Input("clk_i")
         access_i = m.Input("access_i")
         # some policies might only need to know of normal accesses, other might need to know if an access replaces a block
@@ -63,21 +65,35 @@ class ReplacementPolicyGenerator:
             plru_bits = m.Reg("plru_bits", self.NUM_WAYS - 1, self.NUM_SETS)
             tmp_repl = m.Reg("tmp_repl", self.NUM_WAYS_W + 1)
 
-            m.Always(Posedge(clk_i))(
-                If(access_i)(
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(reset_n_i == 0)(
+                    [
+                        (
+                            plru_bits[i](0),
+                            next_replacement_o_reg[i](2**self.NUM_WAYS_W - 1),
+                        )
+                        for i in range(self.NUM_SETS)
+                    ]
+                ).Elif(access_i)(
+                    # Update the PLRU Bits
                     [
                         plru_bits[index_i][
                             ((way_i >> i)) + (2 ** (self.NUM_WAYS_W - i) - 1)
                         ](way_i[i - 1], blk=True)
                         for i in range(1, self.NUM_WAYS_W + 1)
                     ],
+                    # Find out which block should be replaced next
                     tmp_repl(0, blk=True),
                     [
-                        tmp_repl(
-                            2 * tmp_repl
-                            + 2
-                            - plru_bits[index_i][tmp_repl[: self.NUM_WAYS_W]],
-                            blk=True,
+                        (
+                            # FIXME This should work but it's not pretty, but there's a problem with verilator
+                            # only allowing operands of an arithmetic operation to have the same width
+                            # So I cant just say 2*tmp_repl+2-plru_bits[...][...]
+                            If(plru_bits[index_i][tmp_repl[: self.NUM_WAYS_W]])(
+                                tmp_repl(2 * tmp_repl + 1, blk=True),
+                            ).Else(
+                                tmp_repl(2 * tmp_repl + 2, blk=True),
+                            )
                         )
                         for _ in range(self.NUM_WAYS_W)
                     ],
