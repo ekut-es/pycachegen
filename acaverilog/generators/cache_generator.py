@@ -41,12 +41,22 @@ class CacheGenerator:
     #     super().__init__(acadl_object)
 
     def __init__(
-        self, data_width: int, address_width: int, num_ways: int, num_sets: int
+        self, data_width: int, address_width: int, num_ways: int, num_sets: int, replacement_policy: str
     ) -> None:
+        """Cache Generator.
+
+        Args:
+            data_width (int): Width of one data word in bits.
+            address_width (int): Width of the addresses in bits.
+            num_ways (int): Number of ways. Must be a power of 2.
+            num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
+            replacement_policy (str): Either "fifo" or "plru_tree"
+        """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.NUM_WAYS = num_ways
         self.NUM_SETS = num_sets
+        self.REPLACEMENT_POLICY = replacement_policy
         # non configurable atm, because everything will be pulled from the acadl object anyway
         self.HIT_LATENCY = 8
         self.MISS_LATENCY = 10
@@ -157,7 +167,7 @@ class CacheGenerator:
             Submodule(
                 m,
                 ReplacementPolicyGenerator(
-                    self.NUM_WAYS, self.NUM_SETS
+                    self.NUM_WAYS, self.NUM_SETS, self.REPLACEMENT_POLICY
                 ).generate_module(),
                 "replacement_policy",
                 arg_ports=(

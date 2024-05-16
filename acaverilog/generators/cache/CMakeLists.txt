@@ -20,10 +20,10 @@ execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../functional_memory_generator.py"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 1 16 8 1 4"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 1 16 8 1 4 fifo"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 2 16 8 2 4"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 2 16 8 2 4 fifo"
 )
 
 # SystemC dependencies

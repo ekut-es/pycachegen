@@ -8,7 +8,7 @@
 
 // Testbench for data_width=16, address_width=8, num_ways=1, num_sets=4,
 // write_policy=write_through_write_no_allocate,
-// replacement_policy=stupid_increment_overflow
+// replacement_policy=fifo
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
