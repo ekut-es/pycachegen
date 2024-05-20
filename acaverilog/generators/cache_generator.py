@@ -48,7 +48,8 @@ class CacheGenerator:
         num_sets: int,
         replacement_policy: str,
         hit_latency: int,
-        miss_latency: int
+        miss_latency: int,
+        write_back: bool,
     ) -> None:
         """Cache Generator.
 
@@ -60,6 +61,7 @@ class CacheGenerator:
             replacement_policy (str): Either "fifo" or "plru_tree"
             hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
+            write_back (bool): Use write-back or write-through policy
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
@@ -68,6 +70,7 @@ class CacheGenerator:
         self.REPLACEMENT_POLICY = replacement_policy
         self.HIT_LATENCY = hit_latency
         self.MISS_LATENCY = miss_latency
+        self.WRITE_BACK = write_back
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -148,10 +151,15 @@ class CacheGenerator:
         tag_memory = m.Reg(
             f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
-        valid_memory = m.Reg(f"valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
+        valid_memory = m.Reg("valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
         data_memory = m.Reg(
             f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
+        if self.WRITE_BACK:
+            dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
+            # Buffers for read requests if data was dirty and needs to be written back before the read request
+            dirty_address = m.Reg("dirty_address", self.ADDRESS_WIDTH)
+            dirty_req_valid = m.Reg("dirty_address_valid")
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
         m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
         m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
@@ -260,23 +268,150 @@ class CacheGenerator:
                         # handle write
                         [
                             If(hit_vector[i] == 1)(
-                                data_memory[i][address_index](fe_write_data_i_reg)
+                                data_memory[i][address_index](fe_write_data_i_reg),
+                                (
+                                    [dirty_memory[i][address_index](1)]
+                                    if self.WRITE_BACK
+                                    else []
+                                ),
                             )
                             for i in range(self.NUM_WAYS)
                         ]
                     ),
                 ),
-                If(OrList(fe_hit_o == 0, fe_read_write_select_i_reg == 1))(
-                    # We have a miss or we need to write
-                    # Request read/write from lower memory
-                    be_address_o_reg(fe_address_i_reg),
-                    be_address_valid_o_reg(1),
-                    be_read_write_select_o_reg(fe_read_write_select_i_reg),
-                    be_write_data_o_reg(fe_write_data_i_reg),
-                    be_write_data_valid_o_reg(fe_read_write_select_i_reg),
-                    If(be_port_ready_i == 1)(
-                        state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
-                    ),
+                (
+                    [
+                        If(OrList(fe_hit_o == 0, fe_read_write_select_i_reg == 1))(
+                            # We have a miss or we need to write
+                            # Request read/write from lower memory
+                            be_address_o_reg(fe_address_i_reg),
+                            be_address_valid_o_reg(1),
+                            be_read_write_select_o_reg(fe_read_write_select_i_reg),
+                            be_write_data_o_reg(fe_write_data_i_reg),
+                            be_write_data_valid_o_reg(fe_read_write_select_i_reg),
+                            If(be_port_ready_i == 1)(
+                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
+                            ),
+                        ),
+                    ]
+                    if not self.WRITE_BACK
+                    else [
+                        # If read: write back if dirty, read from lower mem, write to cache
+                        # If write: write back if dirty, write to cache
+                        # ---
+                        # Send write request to lower memory if dirty
+                        [
+                            be_address_valid_o_reg(
+                                dirty_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                            ),
+                            be_write_data_valid_o_reg(
+                                dirty_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                            ),
+                            be_write_data_o_reg(
+                                data_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                            ),
+                            be_address_o_reg[: self.INDEX_WIDTH](address_index),
+                            be_address_o_reg[self.INDEX_WIDTH :](
+                                tag_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                            ),
+                        ],
+                        If(fe_read_write_select_i_reg == 1)(
+                            # write request - write to cache
+                            # Go to state STALL if data was not dirty and no write request was sent to lower memory
+                            # Else go to state REQUEST_TO_LOWER_MEM_SENT
+                            If(
+                                dirty_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                                == 1
+                            )(
+                                If(be_port_ready_i == 1)(
+                                    state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
+                                )
+                            ).Else(
+                                state_reg(States.STALL)
+                            ),
+                            data_memory[address_index][
+                                (
+                                    next_to_replace[address_index]
+                                    if self.NUM_WAYS > 1
+                                    else 0
+                                )
+                            ](fe_write_data_i_reg),
+                            valid_memory[address_index][
+                                (
+                                    next_to_replace[address_index]
+                                    if self.NUM_WAYS > 1
+                                    else 0
+                                )
+                            ](1),
+                            dirty_memory[address_index][
+                                (
+                                    next_to_replace[address_index]
+                                    if self.NUM_WAYS > 1
+                                    else 0
+                                )
+                            ](1),
+                            tag_memory[address_index][
+                                (
+                                    next_to_replace[address_index]
+                                    if self.NUM_WAYS > 1
+                                    else 0
+                                )
+                            ](address_tag),
+                        ).Else(
+                            # read request - send read request to lower memory
+                            If(be_port_ready_i == 1)(
+                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
+                            ),
+                            If(
+                                dirty_memory[address_index][
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ]
+                            )(
+                                # data was dirty - we need to queue/buffer the read request
+                                dirty_address(fe_address_i),
+                                dirty_req_valid(1),
+                            ).Else(
+                                # data was not dirty - send the read request to the lower memory immediately
+                                be_address_o_reg(fe_address_i_reg),
+                                be_address_valid_o_reg(1),
+                                be_read_write_select_o_reg(0),
+                            ),
+                        ),
+                    ]
                 ),
             )
         )
@@ -286,7 +421,7 @@ class CacheGenerator:
                 # Stall one cycle so the lower memory can accept the request and switch to port not ready
                 state_reg(States.WAIT_FOR_LOWER_MEM.value),
                 # Add one cycle to the latency counter because we're only gonna react to the response of the lower memory one cycle later
-                latency_counter.inc()
+                latency_counter.inc(),
             )
         )
 
@@ -301,10 +436,12 @@ class CacheGenerator:
                 )(
                     # Request to main memory was processed, we can now
                     # a) hand the data out and write it to the cache in case of a read
-                    # b) do nothing in case of a write
+                    # b) do nothing in case of a write - in case of write_back, the data
+                    # will already have been written to the cache before. In case of write_through,
+                    # nothing needs to be done anyway
                     latency_counter.inc(),
                     state_reg(States.STALL.value),
-                    If(fe_read_write_select_i_reg == 0)(
+                    If(be_read_write_select_o_reg == 0)(
                         fe_read_data_o_reg(be_read_data_i),
                         data_memory[
                             next_to_replace[address_index] if self.NUM_WAYS > 1 else 0
@@ -316,6 +453,19 @@ class CacheGenerator:
                             next_to_replace[address_index] if self.NUM_WAYS > 1 else 0
                         ][address_index](address_tag),
                         (
+                            [
+                                dirty_memory[
+                                    (
+                                        next_to_replace[address_index]
+                                        if self.NUM_WAYS > 1
+                                        else 0
+                                    )
+                                ][address_index](0)
+                            ]
+                            if self.WRITE_BACK
+                            else []
+                        ),
+                        (
                             [  # Update the PLRU Bits
                                 repl_pol_way(next_to_replace[address_index]),
                                 repl_pol_access(1),
@@ -325,6 +475,18 @@ class CacheGenerator:
                             else []
                         ),
                     ),
+                    [
+                        (
+                            If(dirty_req_valid)(
+                                be_address_o_reg(dirty_address),
+                                be_address_valid_o_reg(1),
+                                be_read_write_select_o_reg(0),
+                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT),
+                            )
+                            if self.WRITE_BACK
+                            else []
+                        )
+                    ],
                 ).Else(
                     # Invalidate the address so as to not send another request
                     be_address_valid_o_reg(0)
@@ -351,6 +513,7 @@ class CacheGenerator:
                     state_reg(States.READY.value),
                     hit_valid(0),
                     latency_counter(0),
+                    dirty_req_valid(0),
                 ),
             )
         )
