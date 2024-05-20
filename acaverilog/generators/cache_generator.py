@@ -158,7 +158,7 @@ class CacheGenerator:
         replace_way_index = m.Reg("replace_way_index", max(1, self.NUM_WAYS_W))
 
         if self.NUM_WAYS == 1:
-            m.Assign(replace_way_index, 0)
+            m.Assign(replace_way_index(0))
 
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
@@ -334,7 +334,7 @@ class CacheGenerator:
                                 If(be_port_ready_i == 1)(
                                     state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
                                 )
-                            ).Else(state_reg(States.STALL)),
+                            ).Else(state_reg(States.STALL.value)),
                             data_memory[replace_way_index][address_index](
                                 fe_write_data_i_reg
                             ),
@@ -413,7 +413,7 @@ class CacheGenerator:
                                 be_address_o_reg(dirty_address),
                                 be_address_valid_o_reg(1),
                                 be_read_write_select_o_reg(0),
-                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT),
+                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
                             )
                             if self.WRITE_BACK
                             else []
