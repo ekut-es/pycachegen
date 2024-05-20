@@ -8,7 +8,7 @@
 
 // Testbench for testing the PLRU_TREE replacement policy
 // data_width=16, address_width=8, num_ways=4, num_sets=2,
-// write_policy=write_through_write_no_allocate,
+// write_back=false, write_allocate=false,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
