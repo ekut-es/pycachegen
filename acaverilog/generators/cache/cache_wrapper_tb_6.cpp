@@ -8,7 +8,7 @@
 
 // Testbench for testing the write-back policy
 // data_width=16, address_width=8, num_ways=4, num_sets=2,
-// write_back=true, write_allocate=false,
+// write_back=true, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
@@ -134,8 +134,13 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
+        write(2, 20, false);
+        read(2, 20, true);
         write(4, 40, false);
-        read(4, 40, true);
+        write(6, 60, false);
+        write(8, 80, false);
+        write(10, 100, false);
+        read(2, 20, false);
 
         tick(10);
     } catch (std::runtime_error& e) {

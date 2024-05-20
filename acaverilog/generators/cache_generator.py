@@ -173,7 +173,7 @@ class CacheGenerator:
         # Replacement policy
         if self.NUM_WAYS > 1:
             hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
-            repl_pol_access = m.Reg("update_repl_pol_o")
+            repl_pol_access = m.Reg("repl_pol_access")
             repl_pol_replace = m.Reg("repl_pol_replace")
             repl_pol_way = m.Reg("repl_pol_way_o", max(1, self.NUM_WAYS_W))
             next_to_replace_regs = m.Reg(
@@ -255,17 +255,32 @@ class CacheGenerator:
             If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
                 latency_counter.inc(),
+                ( # update the replacement policy. the way to use will already be buffered somewhere.
+                    [
+                        If(fe_hit_o == 1)(
+                            repl_pol_access(1),
+                            repl_pol_way(hit_index),
+                        ).Else(
+                            [
+                                repl_pol_access(1),
+                                repl_pol_replace(1),
+                                repl_pol_way(replace_way_index),
+                            ]
+                            if self.WRITE_BACK
+                            else [
+                                If(Not(fe_read_write_select_i_reg))(
+                                    repl_pol_access(1),
+                                    repl_pol_replace(1),
+                                    repl_pol_way(replace_way_index),
+                                )
+                            ]
+                        )
+                    ]
+                    if self.NUM_WAYS > 1
+                    else []
+                ),
                 If(fe_hit_o == 1)(
                     # We have a hit
-                    # Update the PLRU Bits
-                    (
-                        [
-                            repl_pol_way(hit_index),
-                            repl_pol_access(1),
-                        ]
-                        if self.NUM_WAYS > 1
-                        else []
-                    ),
                     If(fe_read_write_select_i_reg == 0)(
                         # handle read
                         [
@@ -298,21 +313,19 @@ class CacheGenerator:
                             # If write: write back if dirty, write to cache
                             # ---
                             # Send write request to lower memory if dirty
-                            [
-                                be_address_valid_o_reg(
-                                    dirty_memory[replace_way_index][address_index]
-                                ),
-                                be_write_data_valid_o_reg(
-                                    dirty_memory[replace_way_index][address_index]
-                                ),
-                                be_write_data_o_reg(
-                                    data_memory[replace_way_index][address_index]
-                                ),
-                                be_address_o_reg[: self.INDEX_WIDTH](address_index),
-                                be_address_o_reg[self.INDEX_WIDTH :](
-                                    tag_memory[replace_way_index][address_index]
-                                ),
-                            ],
+                            be_address_valid_o_reg(
+                                dirty_memory[replace_way_index][address_index]
+                            ),
+                            be_write_data_valid_o_reg(
+                                dirty_memory[replace_way_index][address_index]
+                            ),
+                            be_write_data_o_reg(
+                                data_memory[replace_way_index][address_index]
+                            ),
+                            be_address_o_reg[: self.INDEX_WIDTH](address_index),
+                            be_address_o_reg[self.INDEX_WIDTH :](
+                                tag_memory[replace_way_index][address_index]
+                            ),
                             If(fe_read_write_select_i_reg == 1)(
                                 # write request - write to cache
                                 # Go to state STALL if data was not dirty and no write request was sent to lower memory
@@ -375,6 +388,8 @@ class CacheGenerator:
                 state_reg(States.WAIT_FOR_LOWER_MEM.value),
                 # Add one cycle to the latency counter because we're only gonna react to the response of the lower memory one cycle later
                 latency_counter.inc(),
+                # stop updating the replacement policy
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
             )
         )
 
@@ -402,15 +417,6 @@ class CacheGenerator:
                         (
                             [dirty_memory[replace_way_index][address_index](0)]
                             if self.WRITE_BACK
-                            else []
-                        ),
-                        (
-                            [  # Update the PLRU Bits
-                                repl_pol_way(replace_way_index),
-                                repl_pol_access(1),
-                                repl_pol_replace(1),
-                            ]
-                            if self.NUM_WAYS > 1
                             else []
                         ),
                     ),
