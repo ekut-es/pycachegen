@@ -25,7 +25,7 @@ class CacheWrapperGenerator:
         self.REPLACEMENT_POLICY = args[4]
         self.HIT_LATENCY = int(args[5])
         self.MISS_LATENCY = int(args[6])
-        self.WRITE_BACK = bool(args[7])
+        self.WRITE_BACK = bool(int(args[7]))
 
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")

@@ -445,7 +445,7 @@ class CacheGenerator:
                     state_reg(States.READY.value),
                     hit_valid(0),
                     latency_counter(0),
-                    dirty_req_valid(0),
+                    [dirty_req_valid(0)] if self.WRITE_BACK else [],
                 ),
             )
         )
