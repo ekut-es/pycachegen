@@ -255,7 +255,7 @@ class CacheGenerator:
             If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
                 latency_counter.inc(),
-                ( # update the replacement policy. the way to use will already be buffered somewhere.
+                (  # update the replacement policy. the way to use will already be buffered somewhere.
                     [
                         If(fe_hit_o == 1)(
                             repl_pol_access(1),
@@ -326,6 +326,7 @@ class CacheGenerator:
                             be_address_o_reg[self.INDEX_WIDTH :](
                                 tag_memory[replace_way_index][address_index]
                             ),
+                            be_read_write_select_o_reg(1),
                             If(fe_read_write_select_i_reg == 1)(
                                 # write request - write to cache
                                 # Go to state STALL if data was not dirty and no write request was sent to lower memory
@@ -397,10 +398,8 @@ class CacheGenerator:
             If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
                 # Waiting for the lower memory to fulfill the request
                 If(
-                    OrList(
-                        AndList(be_read_data_valid_i, Not(fe_read_write_select_i_reg)),
-                        AndList(be_write_done_i, fe_read_write_select_i_reg),
-                    )
+                    # Check if the lower memory is done
+                    OrList(be_read_data_valid_i, be_write_done_i),
                 )(
                     # Request to main memory was processed, we can now
                     # a) hand the data out and write it to the cache in case of a read
