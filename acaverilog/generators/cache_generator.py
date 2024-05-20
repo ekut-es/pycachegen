@@ -302,41 +302,41 @@ class CacheGenerator:
                         # Send write request to lower memory if dirty
                         [
                             be_address_valid_o_reg(
-                                dirty_memory[address_index][
+                                dirty_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                             ),
                             be_write_data_valid_o_reg(
-                                dirty_memory[address_index][
+                                dirty_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                             ),
                             be_write_data_o_reg(
-                                data_memory[address_index][
+                                data_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                             ),
                             be_address_o_reg[: self.INDEX_WIDTH](address_index),
                             be_address_o_reg[self.INDEX_WIDTH :](
-                                tag_memory[address_index][
+                                tag_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                             ),
                         ],
                         If(fe_read_write_select_i_reg == 1)(
@@ -344,13 +344,13 @@ class CacheGenerator:
                             # Go to state STALL if data was not dirty and no write request was sent to lower memory
                             # Else go to state REQUEST_TO_LOWER_MEM_SENT
                             If(
-                                dirty_memory[address_index][
+                                dirty_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                                 == 1
                             )(
                                 If(be_port_ready_i == 1)(
@@ -359,47 +359,47 @@ class CacheGenerator:
                             ).Else(
                                 state_reg(States.STALL)
                             ),
-                            data_memory[address_index][
+                            data_memory[
                                 (
                                     next_to_replace[address_index]
                                     if self.NUM_WAYS > 1
                                     else 0
                                 )
-                            ](fe_write_data_i_reg),
-                            valid_memory[address_index][
+                            ][address_index](fe_write_data_i_reg),
+                            valid_memory[
                                 (
                                     next_to_replace[address_index]
                                     if self.NUM_WAYS > 1
                                     else 0
                                 )
-                            ](1),
-                            dirty_memory[address_index][
+                            ][address_index](1),
+                            dirty_memory[
                                 (
                                     next_to_replace[address_index]
                                     if self.NUM_WAYS > 1
                                     else 0
                                 )
-                            ](1),
-                            tag_memory[address_index][
+                            ][address_index](1),
+                            tag_memory[
                                 (
                                     next_to_replace[address_index]
                                     if self.NUM_WAYS > 1
                                     else 0
                                 )
-                            ](address_tag),
+                            ][address_index](address_tag),
                         ).Else(
                             # read request - send read request to lower memory
                             If(be_port_ready_i == 1)(
                                 state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
                             ),
                             If(
-                                dirty_memory[address_index][
+                                dirty_memory[
                                     (
                                         next_to_replace[address_index]
                                         if self.NUM_WAYS > 1
                                         else 0
                                     )
-                                ]
+                                ][address_index]
                             )(
                                 # data was dirty - we need to queue/buffer the read request
                                 dirty_address(fe_address_i),
