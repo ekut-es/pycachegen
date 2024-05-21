@@ -50,7 +50,7 @@ class CacheGenerator:
         hit_latency: int,
         miss_latency: int,
         write_back: bool,
-        write_allocate: bool
+        write_allocate: bool,
     ) -> None:
         """Cache Generator.
 
@@ -73,8 +73,8 @@ class CacheGenerator:
         self.HIT_LATENCY = hit_latency
         self.MISS_LATENCY = miss_latency
         self.WRITE_BACK = write_back
-        self.write_allocate = write_allocate
-        
+        self.WRITE_ALLOCATE = write_allocate
+
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
@@ -158,10 +158,7 @@ class CacheGenerator:
         data_memory = m.Reg(
             f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
-        replace_way_index = m.Reg("replace_way_index", max(1, self.NUM_WAYS_W))
-
-        if self.NUM_WAYS == 1:
-            m.Assign(replace_way_index(0))
+        replace_way_index = m.Reg("replace_way_index", max(1, self.NUM_WAYS_W)) # the index of the way to be replaced next (for the current index)
 
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
@@ -173,8 +170,12 @@ class CacheGenerator:
         m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
         m.Assign(fe_hit_o(hit_vector != 0))
 
-        # Replacement policy
-        if self.NUM_WAYS > 1:
+        
+        if(self.NUM_WAYS == 1):
+            hit_index = m.Reg("hit_index") # the index of the way that created a hit (as binary, not one hot)
+            m.Assign(hit_index(0))
+            m.Assign(replace_way_index(0))
+        else:
             hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
             repl_pol_access = m.Reg("repl_pol_access")
             repl_pol_replace = m.Reg("repl_pol_replace")
@@ -257,136 +258,204 @@ class CacheGenerator:
         m.Always(Posedge(clk_i))(
             If(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
-                latency_counter.inc(),
-                (  # update the replacement policy. the way to use will already be buffered somewhere.
-                    [
-                        If(fe_hit_o == 1)(
-                            repl_pol_access(1),
-                            repl_pol_way(hit_index),
-                        ).Else(
+                If(fe_read_write_select_i_reg == 0)(
+                    # Read Request
+                    If(fe_hit_o == 1)(
+                        # We have a hit
+                        # Simply read the data from the cache
+                        fe_read_data_o_reg(data_memory[hit_index][address_index]),
+                        state_reg(States.STALL.value),
+                        # Update replacement policy
+                        (
                             [
                                 repl_pol_access(1),
-                                repl_pol_replace(1),
-                                repl_pol_way(replace_way_index),
+                                repl_pol_way(hit_index),
                             ]
-                            if self.WRITE_BACK
-                            else [
-                                If(Not(fe_read_write_select_i_reg))(
-                                    repl_pol_access(1),
-                                    repl_pol_replace(1),
-                                    repl_pol_way(replace_way_index),
-                                )
-                            ]
-                        )
-                    ]
-                    if self.NUM_WAYS > 1
-                    else []
-                ),
-                If(fe_hit_o == 1)(
-                    # We have a hit
-                    If(fe_read_write_select_i_reg == 0)(
-                        # handle read
-                        [
-                            If(hit_vector[i] == 1)(
-                                fe_read_data_o_reg(data_memory[i][address_index])
-                            )
-                            for i in range(self.NUM_WAYS)
-                        ],
-                        state_reg(
-                            States.STALL.value
-                        ),  # in case of a read, go to state stall since no request to lower memory is needed
-                    ).Elif(fe_read_write_select_i_reg == 1)(
-                        # handle write
-                        [
-                            If(hit_vector[i] == 1)(
-                                data_memory[i][address_index](fe_write_data_i_reg),
-                                (
-                                    [dirty_memory[i][address_index](1)]
-                                    if self.WRITE_BACK
-                                    else []
-                                ),
-                            )
-                            for i in range(self.NUM_WAYS)
-                        ],
-                        # in case of a write, go to state stall if write back, but let the code below handle state transitions for write through
-                        [state_reg(States.STALL.value)] if self.WRITE_BACK else [],
-                    ),
-                ),
-                (
-                    [
-                        If(fe_hit_o == 0)(
-                            # We have a miss and it's write back
-                            # If read: write back if dirty, read from lower mem, write to cache
-                            # If write: write back if dirty, write to cache
-                            # ---
-                            # Send write request to lower memory if dirty
-                            be_address_valid_o_reg(
-                                dirty_memory[replace_way_index][address_index]
-                            ),
-                            be_write_data_valid_o_reg(
-                                dirty_memory[replace_way_index][address_index]
-                            ),
-                            be_write_data_o_reg(
-                                data_memory[replace_way_index][address_index]
-                            ),
-                            be_address_o_reg[: self.INDEX_WIDTH](address_index),
-                            be_address_o_reg[self.INDEX_WIDTH :](
-                                tag_memory[replace_way_index][address_index]
-                            ),
-                            be_read_write_select_o_reg(1),
-                            If(fe_read_write_select_i_reg == 1)(
-                                # write request - write to cache
-                                # Go to state STALL if data was not dirty and no write request was sent to lower memory
-                                # Else go to state REQUEST_TO_LOWER_MEM_SENT
-                                If(dirty_memory[replace_way_index][address_index] == 1)(
-                                    If(be_port_ready_i == 1)(
+                            if self.NUM_WAYS > 1
+                            else []
+                        ),
+                    ).Else(
+                        # We have a miss
+                        (
+                            (
+                                [
+                                    # In case of write back...
+                                    If(
+                                        dirty_memory[replace_way_index][address_index]
+                                        == 1
+                                    )(
+                                        # Write the data to be replaced back if it is dirty
+                                        be_address_o_reg[: self.INDEX_WIDTH](
+                                            address_index
+                                        ),
+                                        be_address_o_reg[self.INDEX_WIDTH :](
+                                            tag_memory[replace_way_index][address_index]
+                                        ),
+                                        be_address_valid_o_reg(1),
+                                        be_read_write_select_o_reg(1),
+                                        be_write_data_o_reg(
+                                            data_memory[replace_way_index][
+                                                address_index
+                                            ]
+                                        ),
+                                        be_write_data_valid_o_reg(1),
+                                        # Buffer a read request to the lower memory
+                                        dirty_address(fe_address_i_reg),
+                                        dirty_req_valid(1),
                                         state_reg(
                                             States.REQUEST_TO_LOWER_MEM_SENT.value
-                                        )
-                                    )
-                                ).Else(state_reg(States.STALL.value)),
-                                data_memory[replace_way_index][address_index](
-                                    fe_write_data_i_reg
-                                ),
-                                valid_memory[replace_way_index][address_index](1),
-                                dirty_memory[replace_way_index][address_index](1),
-                                tag_memory[replace_way_index][address_index](
-                                    address_tag
-                                ),
-                            ).Else(
-                                # read request - send read request to lower memory
-                                If(be_port_ready_i == 1)(
-                                    state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
-                                ),
-                                If(dirty_memory[replace_way_index][address_index])(
-                                    # data was dirty - we need to queue/buffer the read request
-                                    dirty_address(fe_address_i),
-                                    dirty_req_valid(1),
-                                ).Else(
-                                    # data was not dirty - send the read request to the lower memory immediately
+                                        ),
+                                    ).Else(
+                                        # Send a read request to the lower memory
+                                        be_address_o_reg(fe_address_i_reg),
+                                        be_address_valid_o_reg(1),
+                                        be_read_write_select_o_reg(0),
+                                        state_reg(
+                                            States.REQUEST_TO_LOWER_MEM_SENT.value
+                                        ),
+                                    ),
+                                    # Mark the cache block to be replaced as dirty
+                                    dirty_memory[replace_way_index][address_index](1),
+                                ]
+                                if self.WRITE_BACK
+                                else [
+                                    # Send a read request to the lower memory
                                     be_address_o_reg(fe_address_i_reg),
                                     be_address_valid_o_reg(1),
                                     be_read_write_select_o_reg(0),
-                                ),
+                                    state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
+                                ]
                             ),
-                        )
-                    ]
-                    if self.WRITE_BACK
-                    else [
-                        If(OrList(fe_hit_o == 0, fe_read_write_select_i_reg == 1))(
-                            # We have a miss or we need to write
-                            # Request read/write from lower memory
-                            be_address_o_reg(fe_address_i_reg),
-                            be_address_valid_o_reg(1),
-                            be_read_write_select_o_reg(fe_read_write_select_i_reg),
-                            be_write_data_o_reg(fe_write_data_i_reg),
-                            be_write_data_valid_o_reg(fe_read_write_select_i_reg),
-                            If(be_port_ready_i == 1)(
-                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value)
+                            # Update replacement policy
+                            (
+                                [
+                                    repl_pol_access(1),
+                                    repl_pol_replace(1),
+                                    repl_pol_way(replace_way_index),
+                                ]
+                                if self.NUM_WAYS > 1
+                                else []
                             ),
                         ),
-                    ]
+                    )
+                ).Else(
+                    # Write Request
+                    If(fe_hit_o)(
+                        # We have a hit
+                        # update data in cache;
+                        # valid and tag dont need to be updated
+                        data_memory[hit_index][address_index](fe_write_data_i_reg),
+                        # Update replacement policy
+                        (
+                            [
+                                repl_pol_access(1),
+                                repl_pol_way(hit_index),
+                            ]
+                            if self.NUM_WAYS > 1
+                            else []
+                        ),
+                        (
+                            # In case of write back, mark the cache block as dirty
+                            [
+                                dirty_memory[hit_index][address_index](1),
+                                state_reg(States.STALL.value),
+                            ]
+                            if self.WRITE_BACK
+                            else [
+                                # In case of write through, send write request to lower memory
+                                be_address_o_reg(fe_address_i_reg),
+                                be_address_valid_o_reg(1),
+                                be_read_write_select_o_reg(1),
+                                be_write_data_o_reg(fe_write_data_i_reg),
+                                be_write_data_valid_o_reg(1),
+                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
+                            ]
+                        ),
+                    ).Else(
+                        # We have a miss
+                        [
+                            # In case of write allocate...
+                            # Write data to the cache
+                            valid_memory[replace_way_index][address_index](1),
+                            data_memory[replace_way_index][address_index](
+                                fe_write_data_i_reg
+                            ),
+                            # Update replacement policy
+                            tag_memory[replace_way_index][address_index](address_tag),
+                            (
+                                (
+                                    [
+                                        repl_pol_access(1),
+                                        repl_pol_replace(1),
+                                        repl_pol_way(replace_way_index),
+                                    ]
+                                    if self.NUM_WAYS > 1
+                                    else []
+                                ),
+                                (
+                                    [
+                                        # In case of write back...
+                                        # Mark block as dirty
+                                        dirty_memory[replace_way_index][address_index](
+                                            1
+                                        ),
+                                        If(
+                                            dirty_memory[replace_way_index][
+                                                address_index
+                                            ]
+                                        )(
+                                            # Write back data to be replaced if it is dirty
+                                            be_address_o_reg[: self.INDEX_WIDTH](
+                                                address_index
+                                            ),
+                                            be_address_o_reg[self.INDEX_WIDTH :](
+                                                tag_memory[replace_way_index][
+                                                    address_index
+                                                ]
+                                            ),
+                                            be_address_valid_o_reg(1),
+                                            be_read_write_select_o_reg(1),
+                                            be_write_data_o_reg(
+                                                data_memory[replace_way_index][
+                                                    address_index
+                                                ]
+                                            ),
+                                            be_write_data_valid_o_reg(1),
+                                            state_reg(
+                                                States.REQUEST_TO_LOWER_MEM_SENT.value
+                                            ),
+                                        ).Else(
+                                            state_reg(States.STALL.value)
+                                        ),
+                                    ]
+                                    if self.WRITE_BACK
+                                    else [
+                                        # write data to lower memory
+                                        be_address_o_reg(fe_address_i_reg),
+                                        be_address_valid_o_reg(1),
+                                        be_write_data_o_reg(fe_write_data_i_reg),
+                                        be_write_data_valid_o_reg(1),
+                                        be_read_write_select_o_reg(1),
+                                        state_reg(
+                                            States.REQUEST_TO_LOWER_MEM_SENT.value
+                                        ),
+                                    ]
+                                ),
+                            ),
+                        ]
+                        if self.WRITE_ALLOCATE
+                        else [
+                            # write data to lower memory
+                            be_address_o_reg(fe_address_i_reg),
+                            be_address_valid_o_reg(1),
+                            be_write_data_o_reg(fe_write_data_i_reg),
+                            be_write_data_valid_o_reg(1),
+                            be_read_write_select_o_reg(1),
+                            state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
+                        ]
+                    )
                 ),
+                latency_counter.inc(),
             )
         )
 
@@ -409,7 +478,8 @@ class CacheGenerator:
                     OrList(be_read_data_valid_i, be_write_done_i),
                 )(
                     # Request to main memory was processed, we can now
-                    # a) hand the data out and write it to the cache in case of a read
+                    # a) hand the data out and write it to the cache in case of a read.
+                    #    The dirty bit will already have been set in case of write back.
                     # b) do nothing in case of a write - in case of write_back, the data
                     # will already have been written to the cache before. In case of write_through,
                     # nothing needs to be done anyway
@@ -420,11 +490,6 @@ class CacheGenerator:
                         data_memory[replace_way_index][address_index](be_read_data_i),
                         valid_memory[replace_way_index][address_index](1),
                         tag_memory[replace_way_index][address_index](address_tag),
-                        (
-                            [dirty_memory[replace_way_index][address_index](0)]
-                            if self.WRITE_BACK
-                            else []
-                        ),
                     ),
                     [
                         (
