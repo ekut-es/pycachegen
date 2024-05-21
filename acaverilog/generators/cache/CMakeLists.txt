@@ -37,6 +37,12 @@ execute_process(
 execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 6 16 8 4 2 plru_tree 8 10 1 1"
 )
+execute_process(
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 7 16 8 2 2 plru_tree 8 10 0 1"
+)
+execute_process(
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 8 16 8 2 2 plru_tree 8 10 1 0"
+)
 
 # SystemC dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -52,9 +58,11 @@ add_executable(Vcache_wrapper_tb_3 cache_wrapper_tb_3.cpp)
 add_executable(Vcache_wrapper_tb_4 cache_wrapper_tb_4.cpp)
 add_executable(Vcache_wrapper_tb_5 cache_wrapper_tb_5.cpp)
 add_executable(Vcache_wrapper_tb_6 cache_wrapper_tb_6.cpp)
+add_executable(Vcache_wrapper_tb_7 cache_wrapper_tb_7.cpp)
+add_executable(Vcache_wrapper_tb_8 cache_wrapper_tb_8.cpp)
 
 set_property(
-    TARGET Vfunctional_memory_tb Vcache_wrapper_tb_1 Vcache_wrapper_tb_2 Vcache_wrapper_tb_3 Vcache_wrapper_tb_4 Vcache_wrapper_tb_5 Vcache_wrapper_tb_6
+    TARGET Vfunctional_memory_tb Vcache_wrapper_tb_1 Vcache_wrapper_tb_2 Vcache_wrapper_tb_3 Vcache_wrapper_tb_4 Vcache_wrapper_tb_5 Vcache_wrapper_tb_6 Vcache_wrapper_tb_7 Vcache_wrapper_tb_8
     PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
 )
 
@@ -86,6 +94,14 @@ verilate(Vcache_wrapper_tb_6 SYSTEMC COVERAGE TRACE
     INCLUDE_DIRS "src"
     SOURCES src/cache_wrapper_6.v
 )
+verilate(Vcache_wrapper_tb_7 SYSTEMC COVERAGE TRACE
+    INCLUDE_DIRS "src"
+    SOURCES src/cache_wrapper_7.v
+)
+verilate(Vcache_wrapper_tb_8 SYSTEMC COVERAGE TRACE
+    INCLUDE_DIRS "src"
+    SOURCES src/cache_wrapper_8.v
+)
 
 verilator_link_systemc(Vfunctional_memory_tb)
 verilator_link_systemc(Vcache_wrapper_tb_1)
@@ -94,3 +110,5 @@ verilator_link_systemc(Vcache_wrapper_tb_3)
 verilator_link_systemc(Vcache_wrapper_tb_4)
 verilator_link_systemc(Vcache_wrapper_tb_5)
 verilator_link_systemc(Vcache_wrapper_tb_6)
+verilator_link_systemc(Vcache_wrapper_tb_7)
+verilator_link_systemc(Vcache_wrapper_tb_8)

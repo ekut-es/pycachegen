@@ -314,8 +314,8 @@ class CacheGenerator:
                                             States.REQUEST_TO_LOWER_MEM_SENT.value
                                         ),
                                     ),
-                                    # Mark the cache block to be replaced as dirty
-                                    dirty_memory[replace_way_index][address_index](1),
+                                    # Mark the cache block to be replaced as non-dirty
+                                    dirty_memory[replace_way_index][address_index](0),
                                 ]
                                 if self.WRITE_BACK
                                 else [

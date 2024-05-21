@@ -4,11 +4,11 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_6.h"
+#include "Vcache_wrapper_7.h"
 
-// Testbench for testing the write-back, write allocate policy
-// data_width=16, address_width=8, num_ways=4, num_sets=2,
-// write_back=true, write_allocate=true,
+// Testbench for testing the write-through, write allocate policy
+// data_width=16, address_width=8, num_ways=2, num_sets=2,
+// write_back=false, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
@@ -36,8 +36,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_6> cache_wrapper{
-        new Vcache_wrapper_6{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_7> cache_wrapper{
+        new Vcache_wrapper_7{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -115,7 +115,7 @@ int sc_main(int argc, char** argv) {
         hit_assert(hit);
     };
 
-    std::cout << "Vcache_wrapper_6 start!" << std::endl;
+    std::cout << "Vcache_wrapper_7 start!" << std::endl;
 
     tick(0);
 
@@ -123,7 +123,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_6.vcd");
+        trace->open("Vcache_wrapper_tb_7.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -137,13 +137,11 @@ int sc_main(int argc, char** argv) {
         write(2, 20, false);
         read(2, 20, true);
         write(4, 40, false);
-        write(6, 60, false);
-        write(8, 80, false);
-        write(10, 100, false);
-        read(2, 20, false);
-        write(10, 111, true);
-        write(4, 44, false);
-        read(4, 44, true);
+        read(4, 40, true);
+        write(4, 41, true);
+        read(2, 20, true);
+        read(6, 0, false);
+        read(4, 41, false);
         
         tick(10);
     } catch (std::runtime_error& e) {
@@ -157,6 +155,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_6 done!" << std::endl;
+    std::cout << "Vcache_wrapper_7 done!" << std::endl;
     return 0;
 }
