@@ -289,7 +289,9 @@ class CacheGenerator:
                             )
                             for i in range(self.NUM_WAYS)
                         ],
-                        state_reg(States.STALL.value),
+                        state_reg(
+                            States.STALL.value
+                        ),  # in case of a read, go to state stall since no request to lower memory is needed
                     ).Elif(fe_read_write_select_i_reg == 1)(
                         # handle write
                         [
@@ -302,7 +304,9 @@ class CacheGenerator:
                                 ),
                             )
                             for i in range(self.NUM_WAYS)
-                        ]
+                        ],
+                        # in case of a write, go to state stall if write back, but let the code below handle state transitions for write through
+                        [state_reg(States.STALL.value)] if self.WRITE_BACK else [],
                     ),
                 ),
                 (

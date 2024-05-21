@@ -141,7 +141,10 @@ int sc_main(int argc, char** argv) {
         write(8, 80, false);
         write(10, 100, false);
         read(2, 20, false);
-
+        write(10, 111, true);
+        write(4, 44, false);
+        read(4, 44, true);
+        
         tick(10);
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
