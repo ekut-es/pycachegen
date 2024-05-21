@@ -26,6 +26,7 @@ class CacheWrapperGenerator:
         self.HIT_LATENCY = int(args[5])
         self.MISS_LATENCY = int(args[6])
         self.WRITE_BACK = bool(int(args[7]))
+        self.WRITE_ALLOCATE = bool(int(args[8]))
 
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")
@@ -37,7 +38,8 @@ class CacheWrapperGenerator:
             replacement_policy=self.REPLACEMENT_POLICY,
             hit_latency=self.HIT_LATENCY,
             miss_latency=self.MISS_LATENCY,
-            write_back=self.WRITE_BACK
+            write_back=self.WRITE_BACK,
+            write_allocate=self.WRITE_ALLOCATE
         ).generate_module()
         memory = FunctionalMemoryGenerator(
             data_width=self.DATA_WIDTH, address_width=self.ADDRESS_WIDTH
@@ -133,7 +135,7 @@ class CacheWrapperGenerator:
 
 
 if __name__ == "__main__":
-    # argv: (file name), number for output file suffix, data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write back
+    # argv: (file name), number for output file suffix, data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write back, write allocate
     cache_wrapper_generator = CacheWrapperGenerator(*sys.argv[2:])
     m = cache_wrapper_generator.generate_module()
     m.to_verilog(f"../src/cache_wrapper_{sys.argv[1]}.v", for_verilator=True)

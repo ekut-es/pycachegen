@@ -50,6 +50,7 @@ class CacheGenerator:
         hit_latency: int,
         miss_latency: int,
         write_back: bool,
+        write_allocate: bool
     ) -> None:
         """Cache Generator.
 
@@ -62,6 +63,7 @@ class CacheGenerator:
             hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             write_back (bool): Use write-back or write-through policy
+            write_allocate (bool): Use write-allocate or write-no-allocate policy
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
@@ -71,7 +73,8 @@ class CacheGenerator:
         self.HIT_LATENCY = hit_latency
         self.MISS_LATENCY = miss_latency
         self.WRITE_BACK = write_back
-
+        self.write_allocate = write_allocate
+        
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
