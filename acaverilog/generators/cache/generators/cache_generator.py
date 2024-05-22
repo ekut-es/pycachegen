@@ -12,8 +12,8 @@ from veriloggen import (
     Not,
 )
 
-from acaverilog.generators.one_hot_to_bin_generator import OneHotToBinGenerator
-from acaverilog.generators.replacement_policy_generator import (
+from acaverilog.generators.cache.generators.one_hot_to_bin_generator import OneHotToBinGenerator
+from acaverilog.generators.cache.generators.replacement_policy_generator import (
     ReplacementPolicyGenerator,
 )
 

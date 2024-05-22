@@ -12,8 +12,8 @@ from veriloggen import (
     Not,
 )
 
-from acaverilog.generators.cache_generator import CacheGenerator
-from acaverilog.generators.functional_memory_generator import FunctionalMemoryGenerator
+from acaverilog.generators.cache.generators.cache_generator import CacheGenerator
+from acaverilog.generators.cache.generators.functional_memory_generator import FunctionalMemoryGenerator
 
 
 class CacheWrapperGenerator:

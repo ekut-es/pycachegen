@@ -17,31 +17,31 @@ endif()
 file(GLOB SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 file(REMOVE ${SRC_FILES})
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../functional_memory_generator.py"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/functional_memory_generator.py"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 1 16 8 1 4 fifo 8 10 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 1 16 8 1 4 fifo 8 10 0 0"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 2 16 8 2 4 fifo 8 10 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 2 16 8 2 4 fifo 8 10 0 0"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 3 16 8 4 2 fifo 8 10 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 3 16 8 4 2 fifo 8 10 0 0"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 4 16 8 4 2 plru_tree 8 10 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 4 16 8 4 2 plru_tree 8 10 0 0"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 5 16 8 1 2 plru_tree 6 6 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 5 16 8 1 2 plru_tree 6 6 0 0"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 6 16 8 4 2 plru_tree 8 10 1 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 6 16 8 4 2 plru_tree 8 10 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 7 16 8 2 2 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 7 16 8 2 2 plru_tree 8 10 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/../cache_wrapper_generator.py 8 16 8 2 2 plru_tree 8 10 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 8 16 8 2 2 plru_tree 8 10 1 0"
 )
 
 # SystemC dependencies
@@ -51,15 +51,15 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS "../../../external/systemc")
 
-add_executable(Vfunctional_memory_tb functional_memory_tb.cpp)
-add_executable(Vcache_wrapper_tb_1 cache_wrapper_tb_1.cpp)
-add_executable(Vcache_wrapper_tb_2 cache_wrapper_tb_2.cpp)
-add_executable(Vcache_wrapper_tb_3 cache_wrapper_tb_3.cpp)
-add_executable(Vcache_wrapper_tb_4 cache_wrapper_tb_4.cpp)
-add_executable(Vcache_wrapper_tb_5 cache_wrapper_tb_5.cpp)
-add_executable(Vcache_wrapper_tb_6 cache_wrapper_tb_6.cpp)
-add_executable(Vcache_wrapper_tb_7 cache_wrapper_tb_7.cpp)
-add_executable(Vcache_wrapper_tb_8 cache_wrapper_tb_8.cpp)
+add_executable(Vfunctional_memory_tb tb/functional_memory_tb.cpp)
+add_executable(Vcache_wrapper_tb_1 tb/cache_wrapper_tb_1.cpp)
+add_executable(Vcache_wrapper_tb_2 tb/cache_wrapper_tb_2.cpp)
+add_executable(Vcache_wrapper_tb_3 tb/cache_wrapper_tb_3.cpp)
+add_executable(Vcache_wrapper_tb_4 tb/cache_wrapper_tb_4.cpp)
+add_executable(Vcache_wrapper_tb_5 tb/cache_wrapper_tb_5.cpp)
+add_executable(Vcache_wrapper_tb_6 tb/cache_wrapper_tb_6.cpp)
+add_executable(Vcache_wrapper_tb_7 tb/cache_wrapper_tb_7.cpp)
+add_executable(Vcache_wrapper_tb_8 tb/cache_wrapper_tb_8.cpp)
 
 set_property(
     TARGET Vfunctional_memory_tb Vcache_wrapper_tb_1 Vcache_wrapper_tb_2 Vcache_wrapper_tb_3 Vcache_wrapper_tb_4 Vcache_wrapper_tb_5 Vcache_wrapper_tb_6 Vcache_wrapper_tb_7 Vcache_wrapper_tb_8

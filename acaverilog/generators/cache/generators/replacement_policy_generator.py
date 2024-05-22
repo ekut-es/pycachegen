@@ -12,8 +12,6 @@ from veriloggen import (
     Repeat,
 )
 
-from acaverilog.generators.one_hot_to_bin_generator import OneHotToBinGenerator
-
 
 class ReplacementPolicyGenerator:
 
