@@ -51,7 +51,7 @@ class CacheGenerator:
         replacement_policy: str,
         hit_latency: int,
         miss_latency: int,
-        write_back: bool,
+        write_through: bool,
         write_allocate: bool,
     ) -> None:
         """Cache Generator.
@@ -64,7 +64,7 @@ class CacheGenerator:
             replacement_policy (str): Either "fifo" or "plru_tree"
             hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
-            write_back (bool): Use write-back or write-through policy
+            write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
         """
         self.DATA_WIDTH = data_width
@@ -74,7 +74,7 @@ class CacheGenerator:
         self.REPLACEMENT_POLICY = replacement_policy
         self.HIT_LATENCY = hit_latency
         self.MISS_LATENCY = miss_latency
-        self.WRITE_BACK = write_back
+        self.WRITE_BACK = not write_through
         self.WRITE_ALLOCATE = write_allocate
 
         # Internal Constants
