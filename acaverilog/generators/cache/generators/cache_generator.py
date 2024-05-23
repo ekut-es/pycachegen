@@ -12,7 +12,9 @@ from veriloggen import (
     Not,
 )
 
-from acaverilog.generators.cache.generators.one_hot_to_bin_generator import OneHotToBinGenerator
+from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
+    OneHotToBinGenerator,
+)
 from acaverilog.generators.cache.generators.replacement_policy_generator import (
     ReplacementPolicyGenerator,
 )
@@ -158,7 +160,9 @@ class CacheGenerator:
         data_memory = m.Reg(
             f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
-        replace_way_index = m.Reg("replace_way_index", max(1, self.NUM_WAYS_W)) # the index of the way to be replaced next (for the current index)
+        replace_way_index = m.Reg(
+            "replace_way_index", max(1, self.NUM_WAYS_W)
+        )  # the index of the way to be replaced next (for the current index)
 
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
@@ -170,9 +174,10 @@ class CacheGenerator:
         m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
         m.Assign(fe_hit_o(hit_vector != 0))
 
-        
-        if(self.NUM_WAYS == 1):
-            hit_index = m.Reg("hit_index") # the index of the way that created a hit (as binary, not one hot)
+        if self.NUM_WAYS == 1:
+            hit_index = m.Reg(
+                "hit_index"
+            )  # the index of the way that created a hit (as binary, not one hot)
             m.Assign(hit_index(0))
             m.Assign(replace_way_index(0))
         else:
@@ -235,10 +240,7 @@ class CacheGenerator:
                     ),
                 )
             )
-        )
-
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.HIT_LOOKUP.value)(
+            .Elif(state_reg == States.HIT_LOOKUP.value)(
                 # Check whether we have a hit
                 [
                     hit_vector[i](
@@ -253,10 +255,7 @@ class CacheGenerator:
                 latency_counter.inc(),
                 state_reg(States.HIT_LOOKUP_DONE.value),
             )
-        )
-
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.HIT_LOOKUP_DONE.value)(
+            .Elif(state_reg == States.HIT_LOOKUP_DONE.value)(
                 # Hit lookup has finished
                 If(fe_read_write_select_i_reg == 0)(
                     # Read Request
@@ -457,10 +456,7 @@ class CacheGenerator:
                 ),
                 latency_counter.inc(),
             )
-        )
-
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.REQUEST_TO_LOWER_MEM_SENT.value)(
+            .Elif(state_reg == States.REQUEST_TO_LOWER_MEM_SENT.value)(
                 # Stall one cycle so the lower memory can accept the request and switch to port not ready
                 state_reg(States.WAIT_FOR_LOWER_MEM.value),
                 # Add one cycle to the latency counter because we're only gonna react to the response of the lower memory one cycle later
@@ -468,10 +464,7 @@ class CacheGenerator:
                 # stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
             )
-        )
-
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
+            .Elif(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
                 # Waiting for the lower memory to fulfill the request
                 If(
                     # Check if the lower memory is done
@@ -509,10 +502,7 @@ class CacheGenerator:
                     be_address_valid_o_reg(0)
                 )
             )
-        )
-
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.STALL.value)(
+            .Elif(state_reg == States.STALL.value)(
                 # Stall for the remaining time (or error if this took too much time...?)
                 latency_counter.inc(),
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
