@@ -38,8 +38,8 @@ class ReplacementPolicyGenerator:
         access_i = m.Input("access_i")
         # some policies might only need to know of normal accesses, other might need to know if an access replaces a block
         replace_i = m.Input("replace_i")
-        index_i = m.Input("index_i", self.NUM_SETS_W)
-        way_i = m.Input("way_i", self.NUM_WAYS_W)
+        set_index_i = m.Input("set_index_i", self.NUM_SETS_W)
+        block_index_i = m.Input("block_index_i", self.NUM_WAYS_W)
 
         next_replacement_o = m.Output(
             f"next_replacement_o", self.NUM_WAYS_W, dims=self.NUM_SETS
@@ -54,8 +54,8 @@ class ReplacementPolicyGenerator:
         if self.POLICY == "fifo":
             m.Always(Posedge(clk_i))(
                 If(replace_i)(
-                    next_replacement_o_reg[index_i](
-                        next_replacement_o_reg[index_i] + 1, blk=True
+                    next_replacement_o_reg[set_index_i](
+                        next_replacement_o_reg[set_index_i] + 1, blk=True
                     )
                 )
             )
@@ -75,9 +75,9 @@ class ReplacementPolicyGenerator:
                 ).Elif(access_i)(
                     # Update the PLRU Bits
                     [
-                        plru_bits[index_i][
-                            ((way_i >> i)) + (2 ** (self.NUM_WAYS_W - i) - 1)
-                        ](way_i[i - 1], blk=True)
+                        plru_bits[set_index_i][
+                            ((block_index_i >> i)) + (2 ** (self.NUM_WAYS_W - i) - 1)
+                        ](block_index_i[i - 1], blk=True)
                         for i in range(1, self.NUM_WAYS_W + 1)
                     ],
                     # Find out which block should be replaced next
@@ -87,7 +87,7 @@ class ReplacementPolicyGenerator:
                             # FIXME This should work but it's not pretty, but there's a problem with verilator
                             # only allowing operands of an arithmetic operation to have the same width
                             # So I cant just say 2*tmp_repl+2-plru_bits[...][...]
-                            If(plru_bits[index_i][tmp_repl[: self.NUM_WAYS_W]])(
+                            If(plru_bits[set_index_i][tmp_repl[: self.NUM_WAYS_W]])(
                                 tmp_repl(2 * tmp_repl + 1, blk=True),
                             ).Else(
                                 tmp_repl(2 * tmp_repl + 2, blk=True),
@@ -96,7 +96,7 @@ class ReplacementPolicyGenerator:
                         for _ in range(self.NUM_WAYS_W)
                     ],
                     tmp_repl(tmp_repl - self.NUM_WAYS + 1, blk=True),
-                    next_replacement_o_reg[index_i](
+                    next_replacement_o_reg[set_index_i](
                         tmp_repl[: self.NUM_WAYS_W], blk=True
                     ),
                 )
