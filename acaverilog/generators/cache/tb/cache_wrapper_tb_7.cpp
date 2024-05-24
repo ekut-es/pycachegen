@@ -8,7 +8,7 @@
 
 // Testbench for testing the write-through, write allocate policy
 // data_width=16, address_width=8, num_ways=2, num_sets=2,
-// write_back=false, write_allocate=true,
+// write_through=true, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {

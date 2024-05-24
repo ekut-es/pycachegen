@@ -6,7 +6,7 @@
 
 #include "Vcache_wrapper_9.h"
 
-// Testbench for testing the reset
+// Testbench for testing the reset (with write back and associativity)
 // data_width=16, address_width=8, num_ways=2, num_sets=2,
 // write_through=false, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
