@@ -52,8 +52,10 @@ class ReplacementPolicyGenerator:
         m.Assign(next_replacement_o(next_replacement_o_reg))
 
         if self.POLICY == "fifo":
-            m.Always(Posedge(clk_i))(
-                If(replace_i)(
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(reset_n_i == 0)(
+                    [next_replacement_o_reg[i](0) for i in range(self.NUM_SETS)]
+                ).Elif(replace_i)(
                     next_replacement_o_reg[set_index_i](
                         next_replacement_o_reg[set_index_i] + 1, blk=True
                     )
