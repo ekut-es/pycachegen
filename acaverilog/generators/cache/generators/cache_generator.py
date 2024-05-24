@@ -312,12 +312,6 @@ class CacheGenerator:
                     fe_address_i_reg(fe_address_i),
                     fe_write_data_i_reg(fe_write_data_i),
                     fe_read_write_select_i_reg(fe_read_write_select_i),
-                    # Get the index of the block that should be replaced next in case we need to replace something
-                    (
-                        [next_block_replacement(next_to_replace_regs[address_index])]
-                        if self.NUM_WAYS > 1
-                        else []
-                    ),
                 )
             )
             .Elif(state_reg == States.HIT_LOOKUP.value)(
@@ -333,6 +327,12 @@ class CacheGenerator:
                 ],
                 hit_valid(1),
                 latency_counter.inc(),
+                # Get the index of the block that should be replaced next in case we need to replace something
+                (
+                    [next_block_replacement(next_to_replace_regs[address_index])]
+                    if self.NUM_WAYS > 1
+                    else []
+                ),
                 state_reg(States.HIT_LOOKUP_DONE.value),
             )
             .Elif(state_reg == States.HIT_LOOKUP_DONE.value)(
