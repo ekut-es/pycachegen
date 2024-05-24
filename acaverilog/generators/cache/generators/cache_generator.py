@@ -10,6 +10,7 @@ from veriloggen import (
     AndList,
     OrList,
     Not,
+    Or,
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -17,6 +18,9 @@ from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
 )
 from acaverilog.generators.cache.generators.replacement_policy_generator import (
     ReplacementPolicyGenerator,
+)
+from acaverilog.generators.cache.generators.priority_encoder_generator import (
+    PriorityEncoderGenerator,
 )
 
 # from acadl import ACADLObject
@@ -31,6 +35,8 @@ class States(Enum):
     REQUEST_TO_LOWER_MEM_SENT = 3
     WAIT_FOR_LOWER_MEM = 4
     STALL = 5
+    FLUSH_ISSUE_MEM_REQUEST = 7
+    FLUSH_WAIT_FOR_MEM = 8
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -91,6 +97,7 @@ class CacheGenerator:
         # Front End Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
+        flush_i = m.Input("flush_i")
         fe_address_i = m.Input("fe_address_i", self.ADDRESS_WIDTH)
         fe_address_valid_i = m.Input("fe_address_valid_i")
         fe_write_data_i = m.Input("fe_write_data_i", self.DATA_WIDTH)
@@ -120,6 +127,7 @@ class CacheGenerator:
         be_read_write_select_o = m.Output("be_read_write_select_o")
 
         # Front End Input Buffers
+        flush_i_reg = m.Reg("flush_i_reg")
         fe_address_i_reg = m.Reg("fe_address_i_reg", self.ADDRESS_WIDTH)
         fe_write_data_i_reg = m.Reg("fe_write_data_i_reg", self.DATA_WIDTH)
         fe_read_write_select_i_reg = m.Reg("fe_read_write_select_i_reg")
@@ -154,6 +162,7 @@ class CacheGenerator:
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
         hit_valid = m.Reg("hit_valid")
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+        flush_block_index = m.Reg("flush_block_index", max(1, self.NUM_WAYS_W))
 
         # Assignments to frontend signals
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
@@ -294,7 +303,11 @@ class CacheGenerator:
             )
             .Elif(state_reg == States.READY.value)(
                 # Cache is ready for a new request
-                If(
+                # Accept flush signals
+                flush_i_reg(Or(flush_i_reg, flush_i)),
+                If(OrList(flush_i, flush_i_reg))(
+                    state_reg(States.FLUSH_ISSUE_MEM_REQUEST),
+                ).Elif(
                     OrList(
                         AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1),
                         AndList(
@@ -312,7 +325,7 @@ class CacheGenerator:
                     fe_address_i_reg(fe_address_i),
                     fe_write_data_i_reg(fe_write_data_i),
                     fe_read_write_select_i_reg(fe_read_write_select_i),
-                )
+                ),
             )
             .Elif(state_reg == States.HIT_LOOKUP.value)(
                 # Check whether we have a hit
