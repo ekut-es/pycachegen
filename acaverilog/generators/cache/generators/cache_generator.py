@@ -108,7 +108,9 @@ class CacheGenerator:
         be_read_data_i = m.Input("be_read_data_i", self.DATA_WIDTH)
         be_read_data_valid_i = m.Input("be_read_data_valid_i")
         be_write_done_i = m.Input("be_write_done_i")
-        be_port_ready_i = m.Input("be_port_ready_i")
+        be_port_ready_i = m.Input(
+            "be_port_ready_i"
+        )  # FIXME Dont send request until port is ready!
 
         # Back End Outputs
         be_address_o = m.Output("be_address_o", self.ADDRESS_WIDTH)
@@ -146,13 +148,24 @@ class CacheGenerator:
         m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
         m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
-        # Internal
+        ## Internal
+        # Registers
         state_reg = m.Reg("state_reg", self.STATE_REG_WIDTH)
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
         hit_valid = m.Reg("hit_valid")
+        hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+
+        # Assignments to frontend signals
+        m.Assign(fe_port_ready_o(state_reg == States.READY.value))
+        m.Assign(fe_hit_o(hit_vector != 0))
+
+        # Wires with assignments
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
-        hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
+        m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
+
+        # Memories
         tag_memory = m.Reg(
             f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
@@ -160,31 +173,37 @@ class CacheGenerator:
         data_memory = m.Reg(
             f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
         )
-        next_block_replacement = m.Reg(
-            "next_block_replacement", max(1, self.NUM_WAYS_W)
-        )  # the index of the block to be replaced next (for the current address index)
 
+        # Things that are only needed for write back
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
             # Buffers for read requests if data was dirty and needs to be written back before the read request
             dirty_address = m.Reg("dirty_address", self.ADDRESS_WIDTH)
             dirty_req_valid = m.Reg("dirty_address_valid")
-        m.Assign(fe_port_ready_o(state_reg == States.READY.value))
-        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
-        m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
-        m.Assign(fe_hit_o(hit_vector != 0))
 
+        # Things that are only needed for direct mapped cache
         if self.NUM_WAYS == 1:
-            hit_index = m.Reg(
+            hit_index = m.Wire(
                 "hit_index"
             )  # the index of the way that created a hit (as binary, not one hot)
+            next_block_replacement = m.Wire(
+                "next_block_replacement"
+            )  # the index of the block to be replaced next (for the current address index)
             m.Assign(hit_index(0))
             m.Assign(next_block_replacement(0))
+        # Things that are only needed for set associative caches
         else:
-            hit_index = m.Reg("hit_index", self.NUM_WAYS_W)
+            hit_index = m.Reg(
+                "hit_index", self.NUM_WAYS_W
+            )  # the index of the way that created a hit (as binary, not one hot)
+            next_block_replacement = m.Reg(
+                "next_block_replacement", self.NUM_WAYS_W
+            )  # the index of the block to be replaced next (for the current address index)
             repl_pol_access = m.Reg("repl_pol_access")
             repl_pol_replace = m.Reg("repl_pol_replace")
-            repl_pol_block_index_o = m.Reg("repl_pol_block_index_o", max(1, self.NUM_WAYS_W))
+            repl_pol_block_index = m.Reg(
+                "repl_pol_block_index_o", max(1, self.NUM_WAYS_W)
+            )
             next_to_replace_regs = m.Reg(
                 "next_to_replace_regs", max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
             )
@@ -205,14 +224,75 @@ class CacheGenerator:
                     ("reset_n_i", reset_n_i),
                     ("access_i", repl_pol_access),
                     ("replace_i", repl_pol_replace),
-                    ("block_index_i", repl_pol_block_index_o),
+                    ("block_index_i", repl_pol_block_index),
                     ("set_index_i", address_index),
                     ("next_replacement_o", next_to_replace_regs),
                 ),
             )
 
-        m.Always(Posedge(clk_i))(
-            If(state_reg == States.READY.value)(
+        m.Always(Negedge(reset_n_i), Posedge(clk_i))(
+            If(Not(reset_n_i))(
+                ## reset
+                # frontend input buffers
+                fe_address_i_reg(0),
+                fe_write_data_i_reg(0),
+                fe_read_write_select_i_reg(0),
+                # frontend output buffers
+                fe_read_data_o_reg(0),
+                fe_read_data_valid_o_reg(0),
+                fe_write_done_o_reg(0),
+                # backend outputs
+                be_address_o_reg(0),
+                be_address_valid_o_reg(0),
+                be_write_data_o_reg(0),
+                be_write_data_valid_o_reg(0),
+                be_read_write_select_o_reg(0),
+                # internal registers
+                state_reg(States.READY.value),
+                latency_counter(0),
+                hit_valid(0),
+                hit_vector(0),
+                # internal memories
+                [
+                    [
+                        [
+                            tag_memory[block_idx][set_idx](0),
+                            valid_memory[block_idx][set_idx](0),
+                            data_memory[block_idx][set_idx](0),
+                        ]
+                        for set_idx in range(self.NUM_SETS)
+                    ]
+                    for block_idx in range(self.NUM_WAYS)
+                ],
+                # write back things
+                (
+                    [
+                        dirty_address(0),
+                        dirty_req_valid(0),
+                        [
+                            [
+                                dirty_memory[block_idx][set_idx](0)
+                                for set_idx in range(self.NUM_SETS)
+                            ]
+                            for block_idx in range(self.NUM_WAYS)
+                        ],
+                    ]
+                    if self.WRITE_BACK
+                    else []
+                ),
+                # things for set associative caches
+                (
+                    [
+                        next_block_replacement(0),
+                        repl_pol_access(0),
+                        repl_pol_replace(0),
+                        repl_pol_block_index(0),
+                    ]
+                    if self.NUM_WAYS > 1
+                    else []
+                ),
+            )
+            .Elif(state_reg == States.READY.value)(
                 # Cache is ready for a new request
                 If(
                     OrList(
@@ -268,7 +348,7 @@ class CacheGenerator:
                         (
                             [
                                 repl_pol_access(1),
-                                repl_pol_block_index_o(hit_index),
+                                repl_pol_block_index(hit_index),
                             ]
                             if self.NUM_WAYS > 1
                             else []
@@ -280,7 +360,9 @@ class CacheGenerator:
                                 [
                                     # In case of write back...
                                     If(
-                                        dirty_memory[next_block_replacement][address_index]
+                                        dirty_memory[next_block_replacement][
+                                            address_index
+                                        ]
                                         == 1
                                     )(
                                         # Write the data to be replaced back if it is dirty
@@ -288,7 +370,9 @@ class CacheGenerator:
                                             address_index
                                         ),
                                         be_address_o_reg[self.INDEX_WIDTH :](
-                                            tag_memory[next_block_replacement][address_index]
+                                            tag_memory[next_block_replacement][
+                                                address_index
+                                            ]
                                         ),
                                         be_address_valid_o_reg(1),
                                         be_read_write_select_o_reg(1),
@@ -314,7 +398,9 @@ class CacheGenerator:
                                         ),
                                     ),
                                     # Mark the cache block to be replaced as non-dirty
-                                    dirty_memory[next_block_replacement][address_index](0),
+                                    dirty_memory[next_block_replacement][address_index](
+                                        0
+                                    ),
                                 ]
                                 if self.WRITE_BACK
                                 else [
@@ -330,7 +416,7 @@ class CacheGenerator:
                                 [
                                     repl_pol_access(1),
                                     repl_pol_replace(1),
-                                    repl_pol_block_index_o(next_block_replacement),
+                                    repl_pol_block_index(next_block_replacement),
                                 ]
                                 if self.NUM_WAYS > 1
                                 else []
@@ -348,7 +434,7 @@ class CacheGenerator:
                         (
                             [
                                 repl_pol_access(1),
-                                repl_pol_block_index_o(hit_index),
+                                repl_pol_block_index(hit_index),
                             ]
                             if self.NUM_WAYS > 1
                             else []
@@ -380,13 +466,15 @@ class CacheGenerator:
                                 fe_write_data_i_reg
                             ),
                             # Update replacement policy
-                            tag_memory[next_block_replacement][address_index](address_tag),
+                            tag_memory[next_block_replacement][address_index](
+                                address_tag
+                            ),
                             (
                                 (
                                     [
                                         repl_pol_access(1),
                                         repl_pol_replace(1),
-                                        repl_pol_block_index_o(next_block_replacement),
+                                        repl_pol_block_index(next_block_replacement),
                                     ]
                                     if self.NUM_WAYS > 1
                                     else []
@@ -395,9 +483,9 @@ class CacheGenerator:
                                     [
                                         # In case of write back...
                                         # Mark block as dirty
-                                        dirty_memory[next_block_replacement][address_index](
-                                            1
-                                        ),
+                                        dirty_memory[next_block_replacement][
+                                            address_index
+                                        ](1),
                                         If(
                                             dirty_memory[next_block_replacement][
                                                 address_index
@@ -480,7 +568,9 @@ class CacheGenerator:
                     state_reg(States.STALL.value),
                     If(be_read_write_select_o_reg == 0)(
                         fe_read_data_o_reg(be_read_data_i),
-                        data_memory[next_block_replacement][address_index](be_read_data_i),
+                        data_memory[next_block_replacement][address_index](
+                            be_read_data_i
+                        ),
                         valid_memory[next_block_replacement][address_index](1),
                         tag_memory[next_block_replacement][address_index](address_tag),
                     ),
