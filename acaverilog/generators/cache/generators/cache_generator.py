@@ -651,10 +651,12 @@ class CacheGenerator:
                     # We have stalled enough, finish the request
                     fe_read_data_valid_o_reg(Not(fe_read_write_select_i_reg)),
                     fe_write_done_o_reg(fe_read_write_select_i_reg),
-                    state_reg(States.READY.value),
                     hit_valid(0),
                     latency_counter(0),
                     [dirty_req_valid(0)] if self.WRITE_BACK else [],
+                    If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
+                        state_reg(States.READY.value)
+                    ),
                 ),
             )
             .Else(
@@ -675,7 +677,8 @@ class CacheGenerator:
                     ),
                     # Stop sending a memory request to the next lever memory
                     be_address_valid_o_reg(0),
-                ).Elif(state_reg == States.FLUSH_SEND_MEM_REQUEST.value)(
+                )
+                .Elif(state_reg == States.FLUSH_SEND_MEM_REQUEST.value)(
                     flush_enable_encoder(
                         0
                     ),  # disable encoder because we don't need it anymore
@@ -697,7 +700,8 @@ class CacheGenerator:
                         ),
                         state_reg(States.FLUSH_COMPUTE_NEXT.value),
                     ),
-                ).Elif(state_reg == States.FLUSH_DONE.value)(
+                )
+                .Elif(state_reg == States.FLUSH_DONE.value)(
                     If(be_port_ready_i)(
                         # only become ready after the backend is ready too
                         state_reg(States.READY.value)
@@ -705,6 +709,14 @@ class CacheGenerator:
                 )
                 if self.WRITE_BACK
                 else []
-            )
+            ),
+            If(
+                AndList(
+                    state_reg != States.READY.value,
+                    state_reg != States.FLUSH_COMPUTE_NEXT.value,
+                    state_reg != States.FLUSH_DONE.value,
+                    state_reg != States.FLUSH_SEND_MEM_REQUEST.value,
+                )
+            )(flush_i_reg(Or(flush_i_reg, flush_i))),
         )
         return m

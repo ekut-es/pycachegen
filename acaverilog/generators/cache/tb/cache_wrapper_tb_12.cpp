@@ -4,9 +4,9 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_11.h"
+#include "Vcache_wrapper_12.h"
 
-// Testbench for testing the flush in a direct mapped cache
+// Testbench for testing that the flush can be queued whilst another request is being processed
 // data_width=16, address_width=8, num_ways=1, num_sets=4,
 // write_through=false, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
@@ -37,8 +37,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_11> cache_wrapper{
-        new Vcache_wrapper_11{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_12> cache_wrapper{
+        new Vcache_wrapper_12{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -128,7 +128,7 @@ int sc_main(int argc, char** argv) {
         std::cout << "Flush complete" << std::endl;
     };
 
-    std::cout << "Vcache_wrapper_11 start!" << std::endl;
+    std::cout << "Vcache_wrapper_12 start!" << std::endl;
 
     tick(0);
 
@@ -136,7 +136,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_11.vcd");
+        trace->open("Vcache_wrapper_tb_12.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -149,9 +149,27 @@ int sc_main(int argc, char** argv) {
 
         write(4, 0x40, false);
         write(5, 0x50, false);
-        write(6, 0x60, false);
 
-        flush();
+        address_i.write(6);
+        address_valid_i.write(1);
+        write_data_i.write(0x60);
+        write_data_valid_i.write(1);
+        read_write_select_i.write(1);
+        std::cout << "Requesting write manually" << std::endl;
+
+        tick(1);
+        address_valid_i.write(0);
+        tick(1);
+
+        flush_i.write(1);
+        std::cout << "Requesting flush manually" << std::endl;
+        tick(1);
+        flush_i.write(0);
+        tick(1);
+
+        while(!port_ready_o.read()){
+            tick(1);
+        }
 
         read(4, 0x40, true);
         read(5, 0x50, true);
@@ -171,6 +189,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_11 done!" << std::endl;
+    std::cout << "Vcache_wrapper_12 done!" << std::endl;
     return 0;
 }
