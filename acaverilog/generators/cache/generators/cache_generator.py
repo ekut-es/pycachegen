@@ -190,10 +190,11 @@ class CacheGenerator:
             # Buffers for read requests if data was dirty and needs to be written back before the read request
             dirty_address = m.Reg("dirty_address", self.ADDRESS_WIDTH)
             dirty_req_valid = m.Reg("dirty_address_valid")
+            # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
             flush_next_set_index = m.Wire("flush_next_set_index", self.NUM_SETS_W)
             flush_current_block_index = m.Reg(
-                "flush_current_block_index", self.NUM_WAYS_W
+                "flush_current_block_index", max(1, self.NUM_WAYS_W)
             )
             flush_enable_encoder = m.Reg("flush_enable_encoder")
             for i in range(self.NUM_SETS):
