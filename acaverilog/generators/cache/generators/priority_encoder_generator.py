@@ -31,10 +31,12 @@ class PriorityEncoderGenerator:
         m.Assign(encoded_o(encoded))
 
         m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-            If(Not(reset_n_i))(encoded(0)).Elif(enable_i)(
+            If(Not(reset_n_i))(encoded(0, blk=True)).Elif(enable_i)(
                 [
                     If(unencoded_i[i])(encoded(i, blk=True))
                     for i in range(self.WIDTH_UNENCODED)
                 ]
             )
         )
+
+        return m

@@ -46,6 +46,9 @@ execute_process(
 execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 9 16 8 2 2 plru_tree 8 10 0 1"
 )
+execute_process(
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 10 16 8 2 2 plru_tree 8 10 0 1"
+)
 # SystemC dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -63,9 +66,10 @@ add_executable(Vcache_wrapper_tb_6 tb/cache_wrapper_tb_6.cpp)
 add_executable(Vcache_wrapper_tb_7 tb/cache_wrapper_tb_7.cpp)
 add_executable(Vcache_wrapper_tb_8 tb/cache_wrapper_tb_8.cpp)
 add_executable(Vcache_wrapper_tb_9 tb/cache_wrapper_tb_9.cpp)
+add_executable(Vcache_wrapper_tb_10 tb/cache_wrapper_tb_10.cpp)
 
 set_property(
-    TARGET Vfunctional_memory_tb Vcache_wrapper_tb_1 Vcache_wrapper_tb_2 Vcache_wrapper_tb_3 Vcache_wrapper_tb_4 Vcache_wrapper_tb_5 Vcache_wrapper_tb_6 Vcache_wrapper_tb_7 Vcache_wrapper_tb_8 Vcache_wrapper_tb_9
+    TARGET Vfunctional_memory_tb Vcache_wrapper_tb_1 Vcache_wrapper_tb_2 Vcache_wrapper_tb_3 Vcache_wrapper_tb_4 Vcache_wrapper_tb_5 Vcache_wrapper_tb_6 Vcache_wrapper_tb_7 Vcache_wrapper_tb_8 Vcache_wrapper_tb_9 Vcache_wrapper_tb_10
     PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
 )
 
@@ -109,6 +113,10 @@ verilate(Vcache_wrapper_tb_9 SYSTEMC COVERAGE TRACE
     INCLUDE_DIRS "src"
     SOURCES src/cache_wrapper_9.v
 )
+verilate(Vcache_wrapper_tb_10 SYSTEMC COVERAGE TRACE
+    INCLUDE_DIRS "src"
+    SOURCES src/cache_wrapper_10.v
+)
 
 verilator_link_systemc(Vfunctional_memory_tb)
 verilator_link_systemc(Vcache_wrapper_tb_1)
@@ -120,3 +128,4 @@ verilator_link_systemc(Vcache_wrapper_tb_6)
 verilator_link_systemc(Vcache_wrapper_tb_7)
 verilator_link_systemc(Vcache_wrapper_tb_8)
 verilator_link_systemc(Vcache_wrapper_tb_9)
+verilator_link_systemc(Vcache_wrapper_tb_10)

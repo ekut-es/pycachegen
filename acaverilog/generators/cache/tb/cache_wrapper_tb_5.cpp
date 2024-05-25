@@ -23,6 +23,7 @@ int sc_main(int argc, char** argv) {
 
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
+    sc_signal<bool> flush_i;
 
     sc_signal<uint32_t> address_i;
     sc_signal<bool> address_valid_i;
@@ -41,6 +42,7 @@ int sc_main(int argc, char** argv) {
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
+    cache_wrapper->flush_i(flush_i);
 
     cache_wrapper->address_i(address_i);
     cache_wrapper->address_valid_i(address_valid_i);

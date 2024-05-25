@@ -11,6 +11,7 @@ from veriloggen import (
     OrList,
     Not,
     Or,
+    And,
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -35,8 +36,8 @@ class States(Enum):
     REQUEST_TO_LOWER_MEM_SENT = 3
     WAIT_FOR_LOWER_MEM = 4
     STALL = 5
-    FLUSH_ISSUE_MEM_REQUEST = 7
-    FLUSH_WAIT_FOR_MEM = 8
+    FLUSH_COMPUTE_NEXT = 6
+    FLUSH_SEND_MEM_REQUEST = 7
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -85,6 +86,7 @@ class CacheGenerator:
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
+        self.NUM_SETS_W = int(log2(self.NUM_SETS))
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH
@@ -162,7 +164,6 @@ class CacheGenerator:
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
         hit_valid = m.Reg("hit_valid")
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
-        flush_block_index = m.Reg("flush_block_index", max(1, self.NUM_WAYS_W))
 
         # Assignments to frontend signals
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
@@ -189,6 +190,34 @@ class CacheGenerator:
             # Buffers for read requests if data was dirty and needs to be written back before the read request
             dirty_address = m.Reg("dirty_address", self.ADDRESS_WIDTH)
             dirty_req_valid = m.Reg("dirty_address_valid")
+            flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
+            flush_next_set_index = m.Wire("flush_next_set_index", self.NUM_SETS_W)
+            flush_current_block_index = m.Reg(
+                "flush_current_block_index", self.NUM_WAYS_W
+            )
+            flush_enable_encoder = m.Reg("flush_enable_encoder")
+            for i in range(self.NUM_SETS):
+                m.Assign(
+                    flush_encoder_input[i](
+                        And(
+                            valid_memory[flush_current_block_index][i],
+                            dirty_memory[flush_current_block_index][i],
+                        )
+                    )
+                )
+
+            Submodule(
+                m,
+                PriorityEncoderGenerator(self.NUM_SETS).generate_module(),
+                "flush_priority_encoder",
+                arg_ports=(
+                    ("clk_i", clk_i),
+                    ("reset_n_i", reset_n_i),
+                    ("unencoded_i", flush_encoder_input),
+                    ("encoded_o", flush_next_set_index),
+                    ("enable_i", flush_enable_encoder),
+                ),
+            )
 
         # Things that are only needed for direct mapped cache
         if self.NUM_WAYS == 1:
@@ -305,8 +334,8 @@ class CacheGenerator:
                 # Cache is ready for a new request
                 # Accept flush signals
                 flush_i_reg(Or(flush_i_reg, flush_i)),
-                If(OrList(flush_i, flush_i_reg))(
-                    state_reg(States.FLUSH_ISSUE_MEM_REQUEST),
+                If(AndList(self.WRITE_BACK, OrList(flush_i, flush_i_reg)))(
+                    state_reg(States.FLUSH_COMPUTE_NEXT.value),
                 ).Elif(
                     OrList(
                         AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1),
@@ -625,6 +654,53 @@ class CacheGenerator:
                     latency_counter(0),
                     [dirty_req_valid(0)] if self.WRITE_BACK else [],
                 ),
+            )
+            .Else(
+                If(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
+                    If(flush_encoder_input == 0)(
+                        # No more dirty sets in this block, return or go to next block
+                        If(
+                            flush_current_block_index == self.NUM_WAYS - 1,
+                        )(
+                            If(be_port_ready_i)(
+                            # but only do so when the next level memory is ready again, otherwise we might get timing issues (? maybe, depends on when we actually need the flush)
+                                flush_current_block_index(0),
+                                state_reg(States.READY.value),
+                                flush_i_reg(0),
+                            )
+                        ).Else(flush_current_block_index.inc())
+                    ).Else(
+                        # There is a dirty set that we need to write back
+                        flush_enable_encoder(1),
+                        state_reg(States.FLUSH_SEND_MEM_REQUEST.value),
+                    ),
+                    # Stop sending a memory request to the next lever memory
+                    be_address_valid_o_reg(0),
+                ).Elif(state_reg == States.FLUSH_SEND_MEM_REQUEST.value)(
+                    flush_enable_encoder(
+                        0
+                    ),  # disable encoder because we don't need it anymore
+                    If(be_port_ready_i)(
+                        # send write request
+                        be_address_o_reg[: self.INDEX_WIDTH](flush_next_set_index),
+                        be_address_o_reg[self.INDEX_WIDTH :](
+                            tag_memory[flush_current_block_index][flush_next_set_index]
+                        ),
+                        be_address_valid_o_reg(1),
+                        be_write_data_o_reg(
+                            data_memory[flush_current_block_index][flush_next_set_index]
+                        ),
+                        be_write_data_valid_o_reg(1),
+                        be_read_write_select_o_reg(1),
+                        # clear dirty bit and go back to computing the next block to be written back
+                        dirty_memory[flush_current_block_index][flush_next_set_index](
+                            0
+                        ),
+                        state_reg(States.FLUSH_COMPUTE_NEXT.value),
+                    ),
+                )
+                if self.WRITE_BACK
+                else []
             )
         )
         return m

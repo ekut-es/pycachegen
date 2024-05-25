@@ -50,6 +50,7 @@ class CacheWrapperGenerator:
         reset_n_i = m.Input("reset_n_i")
 
         # Cache Inputs
+        flush_i =  m.Input("flush_i")
         address_i = m.Input("address_i", self.ADDRESS_WIDTH)
         address_valid_i = m.Input("address_valid_i")
         write_data_i = m.Input("write_data_i", self.DATA_WIDTH)
@@ -85,6 +86,7 @@ class CacheWrapperGenerator:
                 ("clk_i", clk_i),
                 ("reset_n_i", reset_n_i),
                 # Cache In
+                ("flush_i", flush_i),
                 ("fe_address_i", address_i),
                 ("fe_address_valid_i", address_valid_i),
                 ("fe_write_data_i", write_data_i),

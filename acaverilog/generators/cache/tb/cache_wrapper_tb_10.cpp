@@ -4,11 +4,11 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_4.h"
+#include "Vcache_wrapper_10.h"
 
-// Testbench for testing the PLRU_TREE replacement policy
-// data_width=16, address_width=8, num_ways=4, num_sets=2,
-// write_through=true, write_allocate=false,
+// Testbench for testing the flush in a set-associative cache
+// data_width=16, address_width=8, num_ways=2, num_sets=2,
+// write_through=false, write_allocate=true,
 // replacement_policy=plru_tree, hit_latency=8, miss_latency=10
 
 int sc_main(int argc, char** argv) {
@@ -37,8 +37,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_4> cache_wrapper{
-        new Vcache_wrapper_4{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_10> cache_wrapper{
+        new Vcache_wrapper_10{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -117,7 +117,18 @@ int sc_main(int argc, char** argv) {
         hit_assert(hit);
     };
 
-    std::cout << "Vcache_wrapper_4 start!" << std::endl;
+    auto flush = [&]() {
+        flush_i.write(1);
+        tick(1);
+        flush_i.write(0);
+        tick(1);
+        while(!port_ready_o.read()){
+            tick(1);
+        }
+        std::cout << "Flush complete" << std::endl;
+    };
+
+    std::cout << "Vcache_wrapper_10 start!" << std::endl;
 
     tick(0);
 
@@ -125,7 +136,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_4.vcd");
+        trace->open("Vcache_wrapper_tb_10.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -136,19 +147,17 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        read(0, 0, false);
-        read(2, 0, false);
-        read(0, 0, true);
-        read(4, 0, false);
-        read(6, 0, false);
-        read(4, 0, true);
-        read(8, 0, false);
-        read(4, 0, true);
-        read(2, 0, true);
-        read(8, 0, true);
-        read(0, 0, false);
-        read(2, 0, true);
-        read(4, 0, false);
+        write(2, 0x20, false);
+        write(3, 0x30, false);
+        write(4, 0x40, false);
+
+        flush();
+
+        read(2, 0x20, true);
+        read(3, 0x30, true);
+        read(4, 0x40, true);
+
+        write(6, 0x60, false); // manually check that this doesn't cause a write-back
 
         tick(10);
     } catch (std::runtime_error& e) {
@@ -162,6 +171,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_4 done!" << std::endl;
+    std::cout << "Vcache_wrapper_10 done!" << std::endl;
     return 0;
 }
