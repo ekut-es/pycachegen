@@ -38,6 +38,7 @@ class States(Enum):
     STALL = 5
     FLUSH_COMPUTE_NEXT = 6
     FLUSH_SEND_MEM_REQUEST = 7
+    FLUSH_DONE = 8
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -663,12 +664,9 @@ class CacheGenerator:
                         If(
                             flush_current_block_index == self.NUM_WAYS - 1,
                         )(
-                            If(be_port_ready_i)(
-                            # but only do so when the next level memory is ready again, otherwise we might get timing issues (? maybe, depends on when we actually need the flush)
-                                flush_current_block_index(0),
-                                state_reg(States.READY.value),
-                                flush_i_reg(0),
-                            )
+                            flush_current_block_index(0),
+                            state_reg(States.FLUSH_DONE.value),
+                            flush_i_reg(0),
                         ).Else(flush_current_block_index.inc())
                     ).Else(
                         # There is a dirty set that we need to write back
@@ -699,6 +697,11 @@ class CacheGenerator:
                         ),
                         state_reg(States.FLUSH_COMPUTE_NEXT.value),
                     ),
+                ).Elif(state_reg == States.FLUSH_DONE.value)(
+                    If(be_port_ready_i)(
+                        # only become ready after the backend is ready too
+                        state_reg(States.READY.value)
+                    )
                 )
                 if self.WRITE_BACK
                 else []
