@@ -33,17 +33,15 @@ class States(Enum):
     READY = 0
     HIT_LOOKUP = 1
     HIT_LOOKUP_DONE = 2
-    REQUEST_TO_LOWER_MEM_SENT = 3
-    WAIT_FOR_LOWER_MEM = 4
-    STALL = 5
-    FLUSH_COMPUTE_NEXT = 6
-    FLUSH_SEND_MEM_REQUEST = 7
-    FLUSH_DONE = 8
-    WRITE_BACK_BLOCK = 9
-    READ_BLOCK = 10
-    READ_BLOCK_DONE = 11
-    SEND_MEM_REQUEST = 12
-    SEND_MEM_REQUEST_WAIT = 13
+    WRITE_BACK_BLOCK = 3
+    READ_BLOCK = 4
+    READ_BLOCK_DONE = 5
+    SEND_MEM_REQUEST = 6
+    SEND_MEM_REQUEST_WAIT = 7
+    STALL = 8
+    FLUSH_COMPUTE_NEXT = 9
+    FLUSH_SEND_MEM_REQUEST = 10
+    FLUSH_DONE = 11
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -198,9 +196,6 @@ class CacheGenerator:
         # Things that are only needed for write back
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
-            # Buffers for read requests if data was dirty and needs to be written back before the read request
-            dirty_address = m.Reg("dirty_address", self.ADDRESS_WIDTH)
-            dirty_req_valid = m.Reg("dirty_address_valid")
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
             flush_next_set_index = m.Wire("flush_next_set_index", self.NUM_SETS_W)
@@ -302,6 +297,7 @@ class CacheGenerator:
                 latency_counter(0),
                 hit_valid(0),
                 hit_vector(0),
+                send_mem_request_next_state(0),
                 # internal memories
                 [
                     [
@@ -317,15 +313,11 @@ class CacheGenerator:
                 # write back things
                 (
                     [
-                        dirty_address(0),
-                        dirty_req_valid(0),
                         [
-                            [
-                                dirty_memory[block_idx][set_idx](0)
-                                for set_idx in range(self.NUM_SETS)
-                            ]
-                            for block_idx in range(self.NUM_WAYS)
-                        ],
+                            dirty_memory[block_idx][set_idx](0)
+                            for set_idx in range(self.NUM_SETS)
+                        ]
+                        for block_idx in range(self.NUM_WAYS)
                     ]
                     if self.WRITE_BACK
                     else []
@@ -390,8 +382,16 @@ class CacheGenerator:
                 state_reg(States.HIT_LOOKUP_DONE.value),
             )
             .Elif(state_reg == States.HIT_LOOKUP_DONE.value)(
+                latency_counter.inc(),
                 If(fe_hit_o)(
                     # we have a hit
+                    # update the replacement policy state
+                    (
+                        [repl_pol_access(1), repl_pol_block_index(hit_index)]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
+                    state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg)(
                         # write
                         data_memory[hit_index][address_index](fe_write_data_i_reg),
@@ -403,313 +403,71 @@ class CacheGenerator:
                     ).Else(
                         # read
                         fe_read_data_o_reg(data_memory[hit_index][address_index])
-                    )
-                    # TODO Update replacement policy due to access
-                    # TODO change state
-                )
-                .Elif(And(not self.WRITE_ALLOCATE, fe_read_write_select_i_reg))(
-                    # TODO write data to next level memory, go to state STALL afterwards
-                )
-                .Else(
-                    If(
-                        And(
-                            dirty_memory[hit_index][address_index],
-                            Or(Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE),
-                        )
-                    )(
-                        # TODO Write back the whole block
-                        state_reg(States.WRITE_BACK_BLOCK.value)
-                    ).Else(
-                        # TODO Go to state where whole block will be read from next mem
-                        If(Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1))(
-                            state_reg(States.READ_BLOCK.value)
-                        ).Else(state_reg(States.READ_BLOCK_DONE.value))
-                    )
-                ),
-                ###
-                # Hit lookup has finished
-                If(fe_read_write_select_i_reg == 0)(
-                    # Read Request
-                    If(fe_hit_o == 1)(
-                        # We have a hit
-                        # Simply read the data from the cache
-                        fe_read_data_o_reg(data_memory[hit_index][address_index]),
-                        state_reg(States.STALL.value),
-                        # Update replacement policy
-                        (
-                            [
-                                repl_pol_access(1),
-                                repl_pol_block_index(hit_index),
-                            ]
-                            if self.NUM_WAYS > 1
-                            else []
-                        ),
-                    ).Else(
-                        # We have a miss
-                        (
-                            (
-                                [
-                                    # In case of write back...
-                                    If(
-                                        dirty_memory[next_block_replacement][
-                                            address_index
-                                        ]
-                                        == 1
-                                    )(
-                                        # Write the data to be replaced back if it is dirty
-                                        be_address_o_reg[: self.INDEX_WIDTH](
-                                            address_index
-                                        ),
-                                        be_address_o_reg[self.INDEX_WIDTH :](
-                                            tag_memory[next_block_replacement][
-                                                address_index
-                                            ]
-                                        ),
-                                        be_address_valid_o_reg(1),
-                                        be_read_write_select_o_reg(1),
-                                        be_write_data_o_reg(
-                                            data_memory[next_block_replacement][
-                                                address_index
-                                            ]
-                                        ),
-                                        be_write_data_valid_o_reg(1),
-                                        # Buffer a read request to the lower memory
-                                        dirty_address(fe_address_i_reg),
-                                        dirty_req_valid(1),
-                                        state_reg(
-                                            States.REQUEST_TO_LOWER_MEM_SENT.value
-                                        ),
-                                    ).Else(
-                                        # Send a read request to the lower memory
-                                        be_address_o_reg(fe_address_i_reg),
-                                        be_address_valid_o_reg(1),
-                                        be_read_write_select_o_reg(0),
-                                        state_reg(
-                                            States.REQUEST_TO_LOWER_MEM_SENT.value
-                                        ),
-                                    ),
-                                    # Mark the cache block to be replaced as non-dirty
-                                    dirty_memory[next_block_replacement][address_index](
-                                        0
-                                    ),
-                                ]
-                                if self.WRITE_BACK
-                                else [
-                                    # Send a read request to the lower memory
-                                    be_address_o_reg(fe_address_i_reg),
-                                    be_address_valid_o_reg(1),
-                                    be_read_write_select_o_reg(0),
-                                    state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
-                                ]
-                            ),
-                            # Update replacement policy
-                            (
-                                [
-                                    repl_pol_access(1),
-                                    repl_pol_replace(1),
-                                    repl_pol_block_index(next_block_replacement),
-                                ]
-                                if self.NUM_WAYS > 1
-                                else []
-                            ),
-                        ),
-                    )
+                    ),
                 ).Else(
-                    # Write Request
-                    If(fe_hit_o)(
-                        # We have a hit
-                        # update data in cache;
-                        # valid and tag dont need to be updated
-                        data_memory[hit_index][address_index](fe_write_data_i_reg),
-                        # Update replacement policy
+                    # we have a miss
+                    If(And(not self.WRITE_ALLOCATE, fe_read_write_select_i_reg))(
+                        # write request and write-no-allocate -> only write to memory
+                        be_address_o_reg(fe_address_i_reg),
+                        be_write_data_o_reg(fe_write_data_i_reg),
+                        be_write_data_valid_o_reg(1),
+                        state_reg(States.SEND_MEM_REQUEST.value),
+                        send_mem_request_next_state(States.STALL.value),
+                    ).Else(
+                        # We have to replace a block
+                        # Update the replacement policy state
                         (
                             [
                                 repl_pol_access(1),
-                                repl_pol_block_index(hit_index),
+                                repl_pol_replace(1),
+                                repl_pol_block_index(next_block_replacement),
                             ]
                             if self.NUM_WAYS > 1
                             else []
                         ),
-                        (
-                            # In case of write back, mark the cache block as dirty
-                            [
-                                dirty_memory[hit_index][address_index](1),
-                                state_reg(States.STALL.value),
-                            ]
-                            if self.WRITE_BACK
-                            else [
-                                # In case of write through, send write request to lower memory
-                                be_address_o_reg(fe_address_i_reg),
-                                be_address_valid_o_reg(1),
-                                be_read_write_select_o_reg(1),
-                                be_write_data_o_reg(fe_write_data_i_reg),
-                                be_write_data_valid_o_reg(1),
-                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
-                            ]
-                        ),
-                    ).Else(
-                        # We have a miss
-                        [
-                            # In case of write allocate...
-                            # Write data to the cache
-                            valid_memory[next_block_replacement][address_index](1),
-                            data_memory[next_block_replacement][address_index](
-                                fe_write_data_i_reg
-                            ),
-                            # Update replacement policy
-                            tag_memory[next_block_replacement][address_index](
-                                address_tag
-                            ),
-                            (
-                                (
-                                    [
-                                        repl_pol_access(1),
-                                        repl_pol_replace(1),
-                                        repl_pol_block_index(next_block_replacement),
-                                    ]
-                                    if self.NUM_WAYS > 1
-                                    else []
-                                ),
-                                (
-                                    [
-                                        # In case of write back...
-                                        # Mark block as dirty
-                                        dirty_memory[next_block_replacement][
-                                            address_index
-                                        ](1),
-                                        If(
-                                            dirty_memory[next_block_replacement][
-                                                address_index
-                                            ]
-                                        )(
-                                            # Write back data to be replaced if it is dirty
-                                            be_address_o_reg[: self.INDEX_WIDTH](
-                                                address_index
-                                            ),
-                                            be_address_o_reg[self.INDEX_WIDTH :](
-                                                tag_memory[next_block_replacement][
-                                                    address_index
-                                                ]
-                                            ),
-                                            be_address_valid_o_reg(1),
-                                            be_read_write_select_o_reg(1),
-                                            be_write_data_o_reg(
-                                                data_memory[next_block_replacement][
-                                                    address_index
-                                                ]
-                                            ),
-                                            be_write_data_valid_o_reg(1),
-                                            state_reg(
-                                                States.REQUEST_TO_LOWER_MEM_SENT.value
-                                            ),
-                                        ).Else(
-                                            state_reg(States.STALL.value)
-                                        ),
-                                    ]
-                                    if self.WRITE_BACK
-                                    else [
-                                        # write data to lower memory
-                                        be_address_o_reg(fe_address_i_reg),
-                                        be_address_valid_o_reg(1),
-                                        be_write_data_o_reg(fe_write_data_i_reg),
-                                        be_write_data_valid_o_reg(1),
-                                        be_read_write_select_o_reg(1),
-                                        state_reg(
-                                            States.REQUEST_TO_LOWER_MEM_SENT.value
-                                        ),
-                                    ]
-                                ),
-                            ),
-                        ]
-                        if self.WRITE_ALLOCATE
-                        else [
-                            # write data to lower memory
-                            be_address_o_reg(fe_address_i_reg),
-                            be_address_valid_o_reg(1),
-                            be_write_data_o_reg(fe_write_data_i_reg),
-                            be_write_data_valid_o_reg(1),
-                            be_read_write_select_o_reg(1),
-                            state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
-                        ]
-                    )
-                ),
-                latency_counter.inc(),
-            )
-            .Elif(state_reg == States.REQUEST_TO_LOWER_MEM_SENT.value)(
-                # Stall one cycle so the lower memory can accept the request and switch to port not ready
-                state_reg(States.WAIT_FOR_LOWER_MEM.value),
-                # Add one cycle to the latency counter because we're only gonna react to the response of the lower memory one cycle later
-                latency_counter.inc(),
-                # stop updating the replacement policy
-                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
-            )
-            .Elif(state_reg == States.WAIT_FOR_LOWER_MEM.value)(
-                # Waiting for the lower memory to fulfill the request
-                If(
-                    # Check if the lower memory is done
-                    OrList(be_read_data_valid_i, be_write_done_i),
-                )(
-                    # Request to main memory was processed, we can now
-                    # a) hand the data out and write it to the cache in case of a read.
-                    #    The dirty bit will already have been set in case of write back.
-                    # b) do nothing in case of a write - in case of write_back, the data
-                    # will already have been written to the cache before. In case of write_through,
-                    # nothing needs to be done anyway
-                    latency_counter.inc(),
-                    state_reg(States.STALL.value),
-                    If(be_read_write_select_o_reg == 0)(
-                        fe_read_data_o_reg(be_read_data_i),
-                        data_memory[next_block_replacement][address_index](
-                            be_read_data_i
-                        ),
+                        # Update valid and dirty bits and the tag
                         valid_memory[next_block_replacement][address_index](1),
                         tag_memory[next_block_replacement][address_index](address_tag),
-                    ),
-                    [
                         (
-                            If(dirty_req_valid)(
-                                be_address_o_reg(dirty_address),
-                                be_address_valid_o_reg(1),
-                                be_read_write_select_o_reg(0),
-                                state_reg(States.REQUEST_TO_LOWER_MEM_SENT.value),
-                                dirty_req_valid(0),
+                            # mark dirty if write, else remove dirty bit
+                            dirty_memory[next_block_replacement][address_index](
+                                fe_read_write_select_i_reg
                             )
                             if self.WRITE_BACK
                             else []
-                        )
-                    ],
-                ).Else(
-                    # Invalidate the address so as to not send another request
-                    be_address_valid_o_reg(0)
-                )
-            )
-            .Elif(state_reg == States.STALL.value)(
-                # Stall for the remaining time (or error if this took too much time...?)
-                latency_counter.inc(),
-                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
-                If(
-                    OrList(
-                        AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1),
-                        AndList(
-                            latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
                         ),
-                    )
-                )(
-                    # We have stalled enough, finish the request
-                    fe_read_data_valid_o_reg(Not(fe_read_write_select_i_reg)),
-                    fe_write_done_o_reg(fe_read_write_select_i_reg),
-                    hit_valid(0),
-                    latency_counter(0),
-                    [dirty_req_valid(0)] if self.WRITE_BACK else [],
-                    If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
-                        state_reg(States.READY.value)
+                        If(
+                            And(
+                                dirty_memory[hit_index][address_index],
+                                Or(
+                                    Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE
+                                ),
+                            )
+                        )(
+                            # We need to write back the contents of the block first
+                            state_reg(States.WRITE_BACK_BLOCK.value)
+                            # write back state will figure out where to go next on its own
+                        ).Else(
+                            # No write-back needed
+                            If(
+                                Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1)
+                            )(
+                                # Read the block from the next level memory
+                                state_reg(States.READ_BLOCK.value)
+                            ).Else(
+                                # No need to read from the next level memory
+                                state_reg(States.READ_BLOCK_DONE.value)
+                            )
+                        ),
                     ),
                 ),
             )
             .Elif(state_reg == States.WRITE_BACK_BLOCK.value)(
                 latency_counter.inc(),
+                # Stop updating the replacement policy
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg[: self.INDEX_WIDTH](address_index),
-                be_address_o_reg[self.INDEX_WIDTH :](address_tag),
+                be_address_o_reg[self.INDEX_WIDTH :](tag_memory[next_block_replacement][address_tag]),
                 be_read_write_select_o_reg(1),
                 be_write_data_o_reg(data_memory[next_block_replacement][address_index]),
                 be_write_data_valid_o_reg(1),
@@ -728,10 +486,20 @@ class CacheGenerator:
             .Elif(state_reg == States.SEND_MEM_REQUEST_WAIT.value)(
                 latency_counter.inc(),
                 be_address_valid_o_reg(0),
-                If(be_port_ready_i)(state_reg(send_mem_request_next_state)),
+                If(be_port_ready_i)(
+                    state_reg(send_mem_request_next_state),
+                    If(Not(be_read_write_select_o_reg))(
+                        # if we just read something, write it to the cache
+                        data_memory[next_block_replacement][address_index](
+                            be_read_data_i
+                        )
+                    ),
+                ),
             )
             .Elif(state_reg == States.READ_BLOCK.value)(
                 latency_counter.inc(),
+                # Stop updating the replacement policy
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg(fe_address_i_reg),
                 be_read_write_select_o_reg(0),
                 state_reg(States.SEND_MEM_REQUEST.value),
@@ -739,17 +507,16 @@ class CacheGenerator:
             )
             .Elif(state_reg == States.READ_BLOCK_DONE.value)(
                 latency_counter.inc(),
+                # Stop updating the replacement policy
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 If(fe_read_write_select_i_reg)(
                     # fe write request, write to the cache
                     data_memory[next_block_replacement][address_index](
                         fe_write_data_i_reg
                     ),
-                    tag_memory[next_block_replacement][address_index](address_tag),
-                    valid_memory[next_block_replacement][address_index](1),
-                    # mark dirty if write-back, else write to next level memory
+                    # stall if write-back, else write to next level memory
                     (
                         [
-                            dirty_memory[next_block_replacement][address_index](1),
                             state_reg(States.STALL.value),
                         ]
                         if self.WRITE_BACK
@@ -759,6 +526,7 @@ class CacheGenerator:
                             be_read_write_select_o_reg(1),
                             be_write_data_valid_o_reg(1),
                             send_mem_request_next_state(States.STALL.value),
+                            state_reg(States.SEND_MEM_REQUEST.value)
                         ]
                     ),
                 ).Else(
@@ -767,6 +535,29 @@ class CacheGenerator:
                         data_memory[next_block_replacement][address_index]
                     ),
                     state_reg(States.STALL.value),
+                ),
+            )
+            .Elif(state_reg == States.STALL.value)(
+                # Stall for the remaining time (or error if this took too much time...?)
+                latency_counter.inc(),
+                # Stop updating the replacement policy
+                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
+                If(
+                    OrList(
+                        AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1),
+                        AndList(
+                            latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
+                        ),
+                    )
+                )(
+                    # We have stalled enough, finish the request
+                    fe_read_data_valid_o_reg(Not(fe_read_write_select_i_reg)),
+                    fe_write_done_o_reg(fe_read_write_select_i_reg),
+                    hit_valid(0),
+                    latency_counter(0),
+                    If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
+                        state_reg(States.READY.value)
+                    ),
                 ),
             )
             .Else(
