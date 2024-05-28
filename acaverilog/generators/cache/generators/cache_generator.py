@@ -39,6 +39,11 @@ class States(Enum):
     FLUSH_COMPUTE_NEXT = 6
     FLUSH_SEND_MEM_REQUEST = 7
     FLUSH_DONE = 8
+    WRITE_BACK_BLOCK = 9
+    READ_BLOCK = 10
+    READ_BLOCK_DONE = 11
+    SEND_MEM_REQUEST = 12
+    SEND_MEM_REQUEST_WAIT = 13
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -84,6 +89,8 @@ class CacheGenerator:
         self.MISS_LATENCY = miss_latency
         self.WRITE_BACK = not write_through
         self.WRITE_ALLOCATE = write_allocate
+
+        self.BLOCK_SIZE = 1
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -165,6 +172,9 @@ class CacheGenerator:
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
         hit_valid = m.Reg("hit_valid")
         hit_vector = m.Reg("hit_vector", self.NUM_WAYS)
+        send_mem_request_next_state = m.Reg(
+            "send_mem_request_next_state", self.STATE_REG_WIDTH
+        )
 
         # Assignments to frontend signals
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
@@ -380,6 +390,43 @@ class CacheGenerator:
                 state_reg(States.HIT_LOOKUP_DONE.value),
             )
             .Elif(state_reg == States.HIT_LOOKUP_DONE.value)(
+                If(fe_hit_o)(
+                    # we have a hit
+                    If(fe_read_write_select_i_reg)(
+                        # write
+                        data_memory[hit_index][address_index](fe_write_data_i_reg),
+                        (
+                            dirty_memory[hit_index][address_index](1)
+                            if self.WRITE_BACK
+                            else []
+                        ),
+                    ).Else(
+                        # read
+                        fe_read_data_o_reg(data_memory[hit_index][address_index])
+                    )
+                    # TODO Update replacement policy due to access
+                    # TODO change state
+                )
+                .Elif(And(not self.WRITE_ALLOCATE, fe_read_write_select_i_reg))(
+                    # TODO write data to next level memory, go to state STALL afterwards
+                )
+                .Else(
+                    If(
+                        And(
+                            dirty_memory[hit_index][address_index],
+                            Or(Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE),
+                        )
+                    )(
+                        # TODO Write back the whole block
+                        state_reg(States.WRITE_BACK_BLOCK.value)
+                    ).Else(
+                        # TODO Go to state where whole block will be read from next mem
+                        If(Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1))(
+                            state_reg(States.READ_BLOCK.value)
+                        ).Else(state_reg(States.READ_BLOCK_DONE.value))
+                    )
+                ),
+                ###
                 # Hit lookup has finished
                 If(fe_read_write_select_i_reg == 0)(
                     # Read Request
@@ -657,6 +704,69 @@ class CacheGenerator:
                     If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
                         state_reg(States.READY.value)
                     ),
+                ),
+            )
+            .Elif(state_reg == States.WRITE_BACK_BLOCK.value)(
+                latency_counter.inc(),
+                be_address_o_reg[: self.INDEX_WIDTH](address_index),
+                be_address_o_reg[self.INDEX_WIDTH :](address_tag),
+                be_read_write_select_o_reg(1),
+                be_write_data_o_reg(data_memory[next_block_replacement][address_index]),
+                be_write_data_valid_o_reg(1),
+                state_reg(States.SEND_MEM_REQUEST.value),
+                If(Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1))(
+                    send_mem_request_next_state(States.READ_BLOCK.value)
+                ).Else(send_mem_request_next_state(States.READ_BLOCK_DONE.value)),
+            )
+            .Elif(state_reg == States.SEND_MEM_REQUEST.value)(
+                latency_counter.inc(),
+                If(be_port_ready_i)(
+                    be_address_valid_o_reg(1),
+                    state_reg(States.SEND_MEM_REQUEST_WAIT.value),
+                ),
+            )
+            .Elif(state_reg == States.SEND_MEM_REQUEST_WAIT.value)(
+                latency_counter.inc(),
+                be_address_valid_o_reg(0),
+                If(be_port_ready_i)(state_reg(send_mem_request_next_state)),
+            )
+            .Elif(state_reg == States.READ_BLOCK.value)(
+                latency_counter.inc(),
+                be_address_o_reg(fe_address_i_reg),
+                be_read_write_select_o_reg(0),
+                state_reg(States.SEND_MEM_REQUEST.value),
+                send_mem_request_next_state(States.READ_BLOCK_DONE.value),
+            )
+            .Elif(state_reg == States.READ_BLOCK_DONE.value)(
+                latency_counter.inc(),
+                If(fe_read_write_select_i_reg)(
+                    # fe write request, write to the cache
+                    data_memory[next_block_replacement][address_index](
+                        fe_write_data_i_reg
+                    ),
+                    tag_memory[next_block_replacement][address_index](address_tag),
+                    valid_memory[next_block_replacement][address_index](1),
+                    # mark dirty if write-back, else write to next level memory
+                    (
+                        [
+                            dirty_memory[next_block_replacement][address_index](1),
+                            state_reg(States.STALL.value),
+                        ]
+                        if self.WRITE_BACK
+                        else [
+                            be_address_o_reg(fe_address_i_reg),
+                            be_write_data_o_reg(fe_write_data_i_reg),
+                            be_read_write_select_o_reg(1),
+                            be_write_data_valid_o_reg(1),
+                            send_mem_request_next_state(States.STALL.value),
+                        ]
+                    ),
+                ).Else(
+                    # fe read request, hand the data out
+                    fe_read_data_o_reg(
+                        data_memory[next_block_replacement][address_index]
+                    ),
+                    state_reg(States.STALL.value),
                 ),
             )
             .Else(
