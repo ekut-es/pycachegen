@@ -443,6 +443,8 @@ class CacheGenerator:
                                     Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE
                                 ),
                             )
+                            if self.WRITE_BACK
+                            else False
                         )(
                             # We need to write back the contents of the block first
                             state_reg(States.WRITE_BACK_BLOCK.value)
@@ -467,7 +469,9 @@ class CacheGenerator:
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg[: self.INDEX_WIDTH](address_index),
-                be_address_o_reg[self.INDEX_WIDTH :](tag_memory[next_block_replacement][address_tag]),
+                be_address_o_reg[self.INDEX_WIDTH :](
+                    tag_memory[next_block_replacement][address_index]
+                ),
                 be_read_write_select_o_reg(1),
                 be_write_data_o_reg(data_memory[next_block_replacement][address_index]),
                 be_write_data_valid_o_reg(1),
@@ -526,7 +530,7 @@ class CacheGenerator:
                             be_read_write_select_o_reg(1),
                             be_write_data_valid_o_reg(1),
                             send_mem_request_next_state(States.STALL.value),
-                            state_reg(States.SEND_MEM_REQUEST.value)
+                            state_reg(States.SEND_MEM_REQUEST.value),
                         ]
                     ),
                 ).Else(
