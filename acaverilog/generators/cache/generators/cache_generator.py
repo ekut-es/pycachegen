@@ -411,6 +411,7 @@ class CacheGenerator:
                         be_address_o_reg(fe_address_i_reg),
                         be_write_data_o_reg(fe_write_data_i_reg),
                         be_write_data_valid_o_reg(1),
+                        be_read_write_select_o_reg(1),
                         state_reg(States.SEND_MEM_REQUEST.value),
                         send_mem_request_next_state(States.STALL.value),
                     ).Else(
@@ -490,7 +491,8 @@ class CacheGenerator:
             .Elif(state_reg == States.SEND_MEM_REQUEST_WAIT.value)(
                 latency_counter.inc(),
                 be_address_valid_o_reg(0),
-                If(be_port_ready_i)(
+                # We need to wait at least one cycle here so the backend can accept the request
+                If(And(Not(be_address_valid_o_reg), be_port_ready_i))(
                     state_reg(send_mem_request_next_state),
                     If(Not(be_read_write_select_o_reg))(
                         # if we just read something, write it to the cache
