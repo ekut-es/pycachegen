@@ -320,11 +320,17 @@ class CacheGenerator:
                 # write back things
                 (
                     [
+                        write_back_address_index(0),
+                        write_back_block_index(0),
+                        write_back_next_state(0),
+                        write_back_tag(0),
                         [
-                            dirty_memory[block_idx][set_idx](0)
-                            for set_idx in range(self.NUM_SETS)
-                        ]
-                        for block_idx in range(self.NUM_WAYS)
+                            [
+                                dirty_memory[block_idx][set_idx](0)
+                                for set_idx in range(self.NUM_SETS)
+                            ]
+                            for block_idx in range(self.NUM_WAYS)
+                        ],
                     ]
                     if self.WRITE_BACK
                     else []
