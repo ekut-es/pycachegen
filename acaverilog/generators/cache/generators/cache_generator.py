@@ -40,8 +40,7 @@ class States(Enum):
     SEND_MEM_REQUEST_WAIT = 7
     STALL = 8
     FLUSH_COMPUTE_NEXT = 9
-    FLUSH_SEND_MEM_REQUEST = 10
-    FLUSH_DONE = 11
+    FLUSH_PREPARE_WRITE_BACK = 10
 
 
 # class CacheGenerator(ACADLObjectGenerator):
@@ -196,6 +195,14 @@ class CacheGenerator:
         # Things that are only needed for write back
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
+            write_back_address_index = m.Reg(
+                "write_back_address_index", self.INDEX_WIDTH
+            )
+            write_back_block_index = m.Reg(
+                "write_back_block_index", max(1, self.NUM_WAYS_W)
+            )
+            write_back_tag = m.Reg("write_back_tag", self.TAG_WIDTH)
+            write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
             flush_next_set_index = m.Wire("flush_next_set_index", self.NUM_SETS_W)
@@ -427,6 +434,17 @@ class CacheGenerator:
                         send_mem_request_next_state(States.STALL.value),
                     ).Else(
                         # We have to replace a block
+                        # Update valid and dirty bits and the tag
+                        valid_memory[next_block_replacement][address_index](1),
+                        tag_memory[next_block_replacement][address_index](address_tag),
+                        (
+                            # mark dirty if write, else remove dirty bit
+                            dirty_memory[next_block_replacement][address_index](
+                                fe_read_write_select_i_reg
+                            )
+                            if self.WRITE_BACK
+                            else []
+                        ),
                         # Update the replacement policy state
                         (
                             [
@@ -448,8 +466,26 @@ class CacheGenerator:
                             else False
                         )(
                             # We need to write back the contents of the block first
-                            state_reg(States.WRITE_BACK_BLOCK.value)
-                            # write back state will figure out where to go next on its own
+                            # needs to be wrapped in if/else because we use stuff that only exists in write_back
+                            # even if the above condition would never be true otherwise...
+                            [
+                                state_reg(States.WRITE_BACK_BLOCK.value),
+                                write_back_address_index(address_index),
+                                write_back_block_index(next_block_replacement),
+                                write_back_tag(
+                                    tag_memory[next_block_replacement][address_index]
+                                ),
+                                If(
+                                    Or(
+                                        Not(fe_read_write_select_i_reg),
+                                        self.BLOCK_SIZE > 1,
+                                    )
+                                )(write_back_next_state(States.READ_BLOCK.value)).Else(
+                                    write_back_next_state(States.READ_BLOCK_DONE.value)
+                                ),
+                            ]
+                            if self.WRITE_BACK
+                            else []
                         ).Else(
                             # No write-back needed
                             If(
@@ -466,20 +502,26 @@ class CacheGenerator:
                 ),
             )
             .Elif(state_reg == States.WRITE_BACK_BLOCK.value)(
-                latency_counter.inc(),
-                # Stop updating the replacement policy
-                [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
-                be_address_o_reg[: self.INDEX_WIDTH](address_index),
-                be_address_o_reg[self.INDEX_WIDTH :](
-                    tag_memory[next_block_replacement][address_index]
-                ),
-                be_read_write_select_o_reg(1),
-                be_write_data_o_reg(data_memory[next_block_replacement][address_index]),
-                be_write_data_valid_o_reg(1),
-                state_reg(States.SEND_MEM_REQUEST.value),
-                If(Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1))(
-                    send_mem_request_next_state(States.READ_BLOCK.value)
-                ).Else(send_mem_request_next_state(States.READ_BLOCK_DONE.value)),
+                [
+                    latency_counter.inc(),
+                    # Stop updating the replacement policy
+                    (
+                        [repl_pol_access(0), repl_pol_replace(0)]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
+                    be_address_o_reg[: self.INDEX_WIDTH](write_back_address_index),
+                    be_address_o_reg[self.INDEX_WIDTH :](write_back_tag),
+                    be_read_write_select_o_reg(1),
+                    be_write_data_o_reg(
+                        data_memory[write_back_block_index][address_index]
+                    ),
+                    be_write_data_valid_o_reg(1),
+                    state_reg(States.SEND_MEM_REQUEST.value),
+                    send_mem_request_next_state(write_back_next_state),
+                ]
+                if self.WRITE_BACK
+                else []
             )
             .Elif(state_reg == States.SEND_MEM_REQUEST.value)(
                 latency_counter.inc(),
@@ -504,15 +546,6 @@ class CacheGenerator:
             )
             .Elif(state_reg == States.READ_BLOCK.value)(
                 latency_counter.inc(),
-                # Update valid and dirty bits and the tag
-                valid_memory[next_block_replacement][address_index](1),
-                tag_memory[next_block_replacement][address_index](address_tag),
-                (
-                    # mark non-dirty for now, dirty bit will be set later if it is a write
-                    dirty_memory[next_block_replacement][address_index](0)
-                    if self.WRITE_BACK
-                    else []
-                ),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg(fe_address_i_reg),
@@ -524,19 +557,6 @@ class CacheGenerator:
                 latency_counter.inc(),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
-                # Update valid and dirty bits and the tag
-                # This was already done in READ_BLOCK but in case of a write with 1 word per block
-                # READ_BLOCK was never entered ._.
-                valid_memory[next_block_replacement][address_index](1),
-                tag_memory[next_block_replacement][address_index](address_tag),
-                (
-                    # mark dirty if write, else remove dirty bit
-                    dirty_memory[next_block_replacement][address_index](
-                        fe_read_write_select_i_reg
-                    )
-                    if self.WRITE_BACK
-                    else []
-                ),
                 If(fe_read_write_select_i_reg)(
                     # fe write request, write to the cache
                     data_memory[next_block_replacement][address_index](
@@ -596,45 +616,30 @@ class CacheGenerator:
                             flush_current_block_index == self.NUM_WAYS - 1,
                         )(
                             flush_current_block_index(0),
-                            state_reg(States.FLUSH_DONE.value),
+                            state_reg(States.READY.value),
                             flush_i_reg(0),
+                            latency_counter(
+                                0
+                            ),  # latency counter was incremented all the time by write back state, reset it
                         ).Else(flush_current_block_index.inc())
                     ).Else(
                         # There is a dirty set that we need to write back
                         flush_enable_encoder(1),
-                        state_reg(States.FLUSH_SEND_MEM_REQUEST.value),
+                        state_reg(States.FLUSH_PREPARE_WRITE_BACK.value),
                     ),
-                    # Stop sending a memory request to the next lever memory
-                    be_address_valid_o_reg(0),
-                )
-                .Elif(state_reg == States.FLUSH_SEND_MEM_REQUEST.value)(
+                ).Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
                     flush_enable_encoder(
                         0
                     ),  # disable encoder because we don't need it anymore
-                    If(be_port_ready_i)(
-                        # send write request
-                        be_address_o_reg[: self.INDEX_WIDTH](flush_next_set_index),
-                        be_address_o_reg[self.INDEX_WIDTH :](
-                            tag_memory[flush_current_block_index][flush_next_set_index]
-                        ),
-                        be_address_valid_o_reg(1),
-                        be_write_data_o_reg(
-                            data_memory[flush_current_block_index][flush_next_set_index]
-                        ),
-                        be_write_data_valid_o_reg(1),
-                        be_read_write_select_o_reg(1),
-                        # clear dirty bit and go back to computing the next block to be written back
-                        dirty_memory[flush_current_block_index][flush_next_set_index](
-                            0
-                        ),
-                        state_reg(States.FLUSH_COMPUTE_NEXT.value),
+                    write_back_address_index(flush_next_set_index),
+                    write_back_tag(
+                        tag_memory[flush_current_block_index][flush_next_set_index]
                     ),
-                )
-                .Elif(state_reg == States.FLUSH_DONE.value)(
-                    If(be_port_ready_i)(
-                        # only become ready after the backend is ready too
-                        state_reg(States.READY.value)
-                    )
+                    write_back_block_index(flush_current_block_index),
+                    write_back_next_state(States.FLUSH_COMPUTE_NEXT.value),
+                    state_reg(States.WRITE_BACK_BLOCK.value),
+                    # clear dirty bit
+                    dirty_memory[flush_current_block_index][flush_next_set_index](0),
                 )
                 if self.WRITE_BACK
                 else []
@@ -643,8 +648,7 @@ class CacheGenerator:
                 AndList(
                     state_reg != States.READY.value,
                     state_reg != States.FLUSH_COMPUTE_NEXT.value,
-                    state_reg != States.FLUSH_DONE.value,
-                    state_reg != States.FLUSH_SEND_MEM_REQUEST.value,
+                    state_reg != States.FLUSH_PREPARE_WRITE_BACK.value,
                 )
             )(flush_i_reg(Or(flush_i_reg, flush_i))),
         )
