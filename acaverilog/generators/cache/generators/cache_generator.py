@@ -63,6 +63,7 @@ class CacheGenerator:
         miss_latency: int,
         write_through: bool,
         write_allocate: bool,
+        block_size: int,
     ) -> None:
         """Cache Generator.
 
@@ -76,6 +77,7 @@ class CacheGenerator:
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
+            block_size (int): Number of words per block. Must be a power of 2.
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
@@ -86,8 +88,7 @@ class CacheGenerator:
         self.MISS_LATENCY = miss_latency
         self.WRITE_BACK = not write_through
         self.WRITE_ALLOCATE = write_allocate
-
-        self.BLOCK_SIZE = 1
+        self.BLOCK_SIZE = block_size
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -95,6 +96,7 @@ class CacheGenerator:
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH
+        self.WORD_OFFSET_W = int(log2(self.BLOCK_SIZE))
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
 
     def generate_module(self) -> Module:
@@ -172,6 +174,9 @@ class CacheGenerator:
         send_mem_request_next_state = m.Reg(
             "send_mem_request_next_state", self.STATE_REG_WIDTH
         )
+        read_block_word_offset = m.Reg(
+            "read_block_word_offset", max(1, self.WORD_OFFSET_W)
+        )
 
         # Assignments to frontend signals
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
@@ -180,8 +185,13 @@ class CacheGenerator:
         # Wires with assignments
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         address_index = m.Wire("address_index", self.INDEX_WIDTH)
-        m.Assign(address_tag(fe_address_i_reg[self.INDEX_WIDTH :]))
-        m.Assign(address_index(fe_address_i_reg[: self.INDEX_WIDTH]))
+        address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
+        m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
+        m.Assign(address_index(fe_address_i_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH]))
+        if self.BLOCK_SIZE == 1:
+            m.Assign(address_word_offset(0))
+        else:
+            m.Assign(address_word_offset(fe_address_i_reg[: self.WORD_OFFSET_W]))
 
         # Memories
         tag_memory = m.Reg(
@@ -189,7 +199,9 @@ class CacheGenerator:
         )
         valid_memory = m.Reg("valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
         data_memory = m.Reg(
-            f"data_memory", self.DATA_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
+            f"data_memory",
+            self.DATA_WIDTH,
+            dims=(self.NUM_WAYS, self.NUM_SETS, self.BLOCK_SIZE),
         )
 
         # Things that are only needed for write back
@@ -202,6 +214,7 @@ class CacheGenerator:
                 "write_back_block_index", max(1, self.NUM_WAYS_W)
             )
             write_back_tag = m.Reg("write_back_tag", self.TAG_WIDTH)
+            write_back_word_offset = m.Reg("write_back_word_offset", self.WORD_OFFSET_W)
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
@@ -305,13 +318,17 @@ class CacheGenerator:
                 hit_valid(0),
                 hit_vector(0),
                 send_mem_request_next_state(0),
+                read_block_word_offset(0),
                 # internal memories
                 [
                     [
                         [
                             tag_memory[block_idx][set_idx](0),
                             valid_memory[block_idx][set_idx](0),
-                            data_memory[block_idx][set_idx](0),
+                            [
+                                data_memory[block_idx][set_idx][word_idx](0)
+                                for word_idx in range(self.BLOCK_SIZE)
+                            ],
                         ]
                         for set_idx in range(self.NUM_SETS)
                     ]
@@ -324,6 +341,7 @@ class CacheGenerator:
                         write_back_block_index(0),
                         write_back_next_state(0),
                         write_back_tag(0),
+                        write_back_word_offset(0),
                         [
                             [
                                 dirty_memory[block_idx][set_idx](0)
@@ -406,7 +424,9 @@ class CacheGenerator:
                     ),
                     If(fe_read_write_select_i_reg)(
                         # write
-                        data_memory[hit_index][address_index](fe_write_data_i_reg),
+                        data_memory[hit_index][address_index][address_word_offset](
+                            fe_write_data_i_reg
+                        ),
                         (
                             [
                                 dirty_memory[hit_index][address_index](1),
@@ -425,7 +445,9 @@ class CacheGenerator:
                         ),
                     ).Else(
                         # read
-                        fe_read_data_o_reg(data_memory[hit_index][address_index]),
+                        fe_read_data_o_reg(
+                            data_memory[hit_index][address_index][address_word_offset]
+                        ),
                         state_reg(States.STALL.value),
                     ),
                 ).Else(
@@ -516,15 +538,34 @@ class CacheGenerator:
                         if self.NUM_WAYS > 1
                         else []
                     ),
-                    be_address_o_reg[: self.INDEX_WIDTH](write_back_address_index),
-                    be_address_o_reg[self.INDEX_WIDTH :](write_back_tag),
+                    # prepare memory request
+                    (
+                        be_address_o_reg[: self.WORD_OFFSET_W](write_back_word_offset)
+                        if self.BLOCK_SIZE > 1
+                        else []
+                    ),
+                    be_address_o_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH](
+                        write_back_address_index
+                    ),
+                    be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
+                        write_back_tag
+                    ),
                     be_read_write_select_o_reg(1),
                     be_write_data_o_reg(
-                        data_memory[write_back_block_index][address_index]
+                        data_memory[write_back_block_index][address_index][write_back_word_offset]
                     ),
                     be_write_data_valid_o_reg(1),
+                    # state changes
                     state_reg(States.SEND_MEM_REQUEST.value),
-                    send_mem_request_next_state(write_back_next_state),
+                    If(write_back_word_offset == self.BLOCK_SIZE - 1)(
+                        # This is the last word
+                        send_mem_request_next_state(write_back_next_state),
+                    )(
+                        # We're not done yet, come back after mem request has finished
+                        send_mem_request_next_state(States.WRITE_BACK_BLOCK.value)
+                    ),
+                    # increment block offset
+                    write_back_word_offset.inc(),
                 ]
                 if self.WRITE_BACK
                 else []
@@ -544,20 +585,33 @@ class CacheGenerator:
                     state_reg(send_mem_request_next_state),
                     If(Not(be_read_write_select_o_reg))(
                         # if we just read something, write it to the cache
-                        data_memory[next_block_replacement][address_index](
-                            be_read_data_i
-                        )
+                        data_memory[next_block_replacement][address_index][
+                            # figure out the correct block offset
+                            (
+                                be_address_o_reg[: self.WORD_OFFSET_W]
+                                if self.BLOCK_SIZE > 1
+                                else 0
+                            )
+                        ](be_read_data_i)
                     ),
                 ),
             )
             .Elif(state_reg == States.READ_BLOCK.value)(
+                # TODO Skip the address to be written to if write
                 latency_counter.inc(),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg(fe_address_i_reg),
                 be_read_write_select_o_reg(0),
                 state_reg(States.SEND_MEM_REQUEST.value),
-                send_mem_request_next_state(States.READ_BLOCK_DONE.value),
+                If(self.BLOCK_SIZE > 1)(read_block_word_offset.inc()),
+                If(read_block_word_offset == self.BLOCK_SIZE - 1)(
+                    # We're done, go back
+                    send_mem_request_next_state(States.READ_BLOCK_DONE.value)
+                ).Else(
+                    # Come back, we're not done
+                    send_mem_request_next_state(States.READ_BLOCK.value)
+                ),
             )
             .Elif(state_reg == States.READ_BLOCK_DONE.value)(
                 latency_counter.inc(),
@@ -565,9 +619,9 @@ class CacheGenerator:
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 If(fe_read_write_select_i_reg)(
                     # fe write request, write to the cache
-                    data_memory[next_block_replacement][address_index](
-                        fe_write_data_i_reg
-                    ),
+                    data_memory[next_block_replacement][address_index][
+                        address_word_offset
+                    ](fe_write_data_i_reg),
                     # stall if write-back, else write to next level memory
                     (
                         [
@@ -586,7 +640,9 @@ class CacheGenerator:
                 ).Else(
                     # fe read request, hand the data out
                     fe_read_data_o_reg(
-                        data_memory[next_block_replacement][address_index]
+                        data_memory[next_block_replacement][address_index][
+                            address_word_offset
+                        ]
                     ),
                     state_reg(States.STALL.value),
                 ),
