@@ -391,18 +391,29 @@ class CacheGenerator:
                         if self.NUM_WAYS > 1
                         else []
                     ),
-                    state_reg(States.STALL.value),
                     If(fe_read_write_select_i_reg)(
                         # write
                         data_memory[hit_index][address_index](fe_write_data_i_reg),
                         (
-                            dirty_memory[hit_index][address_index](1)
+                            [
+                                dirty_memory[hit_index][address_index](1),
+                                state_reg(States.STALL.value),
+                            ]
                             if self.WRITE_BACK
-                            else []
+                            else [
+                                # in case of write through, we still need to write to the next level memory
+                                be_address_o_reg(fe_address_i_reg),
+                                be_write_data_valid_o_reg(1),
+                                be_write_data_o_reg(fe_write_data_i_reg),
+                                be_read_write_select_o_reg(1),
+                                state_reg(States.SEND_MEM_REQUEST.value),
+                                send_mem_request_next_state(States.STALL.value),
+                            ]
                         ),
                     ).Else(
                         # read
-                        fe_read_data_o_reg(data_memory[hit_index][address_index])
+                        fe_read_data_o_reg(data_memory[hit_index][address_index]),
+                        state_reg(States.STALL.value),
                     ),
                 ).Else(
                     # we have a miss
