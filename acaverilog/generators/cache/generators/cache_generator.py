@@ -437,17 +437,6 @@ class CacheGenerator:
                             if self.NUM_WAYS > 1
                             else []
                         ),
-                        # Update valid and dirty bits and the tag
-                        valid_memory[next_block_replacement][address_index](1),
-                        tag_memory[next_block_replacement][address_index](address_tag),
-                        (
-                            # mark dirty if write, else remove dirty bit
-                            dirty_memory[next_block_replacement][address_index](
-                                fe_read_write_select_i_reg
-                            )
-                            if self.WRITE_BACK
-                            else []
-                        ),
                         If(
                             And(
                                 dirty_memory[hit_index][address_index],
@@ -515,6 +504,15 @@ class CacheGenerator:
             )
             .Elif(state_reg == States.READ_BLOCK.value)(
                 latency_counter.inc(),
+                # Update valid and dirty bits and the tag
+                valid_memory[next_block_replacement][address_index](1),
+                tag_memory[next_block_replacement][address_index](address_tag),
+                (
+                    # mark non-dirty for now, dirty bit will be set later if it is a write
+                    dirty_memory[next_block_replacement][address_index](0)
+                    if self.WRITE_BACK
+                    else []
+                ),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg(fe_address_i_reg),
@@ -526,6 +524,19 @@ class CacheGenerator:
                 latency_counter.inc(),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
+                # Update valid and dirty bits and the tag
+                # This was already done in READ_BLOCK but in case of a write with 1 word per block
+                # READ_BLOCK was never entered ._.
+                valid_memory[next_block_replacement][address_index](1),
+                tag_memory[next_block_replacement][address_index](address_tag),
+                (
+                    # mark dirty if write, else remove dirty bit
+                    dirty_memory[next_block_replacement][address_index](
+                        fe_read_write_select_i_reg
+                    )
+                    if self.WRITE_BACK
+                    else []
+                ),
                 If(fe_read_write_select_i_reg)(
                     # fe write request, write to the cache
                     data_memory[next_block_replacement][address_index](
