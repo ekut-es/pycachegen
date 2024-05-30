@@ -20,40 +20,40 @@ execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/functional_memory_generator.py"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 1 16 8 1 4 fifo 8 10 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 1 16 8 1 4 fifo 8 10 1 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 2 16 8 2 4 fifo 8 10 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 2 16 8 2 4 fifo 8 10 1 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 3 16 8 4 2 fifo 8 10 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 3 16 8 4 2 fifo 8 10 1 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 4 16 8 4 2 plru_tree 8 10 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 4 16 8 4 2 plru_tree 8 10 1 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 5 16 8 1 2 plru_tree 6 6 1 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 5 16 8 1 2 plru_tree 6 6 1 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 6 16 8 4 2 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 6 16 8 4 2 plru_tree 8 10 0 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 7 16 8 2 2 plru_tree 8 10 1 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 7 16 8 2 2 plru_tree 8 10 1 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 8 16 8 2 2 plru_tree 8 10 0 0"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 8 16 8 2 2 plru_tree 8 10 0 0 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 9 16 8 2 2 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 9 16 8 2 2 plru_tree 8 10 0 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 10 16 8 2 2 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 10 16 8 2 2 plru_tree 8 10 0 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 11 16 8 1 4 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 11 16 8 1 4 plru_tree 8 10 0 1 1"
 )
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 12 16 8 1 4 plru_tree 8 10 0 1"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py 12 16 8 1 4 plru_tree 8 10 0 1 1"
 )
 # SystemC dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)

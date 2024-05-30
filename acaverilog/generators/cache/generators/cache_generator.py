@@ -214,7 +214,7 @@ class CacheGenerator:
                 "write_back_block_index", max(1, self.NUM_WAYS_W)
             )
             write_back_tag = m.Reg("write_back_tag", self.TAG_WIDTH)
-            write_back_word_offset = m.Reg("write_back_word_offset", self.WORD_OFFSET_W)
+            write_back_word_offset = m.Reg("write_back_word_offset", max(1, self.WORD_OFFSET_W))
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
@@ -540,7 +540,12 @@ class CacheGenerator:
                     ),
                     # prepare memory request
                     (
-                        be_address_o_reg[: self.WORD_OFFSET_W](write_back_word_offset)
+                        [
+                            be_address_o_reg[: self.WORD_OFFSET_W](
+                                write_back_word_offset
+                            ),
+                            write_back_word_offset.inc(),  # increment block offset
+                        ]
                         if self.BLOCK_SIZE > 1
                         else []
                     ),
@@ -552,7 +557,9 @@ class CacheGenerator:
                     ),
                     be_read_write_select_o_reg(1),
                     be_write_data_o_reg(
-                        data_memory[write_back_block_index][address_index][write_back_word_offset]
+                        data_memory[write_back_block_index][address_index][
+                            write_back_word_offset
+                        ]
                     ),
                     be_write_data_valid_o_reg(1),
                     # state changes
@@ -564,8 +571,6 @@ class CacheGenerator:
                         # We're not done yet, come back after mem request has finished
                         send_mem_request_next_state(States.WRITE_BACK_BLOCK.value)
                     ),
-                    # increment block offset
-                    write_back_word_offset.inc(),
                 ]
                 if self.WRITE_BACK
                 else []
