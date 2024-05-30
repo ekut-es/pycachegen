@@ -557,9 +557,9 @@ class CacheGenerator:
                         if self.BLOCK_SIZE > 1
                         else []
                     ),
-                    be_address_o_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W](
-                        write_back_address_index
-                    ),
+                    be_address_o_reg[
+                        self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W
+                    ](write_back_address_index),
                     be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
                         write_back_tag
                     ),
@@ -610,7 +610,6 @@ class CacheGenerator:
                 ),
             )
             .Elif(state_reg == States.READ_BLOCK.value)(
-                # TODO Skip the address to be written to if write
                 latency_counter.inc(),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
@@ -618,25 +617,38 @@ class CacheGenerator:
                 # prepare memory request
                 (
                     [
-                        be_address_o_reg[: self.WORD_OFFSET_W](
-                            read_block_word_offset
-                        ),
+                        be_address_o_reg[: self.WORD_OFFSET_W](read_block_word_offset),
                         read_block_word_offset.inc(),  # increment block offset
                     ]
                     if self.BLOCK_SIZE > 1
                     else []
                 ),
                 be_address_o_reg[self.WORD_OFFSET_W :](
-                    fe_address_i_reg[self.WORD_OFFSET_W:]
+                    fe_address_i_reg[self.WORD_OFFSET_W :]
                 ),
                 be_read_write_select_o_reg(0),
-                state_reg(States.SEND_MEM_REQUEST.value),
                 If(read_block_word_offset == self.BLOCK_SIZE - 1)(
                     # We're done, go back
                     send_mem_request_next_state(States.READ_BLOCK_DONE.value)
                 ).Else(
                     # Come back, we're not done
                     send_mem_request_next_state(States.READ_BLOCK.value)
+                ),
+                # Send the memory request except for when its the address to which
+                # we want to write anyway
+                If(
+                    Not(
+                        And(
+                            fe_read_write_select_i_reg,
+                            address_word_offset == read_block_word_offset,
+                        )
+                    )
+                )(state_reg(States.SEND_MEM_REQUEST.value)).Elif(
+                    read_block_word_offset + 1 == 0
+                )(
+                    # If we write to the last word in the block, we have to manually jump
+                    # to the next state because the send_mem state won't do it for us
+                    state_reg(States.READ_BLOCK_DONE.value)
                 ),
             )
             .Elif(state_reg == States.READ_BLOCK_DONE.value)(
