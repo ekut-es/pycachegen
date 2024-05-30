@@ -95,8 +95,8 @@ class CacheGenerator:
         self.NUM_SETS_W = int(log2(self.NUM_SETS))
         self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
-        self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH
         self.WORD_OFFSET_W = int(log2(self.BLOCK_SIZE))
+        self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH - self.WORD_OFFSET_W
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
 
     def generate_module(self) -> Module:
@@ -183,15 +183,21 @@ class CacheGenerator:
         m.Assign(fe_hit_o(hit_vector != 0))
 
         # Wires with assignments
-        address_tag = m.Wire("address_tag", self.TAG_WIDTH)
-        address_index = m.Wire("address_index", self.INDEX_WIDTH)
         address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
-        m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
-        m.Assign(address_index(fe_address_i_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH]))
+        address_index = m.Wire("address_index", self.INDEX_WIDTH)
+        address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         if self.BLOCK_SIZE == 1:
             m.Assign(address_word_offset(0))
         else:
             m.Assign(address_word_offset(fe_address_i_reg[: self.WORD_OFFSET_W]))
+        m.Assign(
+            address_index(
+                fe_address_i_reg[
+                    self.WORD_OFFSET_W : self.WORD_OFFSET_W + self.INDEX_WIDTH
+                ]
+            )
+        )
+        m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
 
         # Memories
         tag_memory = m.Reg(
@@ -214,7 +220,9 @@ class CacheGenerator:
                 "write_back_block_index", max(1, self.NUM_WAYS_W)
             )
             write_back_tag = m.Reg("write_back_tag", self.TAG_WIDTH)
-            write_back_word_offset = m.Reg("write_back_word_offset", max(1, self.WORD_OFFSET_W))
+            write_back_word_offset = m.Reg(
+                "write_back_word_offset", max(1, self.WORD_OFFSET_W)
+            )
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
@@ -485,7 +493,7 @@ class CacheGenerator:
                         ),
                         If(
                             And(
-                                dirty_memory[hit_index][address_index],
+                                dirty_memory[next_block_replacement][address_index],
                                 Or(
                                     Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE
                                 ),
@@ -549,7 +557,7 @@ class CacheGenerator:
                         if self.BLOCK_SIZE > 1
                         else []
                     ),
-                    be_address_o_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH](
+                    be_address_o_reg[self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W](
                         write_back_address_index
                     ),
                     be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
@@ -607,9 +615,22 @@ class CacheGenerator:
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 be_address_o_reg(fe_address_i_reg),
+                # prepare memory request
+                (
+                    [
+                        be_address_o_reg[: self.WORD_OFFSET_W](
+                            read_block_word_offset
+                        ),
+                        read_block_word_offset.inc(),  # increment block offset
+                    ]
+                    if self.BLOCK_SIZE > 1
+                    else []
+                ),
+                be_address_o_reg[self.WORD_OFFSET_W :](
+                    fe_address_i_reg[self.WORD_OFFSET_W:]
+                ),
                 be_read_write_select_o_reg(0),
                 state_reg(States.SEND_MEM_REQUEST.value),
-                If(self.BLOCK_SIZE > 1)(read_block_word_offset.inc()),
                 If(read_block_word_offset == self.BLOCK_SIZE - 1)(
                     # We're done, go back
                     send_mem_request_next_state(States.READ_BLOCK_DONE.value)
