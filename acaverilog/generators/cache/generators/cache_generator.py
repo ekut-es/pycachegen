@@ -71,7 +71,7 @@ class CacheGenerator:
             data_width (int): Width of one data word in bits.
             address_width (int): Width of the addresses in bits.
             num_ways (int): Number of ways. Must be a power of 2.
-            num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
+            num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (str): Either "fifo" or "plru_tree"
             hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
@@ -184,19 +184,22 @@ class CacheGenerator:
 
         # Wires with assignments
         address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
-        address_index = m.Wire("address_index", self.INDEX_WIDTH)
+        address_index = m.Wire("address_index", max(1, self.INDEX_WIDTH))
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         if self.BLOCK_SIZE == 1:
             m.Assign(address_word_offset(0))
         else:
             m.Assign(address_word_offset(fe_address_i_reg[: self.WORD_OFFSET_W]))
-        m.Assign(
-            address_index(
-                fe_address_i_reg[
-                    self.WORD_OFFSET_W : self.WORD_OFFSET_W + self.INDEX_WIDTH
-                ]
+        if self.NUM_SETS == 1:
+            m.Assign(address_index(0))
+        else:
+            m.Assign(
+                address_index(
+                    fe_address_i_reg[
+                        self.WORD_OFFSET_W : self.WORD_OFFSET_W + self.INDEX_WIDTH
+                    ]
+                )
             )
-        )
         m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
 
         # Memories
@@ -214,7 +217,7 @@ class CacheGenerator:
         if self.WRITE_BACK:
             dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
             write_back_address_index = m.Reg(
-                "write_back_address_index", self.INDEX_WIDTH
+                "write_back_address_index", max(1, self.INDEX_WIDTH)
             )
             write_back_block_index = m.Reg(
                 "write_back_block_index", max(1, self.NUM_WAYS_W)
@@ -226,7 +229,7 @@ class CacheGenerator:
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
-            flush_next_set_index = m.Wire("flush_next_set_index", self.NUM_SETS_W)
+            flush_next_set_index = m.Wire("flush_next_set_index", max(1, ceil(log2(self.NUM_SETS))))
             flush_current_block_index = m.Reg(
                 "flush_current_block_index", max(1, self.NUM_WAYS_W)
             )
@@ -559,7 +562,7 @@ class CacheGenerator:
                     ),
                     be_address_o_reg[
                         self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W
-                    ](write_back_address_index),
+                    ](write_back_address_index) if self.NUM_SETS > 1 else [],
                     be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
                         write_back_tag
                     ),

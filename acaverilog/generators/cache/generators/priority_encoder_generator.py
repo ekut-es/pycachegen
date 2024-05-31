@@ -16,7 +16,7 @@ from veriloggen import (
 class PriorityEncoderGenerator:
     def __init__(self, width_unencoded):
         self.WIDTH_UNENCODED = width_unencoded
-        self.WIDTH_ENCODED = ceil(log2(width_unencoded))
+        self.WIDTH_ENCODED = max(1, ceil(log2(width_unencoded)))
 
     def generate_module(self) -> Module:
         m = Module("priority_encoder")

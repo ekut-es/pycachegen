@@ -38,7 +38,7 @@ class ReplacementPolicyGenerator:
         access_i = m.Input("access_i")
         # some policies might only need to know of normal accesses, other might need to know if an access replaces a block
         replace_i = m.Input("replace_i")
-        set_index_i = m.Input("set_index_i", self.NUM_SETS_W)
+        set_index_i = m.Input("set_index_i", max(1, self.NUM_SETS_W))
         block_index_i = m.Input("block_index_i", self.NUM_WAYS_W)
 
         next_replacement_o = m.Output(
