@@ -72,7 +72,7 @@ class CacheGenerator:
             address_width (int): Width of the addresses in bits.
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
-            replacement_policy (str): Either "fifo" or "plru_tree"
+            replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
             hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
             write_through (bool): Use write-through or write-back policy
@@ -269,7 +269,7 @@ class CacheGenerator:
             m.Assign(next_block_replacement(0))
         # Things that are only needed for set associative caches
         else:
-            hit_index = m.Reg(
+            hit_index = m.Wire(
                 "hit_index", self.NUM_WAYS_W
             )  # the index of the way that created a hit (as binary, not one hot)
             next_block_replacement = m.Reg(
@@ -280,8 +280,8 @@ class CacheGenerator:
             repl_pol_block_index = m.Reg(
                 "repl_pol_block_index_o", max(1, self.NUM_WAYS_W)
             )
-            next_to_replace_regs = m.Reg(
-                "next_to_replace_regs", max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
+            next_replacements = m.Wire(
+                "next_replacements", max(1, self.NUM_WAYS_W), dims=self.NUM_SETS
             )
             Submodule(
                 m,
@@ -302,7 +302,7 @@ class CacheGenerator:
                     ("replace_i", repl_pol_replace),
                     ("block_index_i", repl_pol_block_index),
                     ("set_index_i", address_index),
-                    ("next_replacement_o", next_to_replace_regs),
+                    ("next_replacement_o", next_replacements),
                 ),
             )
 
@@ -417,7 +417,7 @@ class CacheGenerator:
                 latency_counter.inc(),
                 # Get the index of the block that should be replaced next in case we need to replace something
                 (
-                    [next_block_replacement(next_to_replace_regs[address_index])]
+                    [next_block_replacement(next_replacements[address_index])]
                     if self.NUM_WAYS > 1
                     else []
                 ),
