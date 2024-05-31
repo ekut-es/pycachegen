@@ -36,6 +36,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "12 16 8 1 4 plru_tree 8 10 0 1 1"
     "13 16 8 2 2 plru_tree 8 10 0 1 4"
     "14 16 8 4 1 plru_tree 8 10 0 1 1"
+    "15 16 8 4 2 plru_mru 8 10 0 1 1"
 )
 
 # create src directory if not already there, remove all files from it
@@ -47,7 +48,7 @@ if(SRC_FILES)
 endif()
 
 # Cache wrapper test benches
-foreach(i RANGE 1 14)
+foreach(i RANGE 1 15)
     message(STATUS "Creating cache wrapper testbench ${i}")
     math(EXPR i_dec "${i} - 1")
     list(GET CACHE_WRAPPER_ARG_LIST ${i_dec} current_args)

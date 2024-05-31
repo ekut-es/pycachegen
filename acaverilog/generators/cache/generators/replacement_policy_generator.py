@@ -21,7 +21,7 @@ class ReplacementPolicyGenerator:
         Args:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
-            policy (str): Can be either "fifo" or "plru_tree"
+            policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
         """
         # This module will only be generated if num_ways > 1
         self.NUM_WAYS = num_ways
@@ -61,15 +61,42 @@ class ReplacementPolicyGenerator:
                     )
                 )
             )
+        elif self.POLICY == "plru_mru":
+            mru_bits = m.Reg("mru_bits", self.NUM_WAYS, self.NUM_SETS)
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(reset_n_i == 0)(
+                    [
+                        (mru_bits[i](0), next_replacement_o_reg[i](0))
+                        for i in range(self.NUM_SETS)
+                    ]
+                ).Elif(access_i)(
+                    # update the mru bits
+                    If(
+                        (mru_bits[set_index_i] | (1 << block_index_i))
+                        == (1 << self.NUM_WAYS) - 1
+                    )(mru_bits[set_index_i](1 << block_index_i, blk=True)).Else(
+                        mru_bits[set_index_i](
+                            mru_bits[set_index_i] | (1 << block_index_i), blk=True
+                        )
+                    ),
+                    # priority encode the mru bits
+                    [
+                        If(Not(mru_bits[set_index_i][i]))(
+                            next_replacement_o_reg[set_index_i](i, blk=True)
+                        )
+                        for i in reversed(range(self.NUM_WAYS))
+                    ],
+                )
+            )
         else:
-            plru_bits = m.Reg("plru_bits", self.NUM_WAYS - 1, self.NUM_SETS)
+            tree_bits = m.Reg("plru_bits", self.NUM_WAYS - 1, self.NUM_SETS)
             tmp_repl = m.Reg("tmp_repl", self.NUM_WAYS_W + 1)
 
             m.Always(Posedge(clk_i), Negedge(reset_n_i))(
                 If(reset_n_i == 0)(
                     [
                         (
-                            plru_bits[i](0),
+                            tree_bits[i](0),
                             next_replacement_o_reg[i](2**self.NUM_WAYS_W - 1),
                         )
                         for i in range(self.NUM_SETS)
@@ -77,7 +104,7 @@ class ReplacementPolicyGenerator:
                 ).Elif(access_i)(
                     # Update the PLRU Bits
                     [
-                        plru_bits[set_index_i][
+                        tree_bits[set_index_i][
                             ((block_index_i >> i)) + (2 ** (self.NUM_WAYS_W - i) - 1)
                         ](block_index_i[i - 1], blk=True)
                         for i in range(1, self.NUM_WAYS_W + 1)
@@ -89,7 +116,7 @@ class ReplacementPolicyGenerator:
                             # FIXME This should work but it's not pretty, but there's a problem with verilator
                             # only allowing operands of an arithmetic operation to have the same width
                             # So I cant just say 2*tmp_repl+2-plru_bits[...][...]
-                            If(plru_bits[set_index_i][tmp_repl[: self.NUM_WAYS_W]])(
+                            If(tree_bits[set_index_i][tmp_repl[: self.NUM_WAYS_W]])(
                                 tmp_repl(2 * tmp_repl + 1, blk=True),
                             ).Else(
                                 tmp_repl(2 * tmp_repl + 2, blk=True),
