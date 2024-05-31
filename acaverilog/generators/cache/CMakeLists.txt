@@ -38,9 +38,13 @@ set(CACHE_WRAPPER_ARG_LIST
     "14 16 8 4 1 plru_tree 8 10 0 1 1"
 )
 
-# remove all existing verilog source code files
+# create src directory if not already there, remove all files from it
+# this is for verilog source files
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 file(GLOB SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
-file(REMOVE ${SRC_FILES})
+if(SRC_FILES)
+    file(REMOVE ${SRC_FILES})
+endif()
 
 # Cache wrapper test benches
 foreach(i RANGE 1 14)
