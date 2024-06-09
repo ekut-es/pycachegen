@@ -44,18 +44,18 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
     cache_wrapper->flush_i(flush_i);
-
-    cache_wrapper->address_i(address_i);
-    cache_wrapper->address_valid_i(address_valid_i);
-    cache_wrapper->write_data_i(write_data_i);
-    cache_wrapper->write_data_valid_i(write_data_valid_i);
-    cache_wrapper->read_write_select_i(read_write_select_i);
-
-    cache_wrapper->read_data_o(read_data_o);
-    cache_wrapper->read_data_valid_o(read_data_valid_o);
-    cache_wrapper->write_done_o(write_done_o);
-    cache_wrapper->port_ready_o(port_ready_o);
     cache_wrapper->hit_o(hit_o);
+
+    cache_wrapper->address_0_i(address_i);
+    cache_wrapper->address_valid_0_i(address_valid_i);
+    cache_wrapper->write_data_0_i(write_data_i);
+    cache_wrapper->write_data_valid_0_i(write_data_valid_i);
+    cache_wrapper->read_write_select_0_i(read_write_select_i);
+
+    cache_wrapper->read_data_0_o(read_data_o);
+    cache_wrapper->read_data_valid_0_o(read_data_valid_o);
+    cache_wrapper->write_done_0_o(write_done_o);
+    cache_wrapper->port_ready_0_o(port_ready_o);
 
     const int MAX_SIMULATION_TIME = 1000;
 
