@@ -11,6 +11,7 @@ from veriloggen import (
     OrList,
     Not,
 )
+from itertools import chain
 
 from acaverilog.generators.cache.generators.cache_generator import CacheGenerator
 from acaverilog.generators.cache.generators.functional_memory_generator import (
@@ -149,6 +150,22 @@ class CacheWrapperGenerator:
             arbiter = MemoryAccessArbiter(
                 self.NUM_PORTS, self.ADDRESS_WIDTH, self.DATA_WIDTH
             ).generate_module()
+
+            arbiter_fe_mapping = []
+            for i in range(self.NUM_PORTS):
+                arbiter_fe_mapping.extend(
+                    [
+                        ("fe_address_{i}_i", address_i[i]),
+                        ("fe_address_valid_{i}_i", address_valid_i[i]),
+                        ("fe_write_data_{i}_i", write_data_i[i]),
+                        ("fe_write_data_valid_{i}_i", write_data_valid_i[i]),
+                        ("fe_read_write_select_{i}_i", read_write_select_i[i]),
+                        ("fe_read_data_{i}_o", read_data_o[i]),
+                        ("fe_read_data_valid_{i}_o", read_data_valid_o[i]),
+                        ("fe_write_done_{i}_o", write_done_o[i]),
+                        ("fe_port_ready_{i}_o", port_ready_o[i]),
+                    ]
+                )
             Submodule(
                 m,
                 arbiter,
@@ -165,20 +182,7 @@ class CacheWrapperGenerator:
                     ("be_write_data_o", arbiter_write_data),
                     ("be_write_data_valid_o", arbiter_write_data_valid),
                     ("be_read_write_select_o", arbiter_read_write_select),
-                    [
-                        (
-                            ("fe_address_{i}_i", address_i[i]),
-                            ("fe_address_valid_{i}_i", address_valid_i[i]),
-                            ("fe_write_data_{i}_i", write_data_i[i]),
-                            ("fe_write_data_valid_{i}_i", write_data_valid_i[i]),
-                            ("fe_read_write_select_{i}_i", read_write_select_i[i]),
-                            ("fe_read_data_{i}_o", read_data_o[i]),
-                            ("fe_read_data_valid_{i}_o", read_data_valid_o[i]),
-                            ("fe_write_done_{i}_o", write_done_o[i]),
-                            ("fe_port_ready_{i}_o", port_ready_o[i])
-                        )
-                        for i in range(self.NUM_PORTS)
-                    ],
+                    *arbiter_fe_mapping,
                 ),
             )
             Submodule(

@@ -18,6 +18,7 @@ from acaverilog.generators.cache.generators.priority_encoder_generator import (
     PriorityEncoderGenerator,
 )
 
+
 class States(Enum):
     READY = 1
     WAITING_FOR_MEMORY = 2
@@ -129,7 +130,7 @@ class MemoryAccessArbiter:
 
         Submodule(
             m,
-            PriorityEncoderGenerator(self.NUM_PORTS),
+            PriorityEncoderGenerator(self.NUM_PORTS).generate_module(),
             "arbiter_priority_encoder",
             arg_ports=(
                 ("clk_i", clk_i),
@@ -165,13 +166,13 @@ class MemoryAccessArbiter:
                 # internal
                 enable_encoder(1),
                 state_reg(States.READY.value),
-                selected_request(0)
+                selected_request(0),
             ).Else(
                 # Always buffer new requests
                 [
                     If(And(fe_port_ready[i], request_valid[i]))(
                         fe_port_ready[i](0),
-                        fe_address(fe_address_i[i]),
+                        fe_address[i](fe_address_i[i]),
                         fe_address_valid[i](1),
                         fe_write_data[i](fe_write_data_i[i]),
                         fe_write_data_valid[i](fe_write_data_valid_i[i]),
@@ -181,29 +182,52 @@ class MemoryAccessArbiter:
                     )
                     for i in range(self.NUM_PORTS)
                 ],
-                If(AndList(state_reg == States.READY.value, be_port_ready_i, request_valid != 0))(
-                    be_address(fe_address[next_request]),
+                If(
+                    AndList(
+                        state_reg == States.READY.value,
+                        be_port_ready_i,
+                        request_valid != 0,
+                    )
+                )(
+                    [
+                        If(i == next_request)(
+                            be_address(fe_address[i]),
+                            be_write_data(fe_write_data[i]),
+                            be_write_data_valid(fe_write_data_valid[i]),
+                            be_read_write_select(fe_read_write_select[i]),
+                        )
+                        for i in range(self.NUM_PORTS)
+                    ],
                     be_address_valid(1),
-                    be_write_data(fe_write_data[i]),
-                    be_write_data_valid(fe_write_data_valid[i]),
-                    be_read_write_select(fe_read_write_select[i]),
-                    state_reg(States.WAITING_FOR_MEMORY.value)
-                ).Elif(state_reg == States.WAITING_FOR_MEMORY.value)(
+                    state_reg(States.WAITING_FOR_MEMORY.value),
+                ).Elif(
+                    state_reg == States.WAITING_FOR_MEMORY.value
+                )(
                     If(be_address_valid)(
                         # invalidate the request
                         be_address_valid(0),
-                        be_write_data_valid(0)
-                    ).Elif(be_port_ready_i))(
-                        state_reg(States.READY.value),
-                        fe_port_ready[selected_request](1),
-                        If((And(be_read_write_select, be_write_done_i)))(
-                            # write done
-                            fe_write_done[selected_request](1),
-                        ).Elif(And(Not(be_read_write_select), be_read_data_valid_i))(
-                            # read done
-                            fe_read_data[selected_request](be_read_data_i),
-                            fe_read_data_valid[selected_request](1)
+                        be_write_data_valid(0),
+                    ).Elif(be_port_ready_i)
+                )(
+                    state_reg(States.READY.value),
+                    [
+                        If(i == selected_request)(
+                            fe_port_ready[i](1),
+                            If((And(be_read_write_select, be_write_done_i)))(
+                                # write done
+                                fe_write_done[i](1),
+                            ).Elif(
+                                And(Not(be_read_write_select), be_read_data_valid_i)
+                            )(
+                                # read done
+                                fe_read_data[i](be_read_data_i),
+                                fe_read_data_valid[i](1),
+                            ),
                         )
-                )
+                        for i in range(self.NUM_PORTS)
+                    ],
+                ),
             )
         )
+
+        return m

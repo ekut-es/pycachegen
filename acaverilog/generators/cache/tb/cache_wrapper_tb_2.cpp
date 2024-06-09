@@ -10,7 +10,7 @@
 // data_width=16, address_width=8, num_ways=2, num_sets=4,
 // write_through=true, write_allocate=false,
 // replacement_policy=fifo, hit_latency=8, miss_latency=10
-// block_size=1
+// block_size=1, num_ports=1
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

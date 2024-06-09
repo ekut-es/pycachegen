@@ -21,6 +21,7 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS "../../../external/systemc")
 
+set(NUM_TESTBENCHES 16)
 set(CACHE_WRAPPER_ARG_LIST
     "1 16 8 1 4 fifo 8 10 1 0 1 1"
     "2 16 8 2 4 fifo 8 10 1 0 1 1"
@@ -37,6 +38,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "13 16 8 2 2 plru_tree 8 10 0 1 4 1"
     "14 16 8 4 1 plru_tree 8 10 0 1 1 1"
     "15 16 8 4 2 plru_mru 8 10 0 1 1 1"
+    "16 16 8 4 2 plru_mru 8 10 0 1 1 2"
 )
 
 # create src directory if not already there, remove all files from it
@@ -48,23 +50,24 @@ if(SRC_FILES)
 endif()
 
 # Cache wrapper test benches
-foreach(i RANGE 1 15)
-    message(STATUS "Creating cache wrapper testbench ${i}")
-    math(EXPR i_dec "${i} - 1")
-    list(GET CACHE_WRAPPER_ARG_LIST ${i_dec} current_args)
+foreach(i RANGE 1 16)
+    math(EXPR current_idx "${NUM_TESTBENCHES} - ${i} + 1")
+    math(EXPR current_idx_dec "${NUM_TESTBENCHES} - ${i}")
+    message(STATUS "Creating cache wrapper testbench ${current_idx}")
+    list(GET CACHE_WRAPPER_ARG_LIST ${current_idx_dec} current_args)
     execute_process(
         COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/cache_wrapper_generator.py ${current_args}"
     )
-    add_executable(Vcache_wrapper_tb_${i} tb/cache_wrapper_tb_${i}.cpp)
+    add_executable(Vcache_wrapper_tb_${current_idx} tb/cache_wrapper_tb_${current_idx}.cpp)
     set_property(
-        TARGET Vcache_wrapper_tb_${i}
+        TARGET Vcache_wrapper_tb_${current_idx}
         PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
     )
-    verilate(Vcache_wrapper_tb_${i} SYSTEMC COVERAGE TRACE
+    verilate(Vcache_wrapper_tb_${current_idx} SYSTEMC COVERAGE TRACE
     INCLUDE_DIRS "src"
-    SOURCES src/cache_wrapper_${i}.v
+    SOURCES src/cache_wrapper_${current_idx}.v
     )
-    verilator_link_systemc(Vcache_wrapper_tb_${i})
+    verilator_link_systemc(Vcache_wrapper_tb_${current_idx})
 endforeach()
 
 # Functional memory test bench
