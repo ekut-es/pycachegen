@@ -20,8 +20,8 @@ from acaverilog.generators.cache.generators.priority_encoder_generator import (
 
 
 class States(Enum):
-    READY = 1
-    WAITING_FOR_MEMORY = 2
+    READY = 0
+    WAITING_FOR_MEMORY = 1
 
 
 class MemoryAccessArbiter:
@@ -55,11 +55,11 @@ class MemoryAccessArbiter:
         be_write_data_valid = m.Reg("be_write_data_valid")
         be_read_write_select = m.Reg("be_read_write_select")
         # output buffer assignments
-        m.Assign(be_address(be_address_o))
-        m.Assign(be_address_valid(be_address_valid_o))
-        m.Assign(be_write_data(be_write_data_o))
-        m.Assign(be_write_data_valid(be_write_data_valid_o))
-        m.Assign(be_read_write_select(be_read_write_select_o))
+        m.Assign(be_address_o(be_address))
+        m.Assign(be_address_valid_o(be_address_valid))
+        m.Assign(be_write_data_o(be_write_data))
+        m.Assign(be_write_data_valid_o(be_write_data_valid))
+        m.Assign(be_read_write_select_o(be_read_write_select))
 
         ## frontend
         # inputs
@@ -207,25 +207,25 @@ class MemoryAccessArbiter:
                         # invalidate the request
                         be_address_valid(0),
                         be_write_data_valid(0),
-                    ).Elif(be_port_ready_i)
-                )(
-                    state_reg(States.READY.value),
-                    [
-                        If(i == selected_request)(
-                            fe_port_ready[i](1),
-                            If((And(be_read_write_select, be_write_done_i)))(
-                                # write done
-                                fe_write_done[i](1),
-                            ).Elif(
-                                And(Not(be_read_write_select), be_read_data_valid_i)
-                            )(
-                                # read done
-                                fe_read_data[i](be_read_data_i),
-                                fe_read_data_valid[i](1),
-                            ),
-                        )
-                        for i in range(self.NUM_PORTS)
-                    ],
+                    ).Elif(be_port_ready_i)(
+                        state_reg(States.READY.value),
+                        [
+                            If(i == selected_request)(
+                                fe_port_ready[i](1),
+                                If(And(be_read_write_select, be_write_done_i))(
+                                    # write done
+                                    fe_write_done[i](1),
+                                ).Elif(
+                                    And(Not(be_read_write_select), be_read_data_valid_i)
+                                )(
+                                    # read done
+                                    fe_read_data[i](be_read_data_i),
+                                    fe_read_data_valid[i](1),
+                                ),
+                            )
+                            for i in range(self.NUM_PORTS)
+                        ],
+                    ),
                 ),
             )
         )

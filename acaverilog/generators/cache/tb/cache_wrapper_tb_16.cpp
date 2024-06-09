@@ -25,6 +25,7 @@ int sc_main(int argc, char** argv) {
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
     sc_signal<bool> flush_i;
+    sc_signal<bool> hit_o;
 
     sc_signal<uint32_t> address_0_i;
     sc_signal<bool> address_valid_0_i;
@@ -36,7 +37,6 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> read_data_valid_0_o;
     sc_signal<bool> write_done_0_o;
     sc_signal<bool> port_ready_0_o;
-    sc_signal<bool> hit_0_o;
 
     sc_signal<uint32_t> address_1_i;
     sc_signal<bool> address_valid_1_i;
@@ -48,10 +48,9 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> read_data_valid_1_o;
     sc_signal<bool> write_done_1_o;
     sc_signal<bool> port_ready_1_o;
-    sc_signal<bool> hit_1_o;
 
-    const std::unique_ptr<Vcache_wrapper_15> cache_wrapper{
-        new Vcache_wrapper_15{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_16> cache_wrapper{
+        new Vcache_wrapper_16{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -82,7 +81,14 @@ int sc_main(int argc, char** argv) {
 
     const int MAX_SIMULATION_TIME = 1000;
 
-    std::cout << "Vcache_wrapper_15 start!" << std::endl;
+    auto tick = [&](int amount) {
+        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
+            throw std::runtime_error("Exceeded maximum simulation time");
+        }
+        sc_start(amount, SC_NS);
+    };
+
+    std::cout << "Vcache_wrapper_16 start!" << std::endl;
 
     tick(0);
 
@@ -90,7 +96,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_15.vcd");
+        trace->open("Vcache_wrapper_tb_16.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -132,6 +138,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_15 done!" << std::endl;
+    std::cout << "Vcache_wrapper_16 done!" << std::endl;
     return 0;
 }

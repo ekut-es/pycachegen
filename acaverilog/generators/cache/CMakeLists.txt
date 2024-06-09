@@ -50,7 +50,7 @@ if(SRC_FILES)
 endif()
 
 # Cache wrapper test benches
-foreach(i RANGE 1 16)
+foreach(i RANGE 1 ${NUM_TESTBENCHES})
     math(EXPR current_idx "${NUM_TESTBENCHES} - ${i} + 1")
     math(EXPR current_idx_dec "${NUM_TESTBENCHES} - ${i}")
     message(STATUS "Creating cache wrapper testbench ${current_idx}")

@@ -151,9 +151,21 @@ class CacheWrapperGenerator:
                 self.NUM_PORTS, self.ADDRESS_WIDTH, self.DATA_WIDTH
             ).generate_module()
 
-            arbiter_fe_mapping = []
+            arbiter_port_mapping = [
+                ("clk_i", clk_i),
+                ("reset_n_i", reset_n_i),
+                ("be_port_ready_i", arbiter_port_ready),
+                ("be_read_data_i", arbiter_read_data),
+                ("be_read_data_valid_i", arbiter_read_data_valid),
+                ("be_write_done_i", arbiter_write_done),
+                ("be_address_o", arbiter_address),
+                ("be_address_valid_o", arbiter_address_valid),
+                ("be_write_data_o", arbiter_write_data),
+                ("be_write_data_valid_o", arbiter_write_data_valid),
+                ("be_read_write_select_o", arbiter_read_write_select),
+            ]
             for i in range(self.NUM_PORTS):
-                arbiter_fe_mapping.extend(
+                arbiter_port_mapping.extend(
                     [
                         ("fe_address_{i}_i", address_i[i]),
                         ("fe_address_valid_{i}_i", address_valid_i[i]),
@@ -166,25 +178,7 @@ class CacheWrapperGenerator:
                         ("fe_port_ready_{i}_o", port_ready_o[i]),
                     ]
                 )
-            Submodule(
-                m,
-                arbiter,
-                "arbiter",
-                arg_ports=(
-                    ("clk_i", clk_i),
-                    ("reset_n_i", reset_n_i),
-                    ("be_port_ready_i", arbiter_port_ready),
-                    ("be_read_data_i", arbiter_read_data),
-                    ("be_read_data_valid_i", arbiter_read_data_valid),
-                    ("be_write_done_i", arbiter_write_done),
-                    ("be_address_o", arbiter_address),
-                    ("be_address_valid_o", arbiter_address_valid),
-                    ("be_write_data_o", arbiter_write_data),
-                    ("be_write_data_valid_o", arbiter_write_data_valid),
-                    ("be_read_write_select_o", arbiter_read_write_select),
-                    *arbiter_fe_mapping,
-                ),
-            )
+            Submodule(m, arbiter, "arbiter", arg_ports=arbiter_port_mapping)
             Submodule(
                 m,
                 cache,
