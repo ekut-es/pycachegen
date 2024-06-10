@@ -233,7 +233,6 @@ class CacheGenerator:
             flush_current_block_index = m.Reg(
                 "flush_current_block_index", max(1, self.NUM_WAYS_W)
             )
-            flush_enable_encoder = m.Reg("flush_enable_encoder")
             for i in range(self.NUM_SETS):
                 m.Assign(
                     flush_encoder_input[i](
@@ -249,11 +248,8 @@ class CacheGenerator:
                 PriorityEncoderGenerator(self.NUM_SETS).generate_module(),
                 "flush_priority_encoder",
                 arg_ports=(
-                    ("clk_i", clk_i),
-                    ("reset_n_i", reset_n_i),
                     ("unencoded_i", flush_encoder_input),
                     ("encoded_o", flush_next_set_index),
-                    ("enable_i", flush_enable_encoder),
                 ),
             )
 
@@ -727,13 +723,9 @@ class CacheGenerator:
                         ).Else(flush_current_block_index.inc())
                     ).Else(
                         # There is a dirty set that we need to write back
-                        flush_enable_encoder(1),
                         state_reg(States.FLUSH_PREPARE_WRITE_BACK.value),
                     ),
                 ).Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
-                    flush_enable_encoder(
-                        0
-                    ),  # disable encoder because we don't need it anymore
                     write_back_address_index(flush_next_set_index),
                     write_back_tag(
                         tag_memory[flush_current_block_index][flush_next_set_index]

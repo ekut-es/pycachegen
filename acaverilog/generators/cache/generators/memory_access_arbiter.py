@@ -133,7 +133,6 @@ class MemoryAccessArbiter:
                 )
             )
         next_request = m.Wire("next_request")
-        enable_encoder = m.Reg("enable_encoder")
         state_reg = m.Reg("state_reg", ceil(log2(len(States))))
         selected_request = m.Reg("selected_request", ceil(log2(self.NUM_PORTS)))
 
@@ -142,11 +141,8 @@ class MemoryAccessArbiter:
             PriorityEncoderGenerator(self.NUM_PORTS, False).generate_module(),
             "arbiter_priority_encoder",
             arg_ports=(
-                ("clk_i", clk_i),
-                ("reset_n_i", reset_n_i),
                 ("unencoded_i", buffered_request_valid),
                 ("encoded_o", next_request),
-                ("enable_i", enable_encoder),
             ),
         )
 
@@ -173,7 +169,6 @@ class MemoryAccessArbiter:
                     for i in range(self.NUM_PORTS)
                 ],
                 # internal
-                enable_encoder(1),
                 state_reg(States.READY.value),
                 selected_request(0),
             ).Else(
