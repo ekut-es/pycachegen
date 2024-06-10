@@ -14,9 +14,13 @@ from veriloggen import (
 
 
 class PriorityEncoderGenerator:
-    def __init__(self, width_unencoded):
+    def __init__(self, width_unencoded, prioritize_msb = True):
         self.WIDTH_UNENCODED = width_unencoded
+        self.PRIORITIZE_MSB = prioritize_msb
         self.WIDTH_ENCODED = max(1, ceil(log2(width_unencoded)))
+        self.ORDER = range(self.WIDTH_UNENCODED)
+        if self.PRIORITIZE_MSB:
+            self.ORDER = reversed(self.ORDER)
 
     def generate_module(self) -> Module:
         m = Module("priority_encoder")
@@ -34,7 +38,7 @@ class PriorityEncoderGenerator:
             If(Not(reset_n_i))(encoded(0, blk=True)).Elif(enable_i)(
                 [
                     If(unencoded_i[i])(encoded(i, blk=True))
-                    for i in range(self.WIDTH_UNENCODED)
+                    for i in self.ORDER
                 ]
             )
         )

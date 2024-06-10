@@ -167,15 +167,15 @@ class CacheWrapperGenerator:
             for i in range(self.NUM_PORTS):
                 arbiter_port_mapping.extend(
                     [
-                        ("fe_address_{i}_i", address_i[i]),
-                        ("fe_address_valid_{i}_i", address_valid_i[i]),
-                        ("fe_write_data_{i}_i", write_data_i[i]),
-                        ("fe_write_data_valid_{i}_i", write_data_valid_i[i]),
-                        ("fe_read_write_select_{i}_i", read_write_select_i[i]),
-                        ("fe_read_data_{i}_o", read_data_o[i]),
-                        ("fe_read_data_valid_{i}_o", read_data_valid_o[i]),
-                        ("fe_write_done_{i}_o", write_done_o[i]),
-                        ("fe_port_ready_{i}_o", port_ready_o[i]),
+                        (f"fe_address_{i}_i", address_i[i]),
+                        (f"fe_address_valid_{i}_i", address_valid_i[i]),
+                        (f"fe_write_data_{i}_i", write_data_i[i]),
+                        (f"fe_write_data_valid_{i}_i", write_data_valid_i[i]),
+                        (f"fe_read_write_select_{i}_i", read_write_select_i[i]),
+                        (f"fe_read_data_{i}_o", read_data_o[i]),
+                        (f"fe_read_data_valid_{i}_o", read_data_valid_o[i]),
+                        (f"fe_write_done_{i}_o", write_done_o[i]),
+                        (f"fe_port_ready_{i}_o", port_ready_o[i]),
                     ]
                 )
             Submodule(m, arbiter, "arbiter", arg_ports=arbiter_port_mapping)

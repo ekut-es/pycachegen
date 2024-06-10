@@ -114,9 +114,18 @@ class MemoryAccessArbiter:
 
         # internal
         request_valid = m.Wire("request_valid", self.NUM_PORTS)
+        buffered_request_valid = m.Wire("buffered_request_valid", self.NUM_PORTS)
         for i in range(self.NUM_PORTS):
             m.Assign(
                 request_valid[i](
+                    And(
+                        fe_address_valid_i[i],
+                        Or(Not(fe_read_write_select_i[i]), fe_write_data_valid_i[i]),
+                    )
+                )
+            )
+            m.Assign(
+                buffered_request_valid[i](
                     And(
                         fe_address_valid[i],
                         Or(Not(fe_read_write_select[i]), fe_write_data_valid[i]),
@@ -130,12 +139,12 @@ class MemoryAccessArbiter:
 
         Submodule(
             m,
-            PriorityEncoderGenerator(self.NUM_PORTS).generate_module(),
+            PriorityEncoderGenerator(self.NUM_PORTS, False).generate_module(),
             "arbiter_priority_encoder",
             arg_ports=(
                 ("clk_i", clk_i),
                 ("reset_n_i", reset_n_i),
-                ("unencoded_i", request_valid),
+                ("unencoded_i", buffered_request_valid),
                 ("encoded_o", next_request),
                 ("enable_i", enable_encoder),
             ),
@@ -186,7 +195,7 @@ class MemoryAccessArbiter:
                     AndList(
                         state_reg == States.READY.value,
                         be_port_ready_i,
-                        request_valid != 0,
+                        buffered_request_valid != 0,
                     )
                 )(
                     [
@@ -195,6 +204,10 @@ class MemoryAccessArbiter:
                             be_write_data(fe_write_data[i]),
                             be_write_data_valid(fe_write_data_valid[i]),
                             be_read_write_select(fe_read_write_select[i]),
+                            selected_request(i),
+                            # invalidate buffered request
+                            fe_address_valid[i](0),
+                            fe_write_data_valid[i](0)
                         )
                         for i in range(self.NUM_PORTS)
                     ],
