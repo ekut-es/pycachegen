@@ -128,7 +128,34 @@ int sc_main(int argc, char** argv) {
     if(read_data_1_o.read() != 14 || !read_data_valid_1_o.read()) {
         std::cerr << "Read failed" << std::endl;
     }
-        
+
+    address_1_i.write(3);    
+    address_valid_1_i.write(1);
+    write_data_valid_1_i.write(0);
+    read_write_select_1_i.write(0);
+
+    tick(1);
+
+    address_0_i.write(3);
+    address_valid_0_i.write(1);
+    write_data_0_i.write(111);
+    write_data_valid_0_i.write(1);
+    read_write_select_0_i.write(1);
+
+    tick(1);
+
+    address_valid_0_i.write(0);
+
+    tick(30);
+
+    tick(10);
+
+    if(!write_done_0_o.read()) {
+        std::cerr << "Write failed" << std::endl;
+    }
+
+    tick(15);
+
     tick(10);
 
     cache_wrapper->final();
