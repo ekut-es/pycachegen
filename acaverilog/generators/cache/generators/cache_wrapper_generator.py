@@ -26,30 +26,39 @@ class CacheWrapperGenerator:
     def __init__(self, *args) -> None:
         self.DATA_WIDTH = int(args[0])
         self.ADDRESS_WIDTH = int(args[1])
-        self.NUM_WAYS = int(args[2])
-        self.NUM_SETS = int(args[3])
-        self.REPLACEMENT_POLICY = args[4]
-        self.HIT_LATENCY = int(args[5])
-        self.MISS_LATENCY = int(args[6])
-        self.WRITE_THROUGH = bool(int(args[7]))
-        self.WRITE_ALLOCATE = bool(int(args[8]))
-        self.BLOCK_SIZE = int(args[9])
-        self.NUM_PORTS = int(args[10])
+        self.NUM_PORTS = int(args[2])
+        self.NUM_CACHES = len(args) - 3
+        cache_configs = [config.split() for config in args[3:]]
+        self.NUM_WAYS = [int(config[0]) for config in cache_configs]
+        self.NUM_SETS = [int(config[1]) for config in cache_configs]
+        self.REPLACEMENT_POLICY = [config[2] for config in cache_configs]
+        self.HIT_LATENCY = [int(config[3]) for config in cache_configs]
+        self.MISS_LATENCY = [int(config[4]) for config in cache_configs]
+        self.WRITE_THROUGH = [bool(int(config[5])) for config in cache_configs]
+        self.WRITE_ALLOCATE = [bool(int(config[6])) for config in cache_configs]
+        self.BLOCK_SIZE = [int(config[7]) for config in cache_configs]
 
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")
-        cache = CacheGenerator(
-            address_width=self.ADDRESS_WIDTH,
-            data_width=self.DATA_WIDTH,
-            num_ways=self.NUM_WAYS,
-            num_sets=self.NUM_SETS,
-            replacement_policy=self.REPLACEMENT_POLICY,
-            hit_latency=self.HIT_LATENCY,
-            miss_latency=self.MISS_LATENCY,
-            write_through=self.WRITE_THROUGH,
-            write_allocate=self.WRITE_ALLOCATE,
-            block_size=self.BLOCK_SIZE,
-        ).generate_module()
+
+        caches = []
+
+        for i in range(self.NUM_CACHES):
+            caches.append(
+                CacheGenerator(
+                    address_width=self.ADDRESS_WIDTH,
+                    data_width=self.DATA_WIDTH,
+                    num_ways=self.NUM_WAYS[i],
+                    num_sets=self.NUM_SETS[i],
+                    replacement_policy=self.REPLACEMENT_POLICY[i],
+                    hit_latency=self.HIT_LATENCY[i],
+                    miss_latency=self.MISS_LATENCY[i],
+                    write_through=self.WRITE_THROUGH[i],
+                    write_allocate=self.WRITE_ALLOCATE[i],
+                    block_size=self.BLOCK_SIZE[i],
+                ).generate_module()
+            )
+
         memory = FunctionalMemoryGenerator(
             data_width=self.DATA_WIDTH, address_width=self.ADDRESS_WIDTH
         ).generate_module()
@@ -85,23 +94,35 @@ class CacheWrapperGenerator:
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
-        # Backend Cache <- Memory
-        be_read_data = m.Wire("be_read_data", self.DATA_WIDTH)
-        be_read_data_valid = m.Wire("be_read_data_valid")
-        be_write_done = m.Wire("be_write_done")
-        be_port_ready = m.Wire("be_port_ready")
+        # Backend Cache <- Next level memory
+        be_read_data = []
+        be_read_data_valid = []
+        be_write_done = []
+        be_port_ready = []
 
-        # Backend Cache -> Memory
-        be_address = m.Wire("be_address", self.ADDRESS_WIDTH)
-        be_address_valid = m.Wire("be_address_valid")
-        be_write_data = m.Wire("be_write_data", self.DATA_WIDTH)
-        be_write_data_valid = m.Wire("be_write_data_valid")
-        be_read_write_select = m.Wire("be_read_write_select")
+        # Backend Cache -> Next level memory
+        be_address = []
+        be_address_valid = []
+        be_write_data = []
+        be_write_data_valid = []
+        be_read_write_select = []
+
+        for i in range(self.NUM_CACHES):
+            # Backend Cache <- Memory
+            be_read_data.append(m.Wire(f"be_read_data_{i}", self.DATA_WIDTH))
+            be_read_data_valid.append(m.Wire(f"be_read_data_valid_{i}"))
+            be_write_done.append(m.Wire(f"be_write_done_{i}"))
+            be_port_ready.append(m.Wire(f"be_port_ready_{i}"))
+            be_address.append(m.Wire(f"be_address_{i}", self.ADDRESS_WIDTH))
+            be_address_valid.append(m.Wire(f"be_address_valid_{i}"))
+            be_write_data.append(m.Wire(f"be_write_data_{i}", self.DATA_WIDTH))
+            be_write_data_valid.append(m.Wire(f"be_write_data_valid_{i}"))
+            be_read_write_select.append(m.Wire(f"be_read_write_select_{i}"))
 
         if self.NUM_PORTS == 1:
             Submodule(
                 m,
-                cache,
+                caches[0],
                 "cache",
                 arg_ports=(
                     # Common
@@ -122,16 +143,16 @@ class CacheWrapperGenerator:
                     ("fe_write_done_o", write_done_o[0]),
                     ("fe_port_ready_o", port_ready_o[0]),
                     # Backend Cache <- Memory
-                    ("be_read_data_i", be_read_data),
-                    ("be_read_data_valid_i", be_read_data_valid),
-                    ("be_write_done_i", be_write_done),
-                    ("be_port_ready_i", be_port_ready),
+                    ("be_read_data_i", be_read_data[0]),
+                    ("be_read_data_valid_i", be_read_data_valid[0]),
+                    ("be_write_done_i", be_write_done[0]),
+                    ("be_port_ready_i", be_port_ready[0]),
                     # Backend Cache -> Memory
-                    ("be_address_o", be_address),
-                    ("be_address_valid_o", be_address_valid),
-                    ("be_write_data_o", be_write_data),
-                    ("be_write_data_valid_o", be_write_data_valid),
-                    ("be_read_write_select_o", be_read_write_select),
+                    ("be_address_o", be_address[0]),
+                    ("be_address_valid_o", be_address_valid[0]),
+                    ("be_write_data_o", be_write_data[0]),
+                    ("be_write_data_valid_o", be_write_data_valid[0]),
+                    ("be_read_write_select_o", be_read_write_select[0]),
                 ),
             )
         else:
@@ -179,9 +200,10 @@ class CacheWrapperGenerator:
                     ]
                 )
             Submodule(m, arbiter, "arbiter", arg_ports=arbiter_port_mapping)
+            # first level cache connected to arbiter
             Submodule(
                 m,
-                cache,
+                caches[0],
                 "cache",
                 arg_ports=(
                     # Common
@@ -202,18 +224,55 @@ class CacheWrapperGenerator:
                     ("fe_write_done_o", arbiter_write_done),
                     ("fe_port_ready_o", arbiter_port_ready),
                     # Backend Cache <- Memory
-                    ("be_read_data_i", be_read_data),
-                    ("be_read_data_valid_i", be_read_data_valid),
-                    ("be_write_done_i", be_write_done),
-                    ("be_port_ready_i", be_port_ready),
+                    ("be_read_data_i", be_read_data[0]),
+                    ("be_read_data_valid_i", be_read_data_valid[0]),
+                    ("be_write_done_i", be_write_done[0]),
+                    ("be_port_ready_i", be_port_ready[0]),
                     # Backend Cache -> Memory
-                    ("be_address_o", be_address),
-                    ("be_address_valid_o", be_address_valid),
-                    ("be_write_data_o", be_write_data),
-                    ("be_write_data_valid_o", be_write_data_valid),
-                    ("be_read_write_select_o", be_read_write_select),
+                    ("be_address_o", be_address[0]),
+                    ("be_address_valid_o", be_address_valid[0]),
+                    ("be_write_data_o", be_write_data[0]),
+                    ("be_write_data_valid_o", be_write_data_valid[0]),
+                    ("be_read_write_select_o", be_read_write_select[0]),
                 ),
             )
+            # all other caches
+            for i in range(1, self.NUM_CACHES):
+                Submodule(
+                    m,
+                    caches[i],
+                    "cache",
+                    arg_ports=(
+                        # Common
+                        ("clk_i", clk_i),
+                        ("reset_n_i", reset_n_i),
+                        # Signals that dont need arbitration
+                        ("flush_i", flush_i),
+                        ("fe_hit_o", hit_o),
+                        # Cache In
+                        ("fe_address_i", arbiter_address[i-1]),
+                        ("fe_address_valid_i", arbiter_address_valid[i-1]),
+                        ("fe_write_data_i", arbiter_write_data[i-1]),
+                        ("fe_write_data_valid_i", arbiter_write_data_valid[i-1]),
+                        ("fe_read_write_select_i", arbiter_read_write_select[i-1]),
+                        # Cache Out
+                        ("fe_read_data_o", arbiter_read_data[i-1]),
+                        ("fe_read_data_valid_o", arbiter_read_data_valid[i-1]),
+                        ("fe_write_done_o", arbiter_write_done[i-1]),
+                        ("fe_port_ready_o", arbiter_port_ready[i-1]),
+                        # Backend Cache <- Memory
+                        ("be_read_data_i", be_read_data[i]),
+                        ("be_read_data_valid_i", be_read_data_valid[i]),
+                        ("be_write_done_i", be_write_done[i]),
+                        ("be_port_ready_i", be_port_ready[i]),
+                        # Backend Cache -> Memory
+                        ("be_address_o", be_address[i]),
+                        ("be_address_valid_o", be_address_valid[i]),
+                        ("be_write_data_o", be_write_data[i]),
+                        ("be_write_data_valid_o", be_write_data_valid[i]),
+                        ("be_read_write_select_o", be_read_write_select[i]),
+                    ),
+                )
 
         Submodule(
             m,
@@ -224,23 +283,23 @@ class CacheWrapperGenerator:
                 ("clk_i", clk_i),
                 ("reset_n_i", reset_n_i),
                 # Backend Cache <- Memory
-                ("read_data_0_o", be_read_data),
-                ("read_data_valid_0_o", be_read_data_valid),
-                ("write_done_0_o", be_write_done),
-                ("port_ready_0_o", be_port_ready),
+                ("read_data_0_o", be_read_data[-1]),
+                ("read_data_valid_0_o", be_read_data_valid[-1]),
+                ("write_done_0_o", be_write_done[-1]),
+                ("port_ready_0_o", be_port_ready[-1]),
                 # Backend Cache -> Memory
-                ("address_0_i", be_address),
-                ("address_valid_0_i", be_address_valid),
-                ("write_data_0_i", be_write_data),
-                ("write_data_valid_0_i", be_write_data_valid),
-                ("read_write_select_0_i", be_read_write_select),
+                ("address_0_i", be_address[-1]),
+                ("address_valid_0_i", be_address_valid[-1]),
+                ("write_data_0_i", be_write_data[-1]),
+                ("write_data_valid_0_i", be_write_data_valid[-1]),
+                ("read_write_select_0_i", be_read_write_select[-1]),
             ),
         )
         return m
 
 
 if __name__ == "__main__":
-    # argv: (file name), number for output file suffix, data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size, num ports
+    # argv: (file name), number for output file suffix, data width, address width, num ports, [num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
     cache_wrapper_generator = CacheWrapperGenerator(*sys.argv[2:])
     m = cache_wrapper_generator.generate_module()
     m.to_verilog(f"../src/cache_wrapper_{sys.argv[1]}.v", for_verilator=True)
