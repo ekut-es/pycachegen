@@ -15,24 +15,26 @@ from veriloggen import (
 
 class ReplacementPolicyGenerator:
 
-    def __init__(self, num_ways: int, num_sets: int, policy: str) -> None:
+    def __init__(self, num_ways: int, num_sets: int, policy: str, prefix: str) -> None:
         """Replacement policy generator.
 
         Args:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
             policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
+            prefix (str): Prefix to be used for this module's name
         """
         # This module will only be generated if num_ways > 1
         self.NUM_WAYS = num_ways
         self.NUM_SETS = num_sets
         self.POLICY = policy
+        self.PREFIX = prefix
         # derived
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
         self.NUM_SETS_W = int(log2(self.NUM_SETS))
 
     def generate_module(self) -> Module:
-        m = Module("replacement_policy")
+        m = Module(f"{self.PREFIX}replacement_policy")
         reset_n_i = m.Input("reset_n_i")
         clk_i = m.Input("clk_i")
         access_i = m.Input("access_i")

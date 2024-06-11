@@ -21,7 +21,7 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS "../../../external/systemc")
 
-set(NUM_TESTBENCHES 16)
+set(NUM_TESTBENCHES 17)
 set(CACHE_WRAPPER_ARG_LIST
     "1 16 8 1 \"1 4 fifo 8 10 1 0 1\""
     "2 16 8 1 \"2 4 fifo 8 10 1 0 1\""
@@ -39,6 +39,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "14 16 8 1 \"4 1 plru_tree 8 10 0 1 1\""
     "15 16 8 1 \"4 2 plru_mru 8 10 0 1 1\""
     "16 16 8 2 \"4 2 plru_mru 8 10 0 1 1\""
+    "17 16 8 1 \"2 1 fifo 8 10 0 1 1\" \"2 2 fifo 8 10 0 1 1\""
 )
 
 # create src directory if not already there, remove all files from it

@@ -4,13 +4,17 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_7.h"
+#include "Vcache_wrapper_17.h"
 
-// Testbench for testing the write-through, write allocate policy
+// Testbench for testing two layers of caches
 // data_width=16, address_width=8, num_ports=1
+// num_ways=2, num_sets=1,
+// write_through=false, write_allocate=true,
+// replacement_policy=fifo, hit_latency=8, miss_latency=10
+// block_size=1
 // num_ways=2, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=8, miss_latency=10,
-// write_through=true, write_allocate=true,
+// write_through=false, write_allocate=true,
+// replacement_policy=fifo, hit_latency=8, miss_latency=10
 // block_size=1
 
 int sc_main(int argc, char** argv) {
@@ -39,8 +43,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_7> cache_wrapper{
-        new Vcache_wrapper_7{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_17> cache_wrapper{
+        new Vcache_wrapper_17{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -67,16 +71,17 @@ int sc_main(int argc, char** argv) {
         sc_start(amount, SC_NS);
     };
 
-    auto read_assert = [&](int expected) {
+    auto read_assert = [&](int address, int expected) {
         if (read_data_o.read() == expected) {
-            std::cout << "Read Successful at cycle "
-                      << sc_time_stamp().to_default_time_units() << std::endl;
+            std::cout << "Read  at address " << address << " at cycle "
+                      << sc_time_stamp().to_default_time_units()
+                      << " successful" << std::endl;
         } else {
-            cerr << "Read failed at "
-                 << sc_time_stamp().to_default_time_units() << "; expected "
-                 << std::to_string(expected) << " got "
-                 << std::to_string(read_data_o.read()) << "; continuing"
-                 << std::endl;
+            std::cerr << "Read  at address " << address << " at cycle "
+                      << sc_time_stamp().to_default_time_units()
+                      << " FAILED; expected " << std::to_string(expected)
+                      << " got " << std::to_string(read_data_o.read())
+                      << "; continuing" << std::endl;
         }
     };
 
@@ -98,7 +103,7 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             tick(1);
         }
-        read_assert(expected);
+        read_assert(address, expected);
         hit_assert(hit);
     };
 
@@ -114,12 +119,24 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             tick(1);
         }
-        std::cout << "Write to address " << std::to_string(address)
-                  << std::endl;
+        std::cout << "Write at address " << std::to_string(address)
+                  << " at cycle " << sc_time_stamp().to_default_time_units()
+                  << " successful" << std::endl;
         hit_assert(hit);
     };
 
-    std::cout << "Vcache_wrapper_7 start!" << std::endl;
+    auto flush = [&]() {
+        flush_i.write(1);
+        tick(1);
+        flush_i.write(0);
+        tick(1);
+        while (!port_ready_o.read()) {
+            tick(1);
+        }
+        std::cout << "Flush complete" << std::endl;
+    };
+
+    std::cout << "Vcache_wrapper_17 start!" << std::endl;
 
     tick(0);
 
@@ -127,7 +144,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_7.vcd");
+        trace->open("Vcache_wrapper_tb_17.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -138,15 +155,22 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(2, 20, false);
-        read(2, 20, true);
-        write(4, 40, false);
-        read(4, 40, true);
-        write(4, 41, true);
-        read(2, 20, true);
-        read(6, 0, false);
-        read(4, 41, false);
-        
+        write(0, 100, false);
+        write(1, 101, false);
+
+        read(0, 100, true);
+        read(1, 101, true);
+
+        write(2, 102, false);
+        write(3, 103, false);
+
+        read(0, 100, false);
+        read(1, 101, false);
+
+        read(4, 0, false);
+
+        read(0, 100, false);
+
         tick(10);
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
@@ -159,6 +183,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_7 done!" << std::endl;
+    std::cout << "Vcache_wrapper_17 done!" << std::endl;
     return 0;
 }

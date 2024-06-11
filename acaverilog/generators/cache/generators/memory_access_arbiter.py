@@ -25,7 +25,14 @@ class States(Enum):
 
 
 class MemoryAccessArbiter:
-    def __init__(self, num_ports, address_width, data_width) -> None:
+    def __init__(self, num_ports: int, address_width: int, data_width: int) -> None:
+        """Generator for an arbiter for memories/caches with the native memory interface.
+
+        Args:
+            num_ports (int): Number of front end ports.
+            address_width (int): Address width.
+            data_width (int): Data word width.
+        """
         self.NUM_PORTS = num_ports
         self.ADDRESS_WIDTH = address_width
         self.DATA_WIDTH = data_width

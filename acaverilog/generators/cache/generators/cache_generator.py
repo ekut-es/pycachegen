@@ -64,6 +64,7 @@ class CacheGenerator:
         write_through: bool,
         write_allocate: bool,
         block_size: int,
+        prefix: str,
     ) -> None:
         """Cache Generator.
 
@@ -78,6 +79,7 @@ class CacheGenerator:
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
+            prefix (str): Prefix to be used for this module's name
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
@@ -89,6 +91,7 @@ class CacheGenerator:
         self.WRITE_BACK = not write_through
         self.WRITE_ALLOCATE = write_allocate
         self.BLOCK_SIZE = block_size
+        self.PREFIX = prefix
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -101,7 +104,7 @@ class CacheGenerator:
 
     def generate_module(self) -> Module:
         # m = Module(self.base_file_name)
-        m = Module("cache")
+        m = Module(f"{self.PREFIX}cache")
 
         # Front End Inputs
         clk_i = m.Input("clk_i")
@@ -229,7 +232,9 @@ class CacheGenerator:
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
             flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
-            flush_next_set_index = m.Wire("flush_next_set_index", max(1, ceil(log2(self.NUM_SETS))))
+            flush_next_set_index = m.Wire(
+                "flush_next_set_index", max(1, ceil(log2(self.NUM_SETS)))
+            )
             flush_current_block_index = m.Reg(
                 "flush_current_block_index", max(1, self.NUM_WAYS_W)
             )
@@ -245,8 +250,10 @@ class CacheGenerator:
 
             Submodule(
                 m,
-                PriorityEncoderGenerator(self.NUM_SETS).generate_module(),
-                "flush_priority_encoder",
+                PriorityEncoderGenerator(
+                    width_unencoded=self.NUM_SETS, prefix=self.PREFIX
+                ).generate_module(),
+                f"{self.PREFIX}flush_priority_encoder",
                 arg_ports=(
                     ("unencoded_i", flush_encoder_input),
                     ("encoded_o", flush_next_set_index),
@@ -281,16 +288,21 @@ class CacheGenerator:
             )
             Submodule(
                 m,
-                OneHotToBinGenerator(self.NUM_WAYS).generate_module(),
-                "hit_one_hot_to_bin",
+                OneHotToBinGenerator(
+                    num_inputs=self.NUM_WAYS, prefix=self.PREFIX
+                ).generate_module(),
+                f"{self.PREFIX}hit_one_hot_to_bin",
                 arg_ports=(("one_hot_i", hit_vector), ("bin_o", hit_index)),
             )
             Submodule(
                 m,
                 ReplacementPolicyGenerator(
-                    self.NUM_WAYS, self.NUM_SETS, self.REPLACEMENT_POLICY
+                    num_ways=self.NUM_WAYS,
+                    num_sets=self.NUM_SETS,
+                    policy=self.REPLACEMENT_POLICY,
+                    prefix=self.PREFIX,
                 ).generate_module(),
-                "replacement_policy",
+                f"{self.PREFIX}replacement_policy",
                 arg_ports=(
                     ("clk_i", clk_i),
                     ("reset_n_i", reset_n_i),
@@ -556,9 +568,13 @@ class CacheGenerator:
                         if self.BLOCK_SIZE > 1
                         else []
                     ),
-                    be_address_o_reg[
-                        self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W
-                    ](write_back_address_index) if self.NUM_SETS > 1 else [],
+                    (
+                        be_address_o_reg[
+                            self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W
+                        ](write_back_address_index)
+                        if self.NUM_SETS > 1
+                        else []
+                    ),
                     be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
                         write_back_tag
                     ),

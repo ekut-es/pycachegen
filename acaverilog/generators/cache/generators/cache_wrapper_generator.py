@@ -56,6 +56,7 @@ class CacheWrapperGenerator:
                     write_through=self.WRITE_THROUGH[i],
                     write_allocate=self.WRITE_ALLOCATE[i],
                     block_size=self.BLOCK_SIZE[i],
+                    prefix=f"l{i+1}_"
                 ).generate_module()
             )
 
@@ -120,10 +121,11 @@ class CacheWrapperGenerator:
             be_read_write_select.append(m.Wire(f"be_read_write_select_{i}"))
 
         if self.NUM_PORTS == 1:
+            # first level cache connected to frontend ports
             Submodule(
                 m,
                 caches[0],
-                "cache",
+                "l1_cache",
                 arg_ports=(
                     # Common
                     ("clk_i", clk_i),
@@ -204,7 +206,7 @@ class CacheWrapperGenerator:
             Submodule(
                 m,
                 caches[0],
-                "cache",
+                "l1_cache",
                 arg_ports=(
                     # Common
                     ("clk_i", clk_i),
@@ -236,43 +238,44 @@ class CacheWrapperGenerator:
                     ("be_read_write_select_o", be_read_write_select[0]),
                 ),
             )
-            # all other caches
-            for i in range(1, self.NUM_CACHES):
-                Submodule(
-                    m,
-                    caches[i],
-                    "cache",
-                    arg_ports=(
-                        # Common
-                        ("clk_i", clk_i),
-                        ("reset_n_i", reset_n_i),
-                        # Signals that dont need arbitration
-                        ("flush_i", flush_i),
-                        ("fe_hit_o", hit_o),
-                        # Cache In
-                        ("fe_address_i", arbiter_address[i-1]),
-                        ("fe_address_valid_i", arbiter_address_valid[i-1]),
-                        ("fe_write_data_i", arbiter_write_data[i-1]),
-                        ("fe_write_data_valid_i", arbiter_write_data_valid[i-1]),
-                        ("fe_read_write_select_i", arbiter_read_write_select[i-1]),
-                        # Cache Out
-                        ("fe_read_data_o", arbiter_read_data[i-1]),
-                        ("fe_read_data_valid_o", arbiter_read_data_valid[i-1]),
-                        ("fe_write_done_o", arbiter_write_done[i-1]),
-                        ("fe_port_ready_o", arbiter_port_ready[i-1]),
-                        # Backend Cache <- Memory
-                        ("be_read_data_i", be_read_data[i]),
-                        ("be_read_data_valid_i", be_read_data_valid[i]),
-                        ("be_write_done_i", be_write_done[i]),
-                        ("be_port_ready_i", be_port_ready[i]),
-                        # Backend Cache -> Memory
-                        ("be_address_o", be_address[i]),
-                        ("be_address_valid_o", be_address_valid[i]),
-                        ("be_write_data_o", be_write_data[i]),
-                        ("be_write_data_valid_o", be_write_data_valid[i]),
-                        ("be_read_write_select_o", be_read_write_select[i]),
-                    ),
-                )
+
+        # all other caches
+        for i in range(1, self.NUM_CACHES):
+            Submodule(
+                m,
+                caches[i],
+                f"l{i+1}_cache",
+                arg_ports=(
+                    # Common
+                    ("clk_i", clk_i),
+                    ("reset_n_i", reset_n_i),
+                    # Signals that dont need arbitration
+                    ("flush_i", flush_i),
+                    ("fe_hit_o", hit_o),
+                    # Cache In
+                    ("fe_address_i", be_address[i-1]),
+                    ("fe_address_valid_i", be_address_valid[i-1]),
+                    ("fe_write_data_i", be_write_data[i-1]),
+                    ("fe_write_data_valid_i", be_write_data_valid[i-1]),
+                    ("fe_read_write_select_i", be_read_write_select[i-1]),
+                    # Cache Out
+                    ("fe_read_data_o", be_read_data[i-1]),
+                    ("fe_read_data_valid_o", be_read_data_valid[i-1]),
+                    ("fe_write_done_o", be_write_done[i-1]),
+                    ("fe_port_ready_o", be_port_ready[i-1]),
+                    # Backend Cache <- Memory
+                    ("be_read_data_i", be_read_data[i]),
+                    ("be_read_data_valid_i", be_read_data_valid[i]),
+                    ("be_write_done_i", be_write_done[i]),
+                    ("be_port_ready_i", be_port_ready[i]),
+                    # Backend Cache -> Memory
+                    ("be_address_o", be_address[i]),
+                    ("be_address_valid_o", be_address_valid[i]),
+                    ("be_write_data_o", be_write_data[i]),
+                    ("be_write_data_valid_o", be_write_data_valid[i]),
+                    ("be_read_write_select_o", be_read_write_select[i]),
+                ),
+            )
 
         Submodule(
             m,

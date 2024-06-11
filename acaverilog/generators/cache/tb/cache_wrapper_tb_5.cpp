@@ -8,10 +8,11 @@
 
 // This testbench should be ignored for now, since the latencies are not fully decided yet.
 // Testbench for testing the minimal latency
-// data_width=16, address_width=8, num_ways=1, num_sets=2,
+// data_width=16, address_width=8, num_ports=1
+// num_ways=1, num_sets=2,
+// replacement_policy=plru_tree, hit_latency=6, miss_latency=6,
 // write_through=true, write_allocate=false,
-// replacement_policy=plru_tree, hit_latency=6, miss_latency=6
-// block_size=1, num_ports=1
+// block_size=1
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

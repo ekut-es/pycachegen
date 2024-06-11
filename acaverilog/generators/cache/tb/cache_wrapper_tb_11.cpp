@@ -7,10 +7,11 @@
 #include "Vcache_wrapper_11.h"
 
 // Testbench for testing the flush in a direct mapped cache
-// data_width=16, address_width=8, num_ways=1, num_sets=4,
+// data_width=16, address_width=8, num_ports=1
+// num_ways=1, num_sets=4,
+// replacement_policy=plru_tree, hit_latency=8, miss_latency=10,
 // write_through=false, write_allocate=true,
-// replacement_policy=plru_tree, hit_latency=8, miss_latency=10
-// block_size=1, num_ports=1
+// block_size=1
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

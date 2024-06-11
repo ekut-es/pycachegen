@@ -7,10 +7,11 @@
 #include "Vcache_wrapper_8.h"
 
 // Testbench for testing the write-back, write no-allocate policy
-// data_width=16, address_width=8, num_ways=2, num_sets=2,
+// data_width=16, address_width=8, num_ports=1
+// num_ways=2, num_sets=2,
+// replacement_policy=plru_tree, hit_latency=8, miss_latency=10,
 // write_through=false, write_allocate=false,
-// replacement_policy=plru_tree, hit_latency=8, miss_latency=10
-// block_size=1, num_ports=1
+// block_size=1
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
