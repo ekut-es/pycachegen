@@ -67,9 +67,8 @@ class CacheWrapperGenerator:
         # Common Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
-
-        # Cache Signals that do not need to be arbitrated
         flush_i = m.Input("flush_i")
+        # Output the cache hit status of the l1 cache
         hit_o = m.Output("hit_o")
 
         # Frontend Inputs
@@ -95,6 +94,8 @@ class CacheWrapperGenerator:
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
+        # hit signal is purely for testing atm 
+        request_hit = []
         # Backend Cache <- Next level memory
         be_read_data = []
         be_read_data_valid = []
@@ -109,7 +110,7 @@ class CacheWrapperGenerator:
         be_read_write_select = []
 
         for i in range(self.NUM_CACHES):
-            # Backend Cache <- Memory
+            request_hit.append(m.Wire(f"request_hit_{i}"))
             be_read_data.append(m.Wire(f"be_read_data_{i}", self.DATA_WIDTH))
             be_read_data_valid.append(m.Wire(f"be_read_data_valid_{i}"))
             be_write_done.append(m.Wire(f"be_write_done_{i}"))
@@ -119,6 +120,9 @@ class CacheWrapperGenerator:
             be_write_data.append(m.Wire(f"be_write_data_{i}", self.DATA_WIDTH))
             be_write_data_valid.append(m.Wire(f"be_write_data_valid_{i}"))
             be_read_write_select.append(m.Wire(f"be_read_write_select_{i}"))
+
+        # Assign the hit status of the l1 cache
+        m.Assign(hit_o(request_hit[0]))
 
         if self.NUM_PORTS == 1:
             # first level cache connected to frontend ports
@@ -130,9 +134,9 @@ class CacheWrapperGenerator:
                     # Common
                     ("clk_i", clk_i),
                     ("reset_n_i", reset_n_i),
-                    # Signals that dont need arbitration
                     ("flush_i", flush_i),
-                    ("fe_hit_o", hit_o),
+                    # Hit signal
+                    ("fe_hit_o", request_hit[0]),
                     # Cache In
                     ("fe_address_i", address_i[0]),
                     ("fe_address_valid_i", address_valid_i[0]),
@@ -211,9 +215,9 @@ class CacheWrapperGenerator:
                     # Common
                     ("clk_i", clk_i),
                     ("reset_n_i", reset_n_i),
-                    # Signals that dont need arbitration
                     ("flush_i", flush_i),
-                    ("fe_hit_o", hit_o),
+                    # Hit signal
+                    ("fe_hit_o", request_hit[0]),
                     # Cache In
                     ("fe_address_i", arbiter_address),
                     ("fe_address_valid_i", arbiter_address_valid),
@@ -249,9 +253,9 @@ class CacheWrapperGenerator:
                     # Common
                     ("clk_i", clk_i),
                     ("reset_n_i", reset_n_i),
-                    # Signals that dont need arbitration
                     ("flush_i", flush_i),
-                    ("fe_hit_o", hit_o),
+                    # Hit signal
+                    ("fe_hit_o", request_hit[i]),
                     # Cache In
                     ("fe_address_i", be_address[i-1]),
                     ("fe_address_valid_i", be_address_valid[i-1]),
