@@ -129,7 +129,7 @@ class CacheGenerator:
         be_write_done_i = m.Input("be_write_done_i")
         be_port_ready_i = m.Input(
             "be_port_ready_i"
-        )  # FIXME Dont send request until port is ready!
+        )
 
         # Back End Outputs
         be_address_o = m.Output("be_address_o", self.ADDRESS_WIDTH)
