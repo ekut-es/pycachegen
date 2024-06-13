@@ -10,7 +10,7 @@
 // Testbench for testing the minimal latency
 // data_width=16, address_width=8, num_ports=1
 // num_ways=1, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=6, miss_latency=6,
+// replacement_policy=plru_tree, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false,
 // block_size=1
 
@@ -23,6 +23,11 @@ int sc_main(int argc, char** argv) {
     if (argc == 2) {
         vcd_file_path = std::string(argv[1]);
     }
+
+    const int hit_latency = 6;
+    const int miss_latency = 8;
+    const int read_latency = 11;
+    const int write_latency = 16;
 
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
@@ -82,7 +87,7 @@ int sc_main(int argc, char** argv) {
     read_write_select_i.write(0);
     sc_start(1, SC_NS);
     address_valid_i.write(0);
-    sc_start(6+10, SC_NS); // one cycle needeed between requests
+    sc_start(miss_latency + read_latency, SC_NS); // one cycle needeed between requests
 
     // read miss
     address_i.write(3);
@@ -91,7 +96,7 @@ int sc_main(int argc, char** argv) {
     sc_start(1, SC_NS);
     assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
-    sc_start(6+10, SC_NS);
+    sc_start(miss_latency + read_latency, SC_NS);
     
     // write hit
     address_i.write(2);
@@ -102,7 +107,7 @@ int sc_main(int argc, char** argv) {
     sc_start(1, SC_NS);
     assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
-    sc_start(6+15, SC_NS);
+    sc_start(hit_latency + write_latency, SC_NS);
 
     // read hit
     address_i.write(2);
@@ -111,7 +116,7 @@ int sc_main(int argc, char** argv) {
     sc_start(1, SC_NS);
     assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
-    sc_start(6, SC_NS);
+    sc_start(hit_latency, SC_NS);
 
     // write miss
     address_i.write(4);
@@ -123,7 +128,7 @@ int sc_main(int argc, char** argv) {
     assert(read_data_o.read() == 55);
     assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
-    sc_start(6+15, SC_NS);
+    sc_start(miss_latency + write_latency, SC_NS);
 
     sc_start(1, SC_NS);
     assert(port_ready_o.read() == 1);    
