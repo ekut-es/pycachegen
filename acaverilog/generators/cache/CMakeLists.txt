@@ -23,13 +23,13 @@ find_package(SystemCLanguage PATHS "../../../external/systemc")
 
 set(NUM_TESTBENCHES 17)
 set(CACHE_WRAPPER_ARG_LIST
-    "1 16 8 1 \"1 4 fifo 6 9 1 0 1\""
-    "2 16 8 1 \"2 4 fifo 6 9 1 0 1\""
-    "3 16 8 1 \"4 2 fifo 6 9 1 0 1\""
-    "4 16 8 1 \"4 2 plru_tree 6 9 1 0 1\""
-    "5 16 8 1 \"1 2 plru_tree 6 9 1 0 1\""
+    "1 16 8 1 \"1 4 fifo 6 8 1 0 1\""
+    "2 16 8 1 \"2 4 fifo 6 8 1 0 1\""
+    "3 16 8 1 \"4 2 fifo 6 8 1 0 1\""
+    "4 16 8 1 \"4 2 plru_tree 6 8 1 0 1\""
+    "5 16 8 1 \"1 2 plru_tree 6 8 1 0 1\""
     "6 16 8 1 \"4 2 plru_tree 4 11 0 1 1\""
-    "7 16 8 1 \"2 2 plru_tree 6 9 1 1 1\""
+    "7 16 8 1 \"2 2 plru_tree 6 8 1 1 1\""
     "8 16 8 1 \"2 2 plru_tree 4 11 0 0 1\""
     "9 16 8 1 \"2 2 plru_tree 4 11 0 1 1\""
     "10 16 8 1 \"2 2 plru_tree 4 11 0 1 1\""

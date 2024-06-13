@@ -120,11 +120,11 @@ class CacheGenerator:
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
             min_miss = max(min_miss, 7)
         if True:
-            min_miss = max(min_miss, 6 + 3 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
         if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and self.WRITE_BACK:
-            min_miss = max(min_miss, 4 + 3 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 3 + 3 * self.BLOCK_SIZE)
         if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and not self.WRITE_BACK:
-            min_miss = max(min_miss, 6 + 3 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
         if self.WRITE_BACK and self.BLOCK_SIZE == 1 and self.WRITE_ALLOCATE:
             min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
         if self.WRITE_BACK:
@@ -166,6 +166,7 @@ class CacheGenerator:
 
     def generate_module(self) -> Module:
         self.validate_latencies()
+        print(self.get_min_worst_case_latencies())
         # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
@@ -660,17 +661,21 @@ class CacheGenerator:
                 else []
             )
             .Elif(state_reg == States.SEND_MEM_REQUEST.value)(
-                latency_counter.inc(),
+                # do nothing (not even increase the latency counter)
+                # while waiting for the next level memory to get ready
                 If(be_port_ready_i)(
+                    latency_counter.inc(),
                     be_address_valid_o_reg(1),
                     state_reg(States.SEND_MEM_REQUEST_WAIT.value),
                 ),
             )
             .Elif(state_reg == States.SEND_MEM_REQUEST_WAIT.value)(
-                latency_counter.inc(),
+                # invalidate the request. Then do nothing for one cycle
                 be_address_valid_o_reg(0),
-                # We need to wait at least one cycle here so the backend can accept the request
+                # After waiting for one cycle, continue as soon as the next level
+                # memory gets ready again (that means that the request was processed)
                 If(And(Not(be_address_valid_o_reg), be_port_ready_i))(
+                    latency_counter.inc(),
                     state_reg(send_mem_request_next_state),
                     If(Not(be_read_write_select_o_reg))(
                         # if we just read something, write it to the cache
