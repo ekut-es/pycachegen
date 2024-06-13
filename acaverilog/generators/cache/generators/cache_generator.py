@@ -166,7 +166,7 @@ class CacheGenerator:
 
     def generate_module(self) -> Module:
         self.validate_latencies()
-        print(self.get_min_worst_case_latencies())
+        print(f"{self.PREFIX} min latencies (hit/miss): {self.get_min_worst_case_latencies()}")
         # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
