@@ -159,9 +159,9 @@ class CacheGenerator:
 
         if not config_valid:
             raise ValueError(
-                f"The configured latencies are too low.
-                The minimum worst case latencies for this configuration are
-                {min_latencies[0]} (hit) and {min_latencies[1]} (miss)."
+                "The configured latencies are too low. " +
+                "The minimum worst case latencies for this configuration are "
+                f"{min_latencies[0]} (hit) and {min_latencies[1]} (miss)."
             )
 
     def generate_module(self) -> Module:
