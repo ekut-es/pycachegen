@@ -87,16 +87,17 @@ int sc_main(int argc, char** argv) {
     read_write_select_i.write(0);
     sc_start(1, SC_NS);
     address_valid_i.write(0);
-    sc_start(miss_latency + read_latency, SC_NS); // one cycle needeed between requests
+    sc_start(miss_latency + read_latency, SC_NS);
+    assert(port_ready_o.read() == 1);
 
     // read miss
     address_i.write(3);
     address_valid_i.write(1);
     read_write_select_i.write(0);
     sc_start(1, SC_NS);
-    assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
     sc_start(miss_latency + read_latency, SC_NS);
+    assert(port_ready_o.read() == 1); 
     
     // write hit
     address_i.write(2);
@@ -105,18 +106,20 @@ int sc_main(int argc, char** argv) {
     write_data_i.write(55);
     write_data_valid_i.write(1);
     sc_start(1, SC_NS);
-    assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
     sc_start(hit_latency + write_latency, SC_NS);
+    assert(port_ready_o.read() == 1); 
 
-    // read hit
+    // read hit (-> no mem access)
     address_i.write(2);
     address_valid_i.write(1);
     read_write_select_i.write(0);
     sc_start(1, SC_NS);
-    assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
     sc_start(hit_latency, SC_NS);
+    assert(port_ready_o.read() == 1); 
+    assert(read_data_valid_o.read() == 1);
+    assert(read_data_o.read() == 55);
 
     // write miss
     address_i.write(4);
@@ -124,13 +127,8 @@ int sc_main(int argc, char** argv) {
     read_write_select_i.write(1);
     write_data_valid_i.write(1);
     sc_start(1, SC_NS);
-    assert(read_data_valid_o.read() == 1);
-    assert(read_data_o.read() == 55);
-    assert(port_ready_o.read() == 1); 
     address_valid_i.write(0);
     sc_start(miss_latency + write_latency, SC_NS);
-
-    sc_start(1, SC_NS);
     assert(port_ready_o.read() == 1);    
 
     sc_start(10, SC_NS);
