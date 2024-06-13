@@ -102,7 +102,70 @@ class CacheGenerator:
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH - self.WORD_OFFSET_W
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
 
+    def get_min_worst_case_latencies(self) -> tuple[int, int]:
+        """Compute the minimum hit and miss latency for the current configuration
+        that occur in the worst case possible.
+
+        Returns:
+            tuple[int, int]: hit latency, miss latency.
+        """
+        min_miss = 0
+        min_hit = 0
+
+        # miss latencies
+        if self.BLOCK_SIZE == 1:
+            min_miss = max(min_miss, 5)
+        if self.WRITE_ALLOCATE and self.WRITE_BACK:
+            min_miss = max(min_miss, 5)
+        if self.WRITE_ALLOCATE and not self.WRITE_BACK:
+            min_miss = max(min_miss, 7)
+        if True:
+            min_miss = max(min_miss, 6 + 3 * self.BLOCK_SIZE)
+        if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and self.WRITE_BACK:
+            min_miss = max(min_miss, 4 + 3 * self.BLOCK_SIZE)
+        if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and not self.WRITE_BACK:
+            min_miss = max(min_miss, 6 + 3 * self.BLOCK_SIZE)
+        if self.WRITE_BACK and self.BLOCK_SIZE == 1 and self.WRITE_ALLOCATE:
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
+        if self.WRITE_BACK:
+            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)
+        if self.WRITE_ALLOCATE and self.WRITE_BACK and self.BLOCK_SIZE > 1:
+            min_miss = max(min_miss, 3 + 6 * self.BLOCK_SIZE)
+        if not self.WRITE_ALLOCATE:
+            min_miss = max(min_miss, 6)
+
+        # hit latencies
+        if True:
+            min_hit = max(min_hit, 4)
+        if not self.WRITE_BACK:
+            min_hit = max(min_hit, 6)
+        if self.WRITE_BACK:
+            min_hit = max(min_hit, 4)
+
+        return min_hit, min_miss
+
+    def validate_latencies(self) -> None:
+        """Validates that the configured latencies are achievable for
+        the current configuration.
+
+        Raises:
+            ValueError: Raises an error if the latencies are set too low.
+        """
+        min_latencies = self.get_min_worst_case_latencies()
+        config_valid = (
+            min_latencies[0] <= self.HIT_LATENCY
+            and min_latencies[1] <= self.MISS_LATENCY
+        )
+
+        if not config_valid:
+            raise ValueError(
+                f"The configured latencies are too low.
+                The minimum worst case latencies for this configuration are
+                {min_latencies[0]} (hit) and {min_latencies[1]} (miss)."
+            )
+
     def generate_module(self) -> Module:
+        self.validate_latencies()
         # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
@@ -127,9 +190,7 @@ class CacheGenerator:
         be_read_data_i = m.Input("be_read_data_i", self.DATA_WIDTH)
         be_read_data_valid_i = m.Input("be_read_data_valid_i")
         be_write_done_i = m.Input("be_write_done_i")
-        be_port_ready_i = m.Input(
-            "be_port_ready_i"
-        )
+        be_port_ready_i = m.Input("be_port_ready_i")
 
         # Back End Outputs
         be_address_o = m.Output("be_address_o", self.ADDRESS_WIDTH)
