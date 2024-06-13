@@ -159,8 +159,8 @@ class CacheGenerator:
 
         if not config_valid:
             raise ValueError(
-                "The configured latencies are too low. " +
-                "The minimum worst case latencies for this configuration are "
+                "The configured latencies are too low. "
+                + "The minimum worst case latencies for this configuration are "
                 f"{min_latencies[0]} (hit) and {min_latencies[1]} (miss)."
             )
 
@@ -470,6 +470,8 @@ class CacheGenerator:
                     fe_address_i_reg(fe_address_i),
                     fe_write_data_i_reg(fe_write_data_i),
                     fe_read_write_select_i_reg(fe_read_write_select_i),
+                    # increment latency counter
+                    latency_counter.inc(),
                 ),
             )
             .Elif(state_reg == States.HIT_LOOKUP.value)(
@@ -767,8 +769,6 @@ class CacheGenerator:
                 ),
             )
             .Elif(state_reg == States.STALL.value)(
-                # Stall for the remaining time (or error if this took too much time...?)
-                latency_counter.inc(),
                 # Stop updating the replacement policy
                 [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
                 If(
@@ -787,7 +787,10 @@ class CacheGenerator:
                     If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
                         state_reg(States.READY.value)
                     ),
-                ),
+                ).Else(
+                    # Stall for the remaining time (or error if this took too much time...?)
+                    latency_counter.inc(),
+                )
             )
             .Else(
                 If(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
