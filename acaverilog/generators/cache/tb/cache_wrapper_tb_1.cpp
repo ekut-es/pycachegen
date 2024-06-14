@@ -9,7 +9,7 @@
 // Testbench for testing a direct mapped cache
 // data_width=16, address_width=8, num_ports=1
 // num_ways=1, num_sets=4,
-// replacement_policy=fifo, hit_latency=8, miss_latency=10,
+// replacement_policy=fifo, hit_latency=6, miss_latency=6,
 // write_through=true, write_allocate=false,
 // block_size=1
 

@@ -9,7 +9,7 @@
 // Testbench for testing the PLRU_TREE replacement policy
 // data_width=16, address_width=8, num_ports=1
 // num_ways=4, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=8, miss_latency=10,
+// replacement_policy=plru_tree, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false,
 // block_size=1
 

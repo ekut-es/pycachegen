@@ -10,11 +10,11 @@
 // data_width=16, address_width=8, num_ports=1
 // num_ways=2, num_sets=1,
 // write_through=false, write_allocate=true,
-// replacement_policy=fifo, hit_latency=8, miss_latency=10
+// replacement_policy=fifo, hit_latency=4, miss_latency=11
 // block_size=1
 // num_ways=2, num_sets=2,
 // write_through=false, write_allocate=true,
-// replacement_policy=fifo, hit_latency=8, miss_latency=10
+// replacement_policy=fifo, hit_latency=4, miss_latency=11
 // block_size=1
 
 int sc_main(int argc, char** argv) {
