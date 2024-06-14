@@ -23,6 +23,11 @@ int sc_main(int argc, char** argv) {
         vcd_file_path = std::string(argv[1]);
     }
 
+    const int hit_latency = 4;
+    const int miss_latency = 11;
+    const int read_latency = 11;
+    const int write_latency = 16;
+
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
     sc_signal<bool> flush_i;
@@ -116,18 +121,32 @@ int sc_main(int argc, char** argv) {
     address_valid_1_i.write(1);
     read_write_select_1_i.write(0);
 
-    tick(1);
+    tick(1); // wait one cycle for the next positive clock edge
     address_valid_0_i.write(0);
     address_valid_1_i.write(0);
+    tick(2); // wait two cycles for the arbiter to buffer and output the request
 
-    tick(30);
+    tick(miss_latency); // write request should be done now
 
+    tick(1); // result of write request should now be accessible on the fe port
+            // and the request from port 1 should be sent
+    
     if(!write_done_0_o.read()) {
         std::cerr << "Write failed" << std::endl;
+    } else {
+        std::cout << "Write successful" << std::endl;
     }
+
+    tick(1); // after another cycle the cache should have registered the request
+
+    tick(hit_latency); // read request should be done now
+
+    tick(1); // wait for the result to be handed out on the fe port
 
     if(read_data_1_o.read() != 14 || !read_data_valid_1_o.read()) {
         std::cerr << "Read failed" << std::endl;
+    } else {
+        std::cout << "Read successful" << std::endl;
     }
 
     address_1_i.write(3);    
@@ -135,7 +154,8 @@ int sc_main(int argc, char** argv) {
     write_data_valid_1_i.write(0);
     read_write_select_1_i.write(0);
 
-    tick(1);
+    tick(1); // arbiter should now register the request from port 1
+    address_valid_1_i.write(0);
 
     address_0_i.write(3);
     address_valid_0_i.write(1);
@@ -143,19 +163,32 @@ int sc_main(int argc, char** argv) {
     write_data_valid_0_i.write(1);
     read_write_select_0_i.write(1);
 
-    tick(1);
+    tick(1); // arbiter should register the request from port 0
+    address_valid_0_i.write(0); // but output the request from port 1
+    
+    tick(1); // cache should now register the request from fe port 1
 
-    address_valid_0_i.write(0);
+    tick(miss_latency + read_latency); // cache read should now be done
 
-    tick(30);
+    tick(1); // result should now be present on the fe port
 
-    tick(10);
+    if(read_data_1_o.read() != 0 || !read_data_valid_1_o.read()) {
+        std::cerr << "Read failed" << std::endl;
+    } else {
+        std::cout << "Read successful" << std::endl;
+    }
+
+    tick(1); // wait another cycle for the cache to register the next request (port 0)
+
+    tick(hit_latency); // write should be done
+
+    tick(1); // result should now be present on the fe port
 
     if(!write_done_0_o.read()) {
         std::cerr << "Write failed" << std::endl;
+    } else {
+        std::cout << "Write successful" << std::endl;
     }
-
-    tick(15);
 
     tick(10);
 
