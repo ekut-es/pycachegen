@@ -177,12 +177,10 @@ class FunctionalMemoryGenerator:
         read_data = []
         read_data_valid = []
         write_done = []
-        port_ready = []
         for i in range(self.read_write_ports):
             read_data.append(m.Reg(f"read_data_{i}", DATA_WIDTH))
             read_data_valid.append(m.Reg(f"read_data_valid_{i}"))
             write_done.append(m.Reg(f"write_done_{i}"))
-            port_ready.append(m.Reg(f"port_ready_{i}"))
 
         # internal
         data_memory = m.Reg("data_memory", DATA_WIDTH, dims=pow(2, ADDRESS_WIDTH.value))
@@ -194,7 +192,7 @@ class FunctionalMemoryGenerator:
 
         for i in range(self.read_write_ports):
             m.Assign(
-                port_ready[i](
+                port_ready_o[i](
                     AndList(read_in_progress[i] == 0, write_in_progress[i] == 0)
                 )
             )
@@ -203,7 +201,6 @@ class FunctionalMemoryGenerator:
             m.Assign(read_data_o[i](read_data[i]))
             m.Assign(read_data_valid_o[i](read_data_valid[i]))
             m.Assign(write_done_o[i](write_done[i]))
-            m.Assign(port_ready_o[i](port_ready[i]))
 
         for i in range(self.read_write_ports):
             m.Always(Posedge(clk_i), Negedge(reset_n_i))(
@@ -220,7 +217,7 @@ class FunctionalMemoryGenerator:
                     write_done[i](0),
                 ).Else(
                     # nothing in progress
-                    If(port_ready[i] == 1)(
+                    If(port_ready_o[i] == 1)(
                         # initialize read: buffer data and set latency counter
                         If(
                             AndList(
