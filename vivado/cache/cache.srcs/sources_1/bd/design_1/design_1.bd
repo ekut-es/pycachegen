@@ -14,7 +14,8 @@
       "ps8_0_axi_periph": {
         "s00_couplers": {}
       },
-      "rst_ps8_0_99M": ""
+      "rst_ps8_0_99M": "",
+      "cache_wrapper_1_0": ""
     },
     "components": {
       "zynq_ultra_ps_e_0": {
@@ -1190,9 +1191,22 @@
         "xci_name": "design_1_rst_ps8_0_99M_0",
         "xci_path": "ip/design_1_rst_ps8_0_99M_0/design_1_rst_ps8_0_99M_0.xci",
         "inst_hier_path": "rst_ps8_0_99M"
+      },
+      "cache_wrapper_1_0": {
+        "vlnv": "user.org:user:cache_wrapper_1:1.0",
+        "ip_revision": "1",
+        "xci_name": "design_1_cache_wrapper_1_0_0",
+        "xci_path": "ip/design_1_cache_wrapper_1_0_0/design_1_cache_wrapper_1_0_0.xci",
+        "inst_hier_path": "cache_wrapper_1_0"
       }
     },
     "interface_nets": {
+      "ps8_0_axi_periph_M00_AXI": {
+        "interface_ports": [
+          "ps8_0_axi_periph/M00_AXI",
+          "cache_wrapper_1_0/S00_AXI"
+        ]
+      },
       "zynq_ultra_ps_e_0_M_AXI_HPM0_LPD": {
         "interface_ports": [
           "zynq_ultra_ps_e_0/M_AXI_HPM0_LPD",
@@ -1206,7 +1220,8 @@
           "rst_ps8_0_99M/peripheral_aresetn",
           "ps8_0_axi_periph/S00_ARESETN",
           "ps8_0_axi_periph/M00_ARESETN",
-          "ps8_0_axi_periph/ARESETN"
+          "ps8_0_axi_periph/ARESETN",
+          "cache_wrapper_1_0/s00_axi_aresetn"
         ]
       },
       "zynq_ultra_ps_e_0_pl_clk0": {
@@ -1216,7 +1231,8 @@
           "ps8_0_axi_periph/S00_ACLK",
           "rst_ps8_0_99M/slowest_sync_clk",
           "ps8_0_axi_periph/M00_ACLK",
-          "ps8_0_axi_periph/ACLK"
+          "ps8_0_axi_periph/ACLK",
+          "cache_wrapper_1_0/s00_axi_aclk"
         ]
       },
       "zynq_ultra_ps_e_0_pl_resetn0": {
@@ -1224,6 +1240,23 @@
           "zynq_ultra_ps_e_0/pl_resetn0",
           "rst_ps8_0_99M/ext_reset_in"
         ]
+      }
+    },
+    "addressing": {
+      "/zynq_ultra_ps_e_0": {
+        "address_spaces": {
+          "Data": {
+            "segments": {
+              "SEG_cache_wrapper_1_0_S00_AXI_reg": {
+                "address_block": "/cache_wrapper_1_0/S00_AXI/S00_AXI_reg",
+                "offset": "0x0080000000",
+                "range": "64K",
+                "offset_base_param": "C_S00_AXI_BASEADDR",
+                "offset_high_param": "C_S00_AXI_HIGHADDR"
+              }
+            }
+          }
+        }
       }
     }
   }
