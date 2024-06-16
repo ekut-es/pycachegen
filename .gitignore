@@ -181,5 +181,6 @@ vivado/cache/cache.cache
 vivado/cache/cache.hw
 vivado/cache/cache.tmp
 vivado/cache/cache.gen
+vivado/cache/cache.runs
 
 
