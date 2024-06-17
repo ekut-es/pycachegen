@@ -1,5 +1,5 @@
 from math import ceil, log2
-from veriloggen import Module, Posedge, Negedge, If, AndList
+from veriloggen import Module, Posedge, Negedge, If, AndList, Not
 
 # from acadl import Memory
 
@@ -202,6 +202,12 @@ class FunctionalMemoryGenerator:
             m.Assign(read_data_valid_o[i](read_data_valid[i]))
             m.Assign(write_done_o[i](write_done[i]))
 
+        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+            If(Not(reset_n_i))(
+                [data_memory[i](0) for i in range(pow(2, ADDRESS_WIDTH.value))]
+            )
+        )
+
         for i in range(self.read_write_ports):
             m.Always(Posedge(clk_i), Negedge(reset_n_i))(
                 If(reset_n_i == 0)(
@@ -215,6 +221,8 @@ class FunctionalMemoryGenerator:
                     read_data[i](0),
                     read_data_valid[i](0),
                     write_done[i](0),
+                    read_in_progress[i](0),
+                    write_in_progress[i](0),
                 ).Else(
                     # nothing in progress
                     If(port_ready_o[i] == 1)(
@@ -284,8 +292,6 @@ class FunctionalMemoryGenerator:
                         ),
                     )
                 ),
-                # reset write_done after one cycle
-                If(write_done[i] == 1)(write_done[i](0)),
             )
 
         return m
