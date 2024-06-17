@@ -1464,7 +1464,7 @@
       },
       "cache_wrapper_1_0": {
         "vlnv": "user.org:user:cache_wrapper_1:1.0",
-        "ip_revision": "8",
+        "ip_revision": "10",
         "xci_name": "design_1_cache_wrapper_1_0_0",
         "xci_path": "ip/design_1_cache_wrapper_1_0_0/design_1_cache_wrapper_1_0_0.xci",
         "inst_hier_path": "cache_wrapper_1_0"

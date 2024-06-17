@@ -409,20 +409,29 @@
 	end    
 
 	// Add user logic here
-	wire flush_cache;
+	wire cache_flush;
 	wire cache_hit;
+	wire cache_read_write_select;
 	wire[15:0] cache_read_data;
+	wire cache_read_data_valid;
+	wire cache_write_done;
+	wire cache_port_ready;
+	
     cache_wrapper
     cache_wrapper_1 (
         .clk_i(S_AXI_ACLK),
         .reset_n_i(S_AXI_ARESETN),
-        .flush_i(flush_cache),
+        .flush_i(cache_flush),
         .hit_o(cache_hit),
         .address_0_i(slv_reg0[7:0]),
         .address_valid_0_i(slv_reg1[0]),
         .write_data_0_i(slv_reg2[15:0]),
         .write_data_valid_0_i(slv_reg3[0]),
-        .read_data_0_o(cache_read_data)
+        .read_write_select_0_i(cache_read_write_select),
+        .read_data_0_o(cache_read_data),
+        .read_data_valid_0_o(cache_read_data_valid),
+        .write_done_0_o(cache_write_done),
+        .port_ready_0_o(cache_port_ready)
     );
 	// User logic ends
 
