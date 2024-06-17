@@ -1,14 +1,14 @@
 {
    "ActiveEmotionalView":"Default View",
    "Default View_ScaleFactor":"1.0",
-   "Default View_TopLeft":"9,-33",
+   "Default View_TopLeft":"6,-32",
    "ExpandedHierarchyInLayout":"",
    "guistr":"# # String gsaved with Nlview 7.5.8 2022-09-21 7111 VDI=41 GEI=38 GUI=JA:10.0 TLS
 #  -string -flagsOSRD
 preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 1 -x 330 -y 90 -defaultsOSRD
 preplace inst ps8_0_axi_periph -pg 1 -lvl 2 -x 800 -y 150 -defaultsOSRD
 preplace inst rst_ps8_0_99M -pg 1 -lvl 1 -x 330 -y 300 -defaultsOSRD
-preplace inst functional_memory_0 -pg 1 -lvl 3 -x 1070 -y 160 -defaultsOSRD
+preplace inst cache_wrapper_1_0 -pg 1 -lvl 3 -x 1070 -y 160 -defaultsOSRD
 preplace netloc rst_ps8_0_99M_peripheral_aresetn 1 1 2 650 10 950
 preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 0 3 20 190 640 290 960J
 preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 0 2 30 200 630
@@ -19,6 +19,6 @@ pagesize -pg 1 -db -bbox -sgen 0 0 1180 400
 "
 }
 {
-   "da_axi4_cnt":"5",
+   "da_axi4_cnt":"6",
    "da_zynq_ultra_ps_e_cnt":"1"
 }

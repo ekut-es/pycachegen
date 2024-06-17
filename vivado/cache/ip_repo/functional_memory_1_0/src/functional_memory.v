@@ -42,6 +42,20 @@ module functional_memory #
   assign write_done_0_o = write_done_0;
 
   always @(posedge clk_i or negedge reset_n_i) begin
+    if(!reset_n_i) begin
+      data_memory[0] <= 0;
+      data_memory[1] <= 0;
+      data_memory[2] <= 0;
+      data_memory[3] <= 0;
+      data_memory[4] <= 0;
+      data_memory[5] <= 0;
+      data_memory[6] <= 0;
+      data_memory[7] <= 0;
+    end 
+  end
+
+
+  always @(posedge clk_i or negedge reset_n_i) begin
     if(reset_n_i == 0) begin
       read_latency_counter_0 <= READ_LATENCY;
       write_latency_counter_0 <= WRITE_LATENCY;

@@ -197,12 +197,12 @@
                 "MA": "Data",
                 "MX": "/zynq_ultra_ps_e_0",
                 "MI": "M_AXI_HPM0_LPD",
-                "MS": "SEG_functional_memory_0_S00_AXI_reg",
+                "MS": "SEG_cache_wrapper_1_0_S00_AXI_reg",
                 "MV": "xilinx.com:ip:zynq_ultra_ps_e:3.5",
-                "SX": "/functional_memory_0",
+                "SX": "/cache_wrapper_1_0",
                 "SI": "S00_AXI",
                 "SS": "S00_AXI_reg",
-                "SV": "user.org:user:functional_memory:1.0",
+                "SV": "user.org:user:cache_wrapper_1:1.0",
                 "TM": "both",
                 "TU": "register"
             }
