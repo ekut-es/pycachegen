@@ -149,7 +149,7 @@ module l1_cache
   assign next_block_replacement = 0;
 
   always @(negedge reset_n_i or posedge clk_i) begin
-    if(!reset_n_i) begin
+    if(reset_n_i == 1'b0) begin
       fe_address_i_reg <= 0;
       fe_write_data_i_reg <= 0;
       fe_read_write_select_i_reg <= 0;
@@ -335,15 +335,13 @@ module functional_memory #
   reg [DATA_WIDTH-1:0] read_data_0;
   reg read_data_valid_0;
   reg write_done_0;
-  reg port_ready_0;
   reg [DATA_WIDTH-1:0] data_memory [0:256-1];
   reg read_in_progress_0;
   reg write_in_progress_0;
-  assign port_ready_0 = (read_in_progress_0 == 0) && (write_in_progress_0 == 0);
+  assign port_ready_0_o = (read_in_progress_0 == 0) && (write_in_progress_0 == 0);
   assign read_data_0_o = read_data_0;
   assign read_data_valid_0_o = read_data_valid_0;
   assign write_done_0_o = write_done_0;
-  assign port_ready_0_o = port_ready_0;
 
   always @(posedge clk_i or negedge reset_n_i) begin
     if(reset_n_i == 0) begin
@@ -358,7 +356,7 @@ module functional_memory #
       read_data_valid_0 <= 0;
       write_done_0 <= 0;
     end else begin
-      if(port_ready_0 == 1) begin
+      if(port_ready_0_o == 1) begin
         if((read_write_select_0_i == 0) && (address_valid_0_i == 1)) begin
           read_in_progress_0 <= 1;
           read_latency_counter_0 <= READ_LATENCY;

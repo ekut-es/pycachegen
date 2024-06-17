@@ -412,6 +412,7 @@
 	wire flush_cache;
 	wire cache_hit;
 	wire[15:0] cache_read_data;
+    cache_wrapper
     cache_wrapper_1 (
         .clk_i(S_AXI_ACLK),
         .reset_n_i(S_AXI_ARESETN),

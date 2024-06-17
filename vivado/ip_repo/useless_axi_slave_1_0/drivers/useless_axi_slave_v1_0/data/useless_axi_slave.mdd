@@ -1,0 +1,10 @@
+
+
+OPTION psf_version = 2.1;
+
+BEGIN DRIVER useless_axi_slave
+	OPTION supported_peripherals = (useless_axi_slave);
+	OPTION copyfiles = all;
+	OPTION VERSION = 1.0;
+	OPTION NAME = useless_axi_slave;
+END DRIVER
