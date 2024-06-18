@@ -43,7 +43,7 @@ class MemoryAccessArbiter:
         self.NUM_PORTS_CEILED_W = ceil(log2(self.NUM_PORTS))
         self.NUM_PORTS_CEILED = 2 ** (self.NUM_PORTS_CEILED_W)
         # Fifo buffer must have one additional element so we know when it's full and empty
-        self.FIFO_BUFFER_LENGTH_W = ceil(log2(self.NUM_PORTS + 1)) 
+        self.FIFO_BUFFER_LENGTH_W = ceil(log2(self.NUM_PORTS + 1))
         self.FIFO_BUFFER_LENGTH = 2 ** (self.FIFO_BUFFER_LENGTH_W)
 
     def generate_module(self) -> Module:
@@ -131,12 +131,31 @@ class MemoryAccessArbiter:
         selected_request = m.Reg("selected_request", self.NUM_PORTS_CEILED_W)
         state_reg = m.Reg("state_reg", ceil(log2(len(States))))
 
+        if self.POLICY == "round_robin":
+            rr_last_accessed = m.Reg("rr_last_accessed", self.NUM_PORTS_CEILED_W)
+            rr_ordered_requests = m.Wire("rr_ordered_requests", self.NUM_PORTS)
+            # Reorder the buffered requests so that the priority encoder gives priority to the
+            # bit which is next according to the round robin policy
+            m.Assign(
+                rr_ordered_requests(
+                    (buffered_request_valid << rr_last_accessed)
+                    | (buffered_request_valid >> (self.NUM_PORTS - rr_last_accessed))
+                )
+            )
+
         Submodule(
             m,
             PriorityEncoderGenerator(self.NUM_PORTS, False).generate_module(),
             "arbiter_priority_encoder",
             arg_ports=(
-                ("unencoded_i", buffered_request_valid),
+                (
+                    "unencoded_i",
+                    (
+                        rr_ordered_requests
+                        if self.POLICY == "round_robin"
+                        else buffered_request_valid
+                    ),
+                ),
                 ("encoded_o", next_request),
             ),
         )
@@ -244,6 +263,11 @@ class MemoryAccessArbiter:
                         # invalidate buffered request
                         buffered_request_valid[next_request](0),
                         state_reg(States.WAITING_FOR_MEMORY.value),
+                        (
+                            rr_last_accessed(next_request) # FIXME I think we might have to give priority to the element after that?
+                            if self.POLICY == "round_robin"
+                            else []
+                        ),
                     )
                 ).Elif(state_reg == States.WAITING_FOR_MEMORY.value)(
                     If(be_address_valid)(
