@@ -121,21 +121,13 @@ class MemoryAccessArbiter:
 
         # internal
         request_valid = m.Wire("request_valid", self.NUM_PORTS)
-        buffered_request_valid = m.Wire("buffered_request_valid", self.NUM_PORTS)
+        buffered_request_valid = m.Reg("buffered_request_valid", self.NUM_PORTS)
         for i in range(self.NUM_PORTS):
             m.Assign(
                 request_valid[i](
                     And(
                         fe_address_valid_i[i],
                         Or(Not(fe_read_write_select_i[i]), fe_write_data_valid_i[i]),
-                    )
-                )
-            )
-            m.Assign(
-                buffered_request_valid[i](
-                    And(
-                        fe_address_valid[i],
-                        Or(Not(fe_read_write_select[i]), fe_write_data_valid[i]),
                     )
                 )
             )
@@ -190,6 +182,7 @@ class MemoryAccessArbiter:
                         fe_read_write_select[i](fe_read_write_select_i[i]),
                         fe_read_data_valid[i](0),
                         fe_write_done[i](0),
+                        buffered_request_valid[i](1)
                     )
                     for i in range(self.NUM_PORTS)
                 ],
@@ -209,7 +202,8 @@ class MemoryAccessArbiter:
                             selected_request(i),
                             # invalidate buffered request
                             fe_address_valid[i](0),
-                            fe_write_data_valid[i](0)
+                            fe_write_data_valid[i](0),
+                            buffered_request_valid[i](0)
                         )
                         for i in range(self.NUM_PORTS)
                     ],
