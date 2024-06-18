@@ -25,17 +25,22 @@ class States(Enum):
 
 
 class MemoryAccessArbiter:
-    def __init__(self, num_ports: int, address_width: int, data_width: int) -> None:
+    def __init__(
+        self, num_ports: int, address_width: int, data_width: int, policy: str
+    ) -> None:
         """Generator for an arbiter for memories/caches with the native memory interface.
 
         Args:
             num_ports (int): Number of front end ports.
             address_width (int): Address width.
             data_width (int): Data word width.
+            policy (str): Policy for the order in which incoming request will be processed. Can be either "priority" or "fifo".
         """
         self.NUM_PORTS = num_ports
         self.ADDRESS_WIDTH = address_width
         self.DATA_WIDTH = data_width
+        self.POLICY = policy
+        self.NUM_PORTS_CEILED = ceil(log2(self.NUM_PORTS))
 
     def generate_module(self) -> Module:
         m = Module("memory_access_arbiter")
@@ -145,6 +150,15 @@ class MemoryAccessArbiter:
             ),
         )
 
+        if self.POLICY == "fifo":
+            # make fifo queue as long as the next power of 2 of the num of ports
+            # so we dont need to apply modulo to the indices
+            fifo_queue = m.Reg(
+                "fifo_queue", self.NUM_PORTS_CEILED, self.NUM_PORTS_CEILED
+            )
+            fifo_read_idx = m.Reg("fifo_read_idx", self.NUM_PORTS_CEILED)
+            fifo_write_idx = m.Reg("fifo_write_idx", self.NUM_PORTS_CEILED)
+
         m.Always(Posedge(clk_i), Negedge(reset_n_i))(
             If(Not(reset_n_i))(
                 # backend buffers
@@ -170,6 +184,16 @@ class MemoryAccessArbiter:
                 # internal
                 state_reg(States.READY.value),
                 selected_request(0),
+                # fifo
+                (
+                    [
+                        fifo_read_idx(0),
+                        fifo_write_idx(0),
+                        [fifo_queue[i](0) for i in range(self.NUM_PORTS_CEILED)],
+                    ]
+                    if self.POLICY == "fifo"
+                    else []
+                ),
             ).Else(
                 # Always buffer new requests
                 [
@@ -182,36 +206,77 @@ class MemoryAccessArbiter:
                         fe_read_write_select[i](fe_read_write_select_i[i]),
                         fe_read_data_valid[i](0),
                         fe_write_done[i](0),
-                        buffered_request_valid[i](1)
+                        buffered_request_valid[i](1),
                     )
                     for i in range(self.NUM_PORTS)
                 ],
-                If(
-                    AndList(
-                        state_reg == States.READY.value,
-                        be_port_ready_i,
-                        buffered_request_valid != 0,
-                    )
-                )(
+                # insert into fifo queue if fifo is used
+                (
                     [
-                        If(i == next_request)(
-                            be_address(fe_address[i]),
-                            be_write_data(fe_write_data[i]),
-                            be_write_data_valid(fe_write_data_valid[i]),
-                            be_read_write_select(fe_read_write_select[i]),
-                            selected_request(i),
-                            # invalidate buffered request
-                            fe_address_valid[i](0),
-                            fe_write_data_valid[i](0),
-                            buffered_request_valid[i](0)
+                        If(buffered_request_valid != 0)(
+                            # Note: We can always insert new request into the fifo without overfilling it
+                            # since each client has to wait for its request to be processed
+                            fifo_queue[fifo_write_idx](next_request),
+                            fifo_write_idx.inc(),
+                            # invalidate buffered request so we dont insert it into the fifo twice
+                            [
+                                If(i == next_request)(
+                                    fe_address_valid[i](0),
+                                    fe_write_data_valid[i](0),
+                                    buffered_request_valid[i](0),
+                                )
+                                for i in range(self.NUM_PORTS)
+                            ],
                         )
-                        for i in range(self.NUM_PORTS)
-                    ],
-                    be_address_valid(1),
-                    state_reg(States.WAITING_FOR_MEMORY.value),
-                ).Elif(
-                    state_reg == States.WAITING_FOR_MEMORY.value
-                )(
+                    ]
+                    if self.POLICY == "fifo"
+                    else []
+                ),
+                If(state_reg == States.READY.value)(
+                    [
+                        If(AndList(be_port_ready_i, fifo_read_idx != fifo_write_idx))(
+                            # There is a new request in the fifo, lets process it
+                            [
+                                If(i == fifo_queue[fifo_read_idx])(
+                                    be_address(fe_address[i]),
+                                    be_write_data(fe_write_data[i]),
+                                    be_write_data_valid(fe_write_data_valid[i]),
+                                    be_read_write_select(fe_read_write_select[i]),
+                                    selected_request(i),
+                                )
+                                for i in range(self.NUM_PORTS)
+                            ],
+                            be_address_valid(1),
+                            state_reg(States.WAITING_FOR_MEMORY.value),
+                        )
+                    ]
+                    if self.POLICY == "fifo"
+                    else [
+                        If(
+                            AndList(
+                                be_port_ready_i,
+                                buffered_request_valid != 0,
+                            )
+                        )(
+                            [
+                                If(i == next_request)(
+                                    be_address(fe_address[i]),
+                                    be_write_data(fe_write_data[i]),
+                                    be_write_data_valid(fe_write_data_valid[i]),
+                                    be_read_write_select(fe_read_write_select[i]),
+                                    selected_request(i),
+                                    # invalidate buffered request
+                                    fe_address_valid[i](0),
+                                    fe_write_data_valid[i](0),
+                                    buffered_request_valid[i](0),
+                                )
+                                for i in range(self.NUM_PORTS)
+                            ],
+                            be_address_valid(1),
+                            state_reg(States.WAITING_FOR_MEMORY.value),
+                        )
+                    ]
+                ).Elif(state_reg == States.WAITING_FOR_MEMORY.value)(
                     If(be_address_valid)(
                         # invalidate the request
                         be_address_valid(0),
@@ -234,6 +299,7 @@ class MemoryAccessArbiter:
                             )
                             for i in range(self.NUM_PORTS)
                         ],
+                        fifo_read_idx.inc() if self.POLICY == "fifo" else [],
                     ),
                 ),
             )

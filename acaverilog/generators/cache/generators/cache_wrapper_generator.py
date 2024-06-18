@@ -24,11 +24,13 @@ from acaverilog.generators.cache.generators.memory_access_arbiter import (
 
 class CacheWrapperGenerator:
     def __init__(self, *args) -> None:
+        NUM_COMMON_ARGS = 4
         self.DATA_WIDTH = int(args[0])
         self.ADDRESS_WIDTH = int(args[1])
         self.NUM_PORTS = int(args[2])
-        self.NUM_CACHES = len(args) - 3
-        cache_configs = [config.split() for config in args[3:]]
+        self.ARBITER_POLICY = args[3]
+        self.NUM_CACHES = len(args) - NUM_COMMON_ARGS
+        cache_configs = [config.split() for config in args[NUM_COMMON_ARGS:]]
         self.NUM_WAYS = [int(config[0]) for config in cache_configs]
         self.NUM_SETS = [int(config[1]) for config in cache_configs]
         self.REPLACEMENT_POLICY = [config[2] for config in cache_configs]
@@ -56,7 +58,7 @@ class CacheWrapperGenerator:
                     write_through=self.WRITE_THROUGH[i],
                     write_allocate=self.WRITE_ALLOCATE[i],
                     block_size=self.BLOCK_SIZE[i],
-                    prefix=f"l{i+1}_"
+                    prefix=f"l{i+1}_",
                 ).generate_module()
             )
 
@@ -94,7 +96,7 @@ class CacheWrapperGenerator:
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
-        # hit signal is purely for testing atm 
+        # hit signal is purely for testing atm
         request_hit = []
         # Backend Cache <- Next level memory
         be_read_data = []
@@ -175,7 +177,10 @@ class CacheWrapperGenerator:
             arbiter_write_done = m.Wire("arbiter_write_done")
 
             arbiter = MemoryAccessArbiter(
-                self.NUM_PORTS, self.ADDRESS_WIDTH, self.DATA_WIDTH
+                num_ports=self.NUM_PORTS,
+                address_width=self.ADDRESS_WIDTH,
+                data_width=self.DATA_WIDTH,
+                policy=self.ARBITER_POLICY,
             ).generate_module()
 
             arbiter_port_mapping = [
@@ -257,16 +262,16 @@ class CacheWrapperGenerator:
                     # Hit signal
                     ("fe_hit_o", request_hit[i]),
                     # Cache In
-                    ("fe_address_i", be_address[i-1]),
-                    ("fe_address_valid_i", be_address_valid[i-1]),
-                    ("fe_write_data_i", be_write_data[i-1]),
-                    ("fe_write_data_valid_i", be_write_data_valid[i-1]),
-                    ("fe_read_write_select_i", be_read_write_select[i-1]),
+                    ("fe_address_i", be_address[i - 1]),
+                    ("fe_address_valid_i", be_address_valid[i - 1]),
+                    ("fe_write_data_i", be_write_data[i - 1]),
+                    ("fe_write_data_valid_i", be_write_data_valid[i - 1]),
+                    ("fe_read_write_select_i", be_read_write_select[i - 1]),
                     # Cache Out
-                    ("fe_read_data_o", be_read_data[i-1]),
-                    ("fe_read_data_valid_o", be_read_data_valid[i-1]),
-                    ("fe_write_done_o", be_write_done[i-1]),
-                    ("fe_port_ready_o", be_port_ready[i-1]),
+                    ("fe_read_data_o", be_read_data[i - 1]),
+                    ("fe_read_data_valid_o", be_read_data_valid[i - 1]),
+                    ("fe_write_done_o", be_write_done[i - 1]),
+                    ("fe_port_ready_o", be_port_ready[i - 1]),
                     # Backend Cache <- Memory
                     ("be_read_data_i", be_read_data[i]),
                     ("be_read_data_valid_i", be_read_data_valid[i]),
@@ -306,7 +311,7 @@ class CacheWrapperGenerator:
 
 
 if __name__ == "__main__":
-    # argv: (file name), number for output file suffix, data width, address width, num ports, [num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
+    # argv: (file name), number for output file suffix, data width, address width, num ports, arbiter policy, [num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
     cache_wrapper_generator = CacheWrapperGenerator(*sys.argv[2:])
     m = cache_wrapper_generator.generate_module()
     m.to_verilog(f"../src/cache_wrapper_{sys.argv[1]}.v", for_verilator=True)
