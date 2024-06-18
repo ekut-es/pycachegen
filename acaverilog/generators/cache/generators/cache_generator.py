@@ -380,6 +380,7 @@ class CacheGenerator:
             If(Not(reset_n_i))(
                 ## reset
                 # frontend input buffers
+                flush_i_reg(0),
                 fe_address_i_reg(0),
                 fe_write_data_i_reg(0),
                 fe_read_write_select_i_reg(0),
