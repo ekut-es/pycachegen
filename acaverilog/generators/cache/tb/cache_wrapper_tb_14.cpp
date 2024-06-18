@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_14.h"
 
 // Testbench for testing fully associative caches
-// data_width=16, address_width=8, num_ports=1
+// data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
 // num_ways=4, num_sets=1,
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,

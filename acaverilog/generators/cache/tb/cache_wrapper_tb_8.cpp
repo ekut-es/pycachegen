@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_8.h"
 
 // Testbench for testing the write-back, write no-allocate policy
-// data_width=16, address_width=8, num_ports=1
+// data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
 // num_ways=2, num_sets=2,
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=false,

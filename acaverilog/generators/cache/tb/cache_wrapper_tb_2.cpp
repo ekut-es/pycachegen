@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_2.h"
 
 // Testbench for testing a set associative cache
-// data_width=16, address_width=8, num_ports=1
+// data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
 // num_ways=2, num_sets=4,
 // replacement_policy=fifo, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false,

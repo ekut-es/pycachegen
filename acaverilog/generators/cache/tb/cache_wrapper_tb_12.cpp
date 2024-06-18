@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_12.h"
 
 // Testbench for testing that the flush can be queued whilst another request is being processed
-// data_width=16, address_width=8, num_ports=1
+// data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
 // num_ways=1, num_sets=4,
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,

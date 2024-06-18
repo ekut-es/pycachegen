@@ -21,7 +21,6 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS "../../../external/systemc")
 
-set(NUM_TESTBENCHES 17)
 set(CACHE_WRAPPER_ARG_LIST
     "1 16 8 1 priority \"1 4 fifo 6 8 1 0 1\""
     "2 16 8 1 priority \"2 4 fifo 6 8 1 0 1\""
@@ -40,7 +39,9 @@ set(CACHE_WRAPPER_ARG_LIST
     "15 16 8 1 priority \"4 2 plru_mru 4 11 0 1 1\""
     "16 16 8 2 priority \"4 2 plru_mru 4 11 0 1 1\""
     "17 16 8 1 priority \"2 1 fifo 4 11 0 1 1\" \"2 2 fifo 4 11 0 1 1\""
+    "18 16 8 4 fifo \"4 2 plru_mru 4 11 0 1 1\""
 )
+list(LENGTH CACHE_WRAPPER_ARG_LIST NUM_TESTBENCHES)
 
 # create src directory if not already there, remove all files from it
 # this is for verilog source files

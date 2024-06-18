@@ -40,7 +40,8 @@ class MemoryAccessArbiter:
         self.ADDRESS_WIDTH = address_width
         self.DATA_WIDTH = data_width
         self.POLICY = policy
-        self.NUM_PORTS_CEILED = ceil(log2(self.NUM_PORTS))
+        self.NUM_PORTS_CEILED_W = ceil(log2(self.NUM_PORTS))
+        self.NUM_PORTS_CEILED = 2**(self.NUM_PORTS_CEILED_W)
 
     def generate_module(self) -> Module:
         m = Module("memory_access_arbiter")
@@ -136,7 +137,7 @@ class MemoryAccessArbiter:
                     )
                 )
             )
-        next_request = m.Wire("next_request")
+        next_request = m.Wire("next_request", self.NUM_PORTS_CEILED_W)
         state_reg = m.Reg("state_reg", ceil(log2(len(States))))
         selected_request = m.Reg("selected_request", ceil(log2(self.NUM_PORTS)))
 
@@ -154,10 +155,10 @@ class MemoryAccessArbiter:
             # make fifo queue as long as the next power of 2 of the num of ports
             # so we dont need to apply modulo to the indices
             fifo_queue = m.Reg(
-                "fifo_queue", self.NUM_PORTS_CEILED, self.NUM_PORTS_CEILED
+                "fifo_queue", self.NUM_PORTS_CEILED_W, self.NUM_PORTS_CEILED
             )
-            fifo_read_idx = m.Reg("fifo_read_idx", self.NUM_PORTS_CEILED)
-            fifo_write_idx = m.Reg("fifo_write_idx", self.NUM_PORTS_CEILED)
+            fifo_read_idx = m.Reg("fifo_read_idx", self.NUM_PORTS_CEILED_W)
+            fifo_write_idx = m.Reg("fifo_write_idx", self.NUM_PORTS_CEILED_W)
 
         m.Always(Posedge(clk_i), Negedge(reset_n_i))(
             If(Not(reset_n_i))(
