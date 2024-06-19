@@ -65,7 +65,9 @@ class DynamicPriorityEncoderGenerator:
         Submodule(
             m,
             PriorityEncoderGenerator(
-                self.WIDTH_UNENCODED, self.PREFIX, self.PRIORITIZE_MSB
+                width_unencoded=self.WIDTH_UNENCODED_CEILED,
+                prefix=self.PREFIX,
+                prioritize_msb=self.PRIORITIZE_MSB,
             ).generate_module(),
             f"{self.PREFIX}priority_encoder",
             arg_ports=(

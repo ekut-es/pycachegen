@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_19.h"
 
 // Testbench for testing multiple ports with an arbiter with round robin policy
-// data_width=16, address_width=8, num_ports=4, arbiter_policy=round_robin
+// data_width=16, address_width=8, num_ports=5, arbiter_policy=round_robin
 // num_ways=4, num_sets=2,
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,
@@ -77,6 +77,17 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> write_done_3_o;
     sc_signal<bool> port_ready_3_o;
 
+    sc_signal<uint32_t> address_4_i;
+    sc_signal<bool> address_valid_4_i;
+    sc_signal<uint32_t> write_data_4_i;
+    sc_signal<bool> write_data_valid_4_i;
+    sc_signal<bool> read_write_select_4_i;
+
+    sc_signal<uint32_t> read_data_4_o;
+    sc_signal<bool> read_data_valid_4_o;
+    sc_signal<bool> write_done_4_o;
+    sc_signal<bool> port_ready_4_o;
+
     const std::unique_ptr<Vcache_wrapper_19> cache_wrapper{
         new Vcache_wrapper_19{"cache_wrapper"}};
 
@@ -128,6 +139,17 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->read_data_valid_3_o(read_data_valid_3_o);
     cache_wrapper->write_done_3_o(write_done_3_o);
     cache_wrapper->port_ready_3_o(port_ready_3_o);
+
+    cache_wrapper->address_4_i(address_4_i);
+    cache_wrapper->address_valid_4_i(address_valid_4_i);
+    cache_wrapper->write_data_4_i(write_data_4_i);
+    cache_wrapper->write_data_valid_4_i(write_data_valid_4_i);
+    cache_wrapper->read_write_select_4_i(read_write_select_4_i);
+
+    cache_wrapper->read_data_4_o(read_data_4_o);
+    cache_wrapper->read_data_valid_4_o(read_data_valid_4_o);
+    cache_wrapper->write_done_4_o(write_done_4_o);
+    cache_wrapper->port_ready_4_o(port_ready_4_o);
 
     const int MAX_SIMULATION_TIME = 1000;
 
