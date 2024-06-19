@@ -313,7 +313,7 @@ class CacheGenerator:
             Submodule(
                 m,
                 PriorityEncoderGenerator(
-                    width_unencoded=self.NUM_SETS, prefix=self.PREFIX
+                    width_unencoded=self.NUM_SETS, prefix=self.PREFIX, prioritize_msb=False
                 ).generate_module(),
                 f"{self.PREFIX}flush_priority_encoder",
                 arg_ports=(

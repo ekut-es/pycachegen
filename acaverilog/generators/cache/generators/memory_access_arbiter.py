@@ -17,6 +17,9 @@ from math import ceil, log2
 from acaverilog.generators.cache.generators.priority_encoder_generator import (
     PriorityEncoderGenerator,
 )
+from acaverilog.generators.cache.generators.dynamic_priority_encoder_generator import (
+    DynamicPriorityEncoderGenerator,
+)
 
 
 class States(Enum):
@@ -132,34 +135,29 @@ class MemoryAccessArbiter:
         state_reg = m.Reg("state_reg", ceil(log2(len(States))))
 
         if self.POLICY == "round_robin":
+            # round robin uses a priority encoder that can dynamically set which bit
+            # has the highest priority
             rr_priority = m.Reg("rr_priority", self.NUM_PORTS_CEILED_W)
-            rr_ordered_requests = m.Wire("rr_ordered_requests", self.NUM_PORTS)
-            # Reorder the buffered requests so that the priority encoder gives priority to the
-            # bit which is next according to the round robin policy
-            # priority encoder gives priority to the msb
-            m.Assign(
-                rr_ordered_requests(
-                    (buffered_request_valid << (self.NUM_PORTS - rr_priority - 1))
-                    | (buffered_request_valid >> (rr_priority + 1))
-                )
-            )
-
-        Submodule(
-            m,
-            PriorityEncoderGenerator(self.NUM_PORTS, False).generate_module(),
-            "arbiter_priority_encoder",
-            arg_ports=(
-                (
-                    "unencoded_i",
-                    (
-                        rr_ordered_requests
-                        if self.POLICY == "round_robin"
-                        else buffered_request_valid
-                    ),
+            Submodule(
+                m,
+                DynamicPriorityEncoderGenerator(self.NUM_PORTS, "arbiter", False).generate_module(),
+                "dynamic_arbiter_priority_encoder",
+                arg_ports=(
+                    ("priority_i", rr_priority),
+                    ("unencoded_i", buffered_request_valid),
+                    ("encoded_o", next_request),
                 ),
-                ("encoded_o", next_request),
-            ),
-        )
+            )
+        else:
+            Submodule(
+                m,
+                PriorityEncoderGenerator(self.NUM_PORTS, "arbiter", False).generate_module(),
+                "arbiter_priority_encoder",
+                arg_ports=(
+                    ("unencoded_i", buffered_request_valid),
+                    ("encoded_o", next_request),
+                ),
+            )
 
         if self.POLICY == "fifo":
             # make fifo queue as long as the next power of 2 of the num of ports
