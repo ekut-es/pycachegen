@@ -34,7 +34,7 @@ class MemoryAccessArbiter:
             num_ports (int): Number of front end ports.
             address_width (int): Address width.
             data_width (int): Data word width.
-            policy (str): Policy for the order in which incoming request will be processed. Can be either "priority" or "fifo".
+            policy (str): Policy for the order in which incoming request will be processed. Can be either "priority", "fifo" or "round_robin".
         """
         self.NUM_PORTS = num_ports
         self.ADDRESS_WIDTH = address_width
@@ -132,14 +132,15 @@ class MemoryAccessArbiter:
         state_reg = m.Reg("state_reg", ceil(log2(len(States))))
 
         if self.POLICY == "round_robin":
-            rr_last_accessed = m.Reg("rr_last_accessed", self.NUM_PORTS_CEILED_W)
+            rr_priority = m.Reg("rr_priority", self.NUM_PORTS_CEILED_W)
             rr_ordered_requests = m.Wire("rr_ordered_requests", self.NUM_PORTS)
             # Reorder the buffered requests so that the priority encoder gives priority to the
             # bit which is next according to the round robin policy
+            # priority encoder gives priority to the msb
             m.Assign(
                 rr_ordered_requests(
-                    (buffered_request_valid << rr_last_accessed)
-                    | (buffered_request_valid >> (self.NUM_PORTS - rr_last_accessed))
+                    (buffered_request_valid << (self.NUM_PORTS - rr_priority - 1))
+                    | (buffered_request_valid >> (rr_priority + 1))
                 )
             )
 
@@ -264,7 +265,14 @@ class MemoryAccessArbiter:
                         buffered_request_valid[next_request](0),
                         state_reg(States.WAITING_FOR_MEMORY.value),
                         (
-                            rr_last_accessed(next_request) # FIXME I think we might have to give priority to the element after that?
+                            # Set new highest priority for round robin
+                            If(next_request == self.NUM_PORTS - 1)(
+                                # do manual "overflow" (natural overflow would only occur if num ports is a power of two)
+                                rr_priority(0)
+                            ).Else(
+                                # Give the element after the one accessed last the highest priority
+                                rr_priority(next_request + 1)
+                            )
                             if self.POLICY == "round_robin"
                             else []
                         ),
