@@ -417,27 +417,38 @@
 	end    
 
 	// Add user logic here
-    wire cache_flush;
-    wire cache_hit;
-    wire[15:0] cache_read_data;
+	
+	// input registers:
+	// slv_reg0: flush, rw_select, wdata_valid, addr_valid
+	// slv_reg1: addr
+	// slv_reg2: wdata
+	//
+	// output registers:
+	// slv_reg5: hit, rdata_valid, w_done, p_ready
+	// slv_reg6: rdata
+
+    // output wires
     wire cache_read_data_valid;
     wire cache_write_done;
     wire cache_port_ready;
+    wire cache_hit;
+    wire[15:0] cache_read_data;
+    
     cache_wrapper
     cache_wrapper (
         .clk_i(S_AXI_ACLK),
         .reset_n_i(S_AXI_ARESETN),
-        .flush_i(cache_flush),
-        .hit_o(cache_hit),
-        .address_0_i(slv_reg0[7:0]),
-        .address_valid_0_i(slv_reg1[0]),
+        .address_valid_0_i(slv_reg0[0]),
+        .write_data_valid_0_i(slv_reg0[1]),
+        .read_write_select_0_i(slv_reg0[2]),
+        .flush_i(slv_reg0[3]),
+        .address_0_i(slv_reg1[7:0]),
         .write_data_0_i(slv_reg2[15:0]),
-        .write_data_valid_0_i(slv_reg3[0]),
-        .read_write_select_0_i(slv_reg4[0]),
-        .read_data_0_o(cache_read_data),
         .read_data_valid_0_o(cache_read_data_valid),
         .write_done_0_o(cache_write_done),
-        .port_ready_0_o(cache_port_ready)
+        .port_ready_0_o(cache_port_ready),
+        .hit_o(cache_hit),
+        .read_data_0_o(cache_read_data)
     );
     
     always @( posedge S_AXI_ACLK ) begin
@@ -447,10 +458,10 @@
             slv_reg7 <= 0;
             slv_reg8 <= 0;
         end else begin
-            slv_reg5 <= {16'b0, cache_read_data};
-            slv_reg6 <= {31'b0, cache_read_data_valid};
-            slv_reg7 <= {31'b0, cache_write_done};
-            slv_reg8 <= {31'b0, cache_port_ready};
+            slv_reg5 <= {28'b0, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
+            slv_reg6 <= {16'b0, cache_read_data};
+            slv_reg7 <= 0;
+            slv_reg8 <= 0;
         end
     end
 	// User logic ends

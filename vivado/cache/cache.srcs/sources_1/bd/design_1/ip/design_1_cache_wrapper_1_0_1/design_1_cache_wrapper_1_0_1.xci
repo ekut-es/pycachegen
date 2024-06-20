@@ -4,7 +4,7 @@
     "xci_name": "design_1_cache_wrapper_1_0_1",
     "cell_name": "cache_wrapper_1_0",
     "component_reference": "user.org:user:cache_wrapper_1:1.1",
-    "ip_revision": "9",
+    "ip_revision": "10",
     "gen_directory": "../../../../../../cache.gen/sources_1/bd/design_1/ip/design_1_cache_wrapper_1_0_1",
     "parameters": {
       "component_parameters": {
@@ -33,7 +33,7 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Integrator" } ],
-        "IPREVISION": [ { "value": "9" } ],
+        "IPREVISION": [ { "value": "10" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../../../cache.gen/sources_1/bd/design_1/ip/design_1_cache_wrapper_1_0_1" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
