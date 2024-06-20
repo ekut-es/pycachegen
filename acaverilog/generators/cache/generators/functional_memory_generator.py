@@ -1,5 +1,5 @@
 from math import ceil, log2
-from veriloggen import Module, Posedge, Negedge, If, AndList, Not
+from veriloggen import Module, Posedge, Negedge, If, AndList, Not, For
 
 # from acadl import Memory
 
@@ -159,6 +159,7 @@ class FunctionalMemoryGenerator:
         data_memory = m.Reg("data_memory", DATA_WIDTH, dims=pow(2, ADDRESS_WIDTH.value))
         read_in_progress = (m.Reg(f"read_in_progress"))
         write_in_progress = (m.Reg(f"write_in_progress"))
+        reset_index = m.Integer("reset_index", ADDRESS_WIDTH.value + 1)
 
         m.Assign(
             port_ready_o(
@@ -184,7 +185,9 @@ class FunctionalMemoryGenerator:
                 write_done(0),
                 read_in_progress(0),
                 write_in_progress(0),
-                [data_memory[i](0) for i in range(pow(2, ADDRESS_WIDTH.value))]
+                For(reset_index(0), reset_index < (2 ** ADDRESS_WIDTH.value), reset_index.inc())(
+                    data_memory[reset_index](0, blk=True) # Verilator wants this to be a blocking assignment
+                )
             ).Else(
                 # nothing in progress
                 If(port_ready_o == 1)(
