@@ -183,4 +183,5 @@ vivado/cache/cache.tmp
 vivado/cache/cache.gen
 vivado/cache/cache.runs
 vivado/cache/cache.ip_user_files
+*.xsa
 
