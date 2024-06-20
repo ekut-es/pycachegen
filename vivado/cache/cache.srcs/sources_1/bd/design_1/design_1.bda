@@ -202,7 +202,7 @@
                 "SX": "/cache_wrapper_1_0",
                 "SI": "S00_AXI",
                 "SS": "S00_AXI_reg",
-                "SV": "user.org:user:cache_wrapper_1:1.0",
+                "SV": "user.org:user:cache_wrapper_1:1.1",
                 "TM": "both",
                 "TU": "register"
             }

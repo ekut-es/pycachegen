@@ -1463,10 +1463,10 @@
         "inst_hier_path": "rst_ps8_0_99M"
       },
       "cache_wrapper_1_0": {
-        "vlnv": "user.org:user:cache_wrapper_1:1.0",
-        "ip_revision": "11",
-        "xci_name": "design_1_cache_wrapper_1_0_0",
-        "xci_path": "ip/design_1_cache_wrapper_1_0_0/design_1_cache_wrapper_1_0_0.xci",
+        "vlnv": "user.org:user:cache_wrapper_1:1.1",
+        "ip_revision": "7",
+        "xci_name": "design_1_cache_wrapper_1_0_1",
+        "xci_path": "ip/design_1_cache_wrapper_1_0_1/design_1_cache_wrapper_1_0_1.xci",
         "inst_hier_path": "cache_wrapper_1_0"
       }
     },

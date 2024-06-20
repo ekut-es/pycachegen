@@ -12,13 +12,13 @@ preplace inst cache_wrapper_1_0 -pg 1 -lvl 3 -x 1070 -y 160 -defaultsOSRD
 preplace netloc rst_ps8_0_99M_peripheral_aresetn 1 1 2 650 10 950
 preplace netloc zynq_ultra_ps_e_0_pl_clk0 1 0 3 20 190 640 290 960J
 preplace netloc zynq_ultra_ps_e_0_pl_resetn0 1 0 2 30 200 630
-preplace netloc ps8_0_axi_periph_M00_AXI 1 2 1 N 140
 preplace netloc zynq_ultra_ps_e_0_M_AXI_HPM0_LPD 1 1 1 N 70
+preplace netloc ps8_0_axi_periph_M00_AXI 1 2 1 N 140
 levelinfo -pg 1 0 330 800 1070 1180
 pagesize -pg 1 -db -bbox -sgen 0 0 1180 400
 "
 }
 {
-   "da_axi4_cnt":"6",
+   "da_axi4_cnt":"7",
    "da_zynq_ultra_ps_e_cnt":"1"
 }
