@@ -37,16 +37,16 @@ int sc_main(int argc, char **argv)
     memory->clk_i(clk_i);
     memory->reset_n_i(reset_n_i);
 
-    memory->address_0_i(address_i);
-    memory->address_valid_0_i(address_valid_i);
-    memory->write_data_0_i(write_data_i);
-    memory->write_data_valid_0_i(write_data_valid_i);
-    memory->read_write_select_0_i(read_write_select_i);
+    memory->address_i(address_i);
+    memory->address_valid_i(address_valid_i);
+    memory->write_data_i(write_data_i);
+    memory->write_data_valid_i(write_data_valid_i);
+    memory->read_write_select_i(read_write_select_i);
 
-    memory->read_data_0_o(read_data_o);
-    memory->read_data_valid_0_o(read_data_valid_o);
-    memory->write_done_0_o(write_done_o);
-    memory->port_ready_0_o(port_ready_o);
+    memory->read_data_o(read_data_o);
+    memory->read_data_valid_o(read_data_valid_o);
+    memory->write_done_o(write_done_o);
+    memory->port_ready_o(port_ready_o);
 
     const int MAX_SIMULATION_TIME = 1000;
 

@@ -295,16 +295,16 @@ class CacheWrapperGenerator:
                 ("clk_i", clk_i),
                 ("reset_n_i", reset_n_i),
                 # Backend Cache <- Memory
-                ("read_data_0_o", be_read_data[-1]),
-                ("read_data_valid_0_o", be_read_data_valid[-1]),
-                ("write_done_0_o", be_write_done[-1]),
-                ("port_ready_0_o", be_port_ready[-1]),
+                ("read_data_o", be_read_data[-1]),
+                ("read_data_valid_o", be_read_data_valid[-1]),
+                ("write_done_o", be_write_done[-1]),
+                ("port_ready_o", be_port_ready[-1]),
                 # Backend Cache -> Memory
-                ("address_0_i", be_address[-1]),
-                ("address_valid_0_i", be_address_valid[-1]),
-                ("write_data_0_i", be_write_data[-1]),
-                ("write_data_valid_0_i", be_write_data_valid[-1]),
-                ("read_write_select_0_i", be_read_write_select[-1]),
+                ("address_i", be_address[-1]),
+                ("address_valid_i", be_address_valid[-1]),
+                ("write_data_i", be_write_data[-1]),
+                ("write_data_valid_i", be_write_data_valid[-1]),
+                ("read_write_select_i", be_read_write_select[-1]),
             ),
         )
         return m
