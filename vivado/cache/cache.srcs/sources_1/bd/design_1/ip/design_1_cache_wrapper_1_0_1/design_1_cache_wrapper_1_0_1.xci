@@ -4,7 +4,7 @@
     "xci_name": "design_1_cache_wrapper_1_0_1",
     "cell_name": "cache_wrapper_1_0",
     "component_reference": "user.org:user:cache_wrapper_1:1.1",
-    "ip_revision": "7",
+    "ip_revision": "8",
     "gen_directory": "../../../../../../cache.gen/sources_1/bd/design_1/ip/design_1_cache_wrapper_1_0_1",
     "parameters": {
       "component_parameters": {
@@ -33,7 +33,7 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Integrator" } ],
-        "IPREVISION": [ { "value": "7" } ],
+        "IPREVISION": [ { "value": "8" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../../../cache.gen/sources_1/bd/design_1/ip/design_1_cache_wrapper_1_0_1" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
@@ -44,6 +44,8 @@
     },
     "boundary": {
       "ports": {
+        "s00_axi_aclk": [ { "direction": "in" } ],
+        "s00_axi_aresetn": [ { "direction": "in" } ],
         "s00_axi_awaddr": [ { "direction": "in", "size_left": "5", "size_right": "0" } ],
         "s00_axi_awprot": [ { "direction": "in", "size_left": "2", "size_right": "0" } ],
         "s00_axi_awvalid": [ { "direction": "in" } ],
@@ -62,9 +64,7 @@
         "s00_axi_rdata": [ { "direction": "out", "size_left": "31", "size_right": "0" } ],
         "s00_axi_rresp": [ { "direction": "out", "size_left": "1", "size_right": "0" } ],
         "s00_axi_rvalid": [ { "direction": "out" } ],
-        "s00_axi_rready": [ { "direction": "in" } ],
-        "s00_axi_aclk": [ { "direction": "in" } ],
-        "s00_axi_aresetn": [ { "direction": "in" } ]
+        "s00_axi_rready": [ { "direction": "in" } ]
       },
       "interfaces": {
         "S00_AXI": {
