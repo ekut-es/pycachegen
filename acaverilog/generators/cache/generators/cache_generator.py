@@ -166,7 +166,9 @@ class CacheGenerator:
 
     def generate_module(self) -> Module:
         self.validate_latencies()
-        print(f"{self.PREFIX} min latencies (hit/miss): {self.get_min_worst_case_latencies()}")
+        print(
+            f"{self.PREFIX} min latencies (hit/miss): {self.get_min_worst_case_latencies()}"
+        )
         # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
@@ -313,7 +315,9 @@ class CacheGenerator:
             Submodule(
                 m,
                 PriorityEncoderGenerator(
-                    width_unencoded=self.NUM_SETS, prefix=self.PREFIX, prioritize_msb=False
+                    width_unencoded=self.NUM_SETS,
+                    prefix=self.PREFIX,
+                    prioritize_msb=False,
                 ).generate_module(),
                 f"{self.PREFIX}flush_priority_encoder",
                 arg_ports=(
@@ -372,7 +376,10 @@ class CacheGenerator:
                     ("replace_i", repl_pol_replace),
                     ("block_index_i", repl_pol_block_index),
                     ("set_index_i", address_index),
-                    ("next_replacement_o", next_replacements),
+                    *[
+                        (f"next_replacement_{i}_o", next_replacements[i])
+                        for i in range(self.NUM_SETS)
+                    ],
                 ),
             )
 
@@ -453,7 +460,9 @@ class CacheGenerator:
                         state_reg(States.FLUSH_COMPUTE_NEXT.value),
                     ).Elif(
                         OrList(
-                            AndList(fe_read_write_select_i == 0, fe_address_valid_i == 1),
+                            AndList(
+                                fe_read_write_select_i == 0, fe_address_valid_i == 1
+                            ),
                             AndList(
                                 fe_read_write_select_i == 1,
                                 fe_write_data_valid_i == 1,
@@ -528,7 +537,9 @@ class CacheGenerator:
                         ).Else(
                             # read
                             fe_read_data_o_reg(
-                                data_memory[hit_index][address_index][address_word_offset]
+                                data_memory[hit_index][address_index][
+                                    address_word_offset
+                                ]
                             ),
                             state_reg(States.STALL.value),
                         ),
@@ -546,7 +557,9 @@ class CacheGenerator:
                             # We have to replace a block
                             # Update valid and dirty bits and the tag
                             valid_memory[next_block_replacement][address_index](1),
-                            tag_memory[next_block_replacement][address_index](address_tag),
+                            tag_memory[next_block_replacement][address_index](
+                                address_tag
+                            ),
                             (
                                 # mark dirty if write, else remove dirty bit
                                 dirty_memory[next_block_replacement][address_index](
@@ -569,7 +582,8 @@ class CacheGenerator:
                                 And(
                                     dirty_memory[next_block_replacement][address_index],
                                     Or(
-                                        Not(fe_read_write_select_i_reg), self.WRITE_ALLOCATE
+                                        Not(fe_read_write_select_i_reg),
+                                        self.WRITE_ALLOCATE,
                                     ),
                                 )
                                 if self.WRITE_BACK
@@ -583,15 +597,21 @@ class CacheGenerator:
                                     write_back_address_index(address_index),
                                     write_back_block_index(next_block_replacement),
                                     write_back_tag(
-                                        tag_memory[next_block_replacement][address_index]
+                                        tag_memory[next_block_replacement][
+                                            address_index
+                                        ]
                                     ),
                                     If(
                                         Or(
                                             Not(fe_read_write_select_i_reg),
                                             self.BLOCK_SIZE > 1,
                                         )
-                                    )(write_back_next_state(States.READ_BLOCK.value)).Else(
-                                        write_back_next_state(States.READ_BLOCK_DONE.value)
+                                    )(
+                                        write_back_next_state(States.READ_BLOCK.value)
+                                    ).Else(
+                                        write_back_next_state(
+                                            States.READ_BLOCK_DONE.value
+                                        )
                                     ),
                                 ]
                                 if self.WRITE_BACK
@@ -599,7 +619,10 @@ class CacheGenerator:
                             ).Else(
                                 # No write-back needed
                                 If(
-                                    Or(Not(fe_read_write_select_i_reg), self.BLOCK_SIZE > 1)
+                                    Or(
+                                        Not(fe_read_write_select_i_reg),
+                                        self.BLOCK_SIZE > 1,
+                                    )
                                 )(
                                     # Read the block from the next level memory
                                     state_reg(States.READ_BLOCK.value)
@@ -633,7 +656,8 @@ class CacheGenerator:
                         ),
                         (
                             be_address_o_reg[
-                                self.WORD_OFFSET_W : self.INDEX_WIDTH + self.WORD_OFFSET_W
+                                self.WORD_OFFSET_W : self.INDEX_WIDTH
+                                + self.WORD_OFFSET_W
                             ](write_back_address_index)
                             if self.NUM_SETS > 1
                             else []
@@ -694,12 +718,18 @@ class CacheGenerator:
                 .Elif(state_reg == States.READ_BLOCK.value)(
                     latency_counter.inc(),
                     # Stop updating the replacement policy
-                    [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
+                    (
+                        [repl_pol_access(0), repl_pol_replace(0)]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
                     be_address_o_reg(fe_address_i_reg),
                     # prepare memory request
                     (
                         [
-                            be_address_o_reg[: self.WORD_OFFSET_W](read_block_word_offset),
+                            be_address_o_reg[: self.WORD_OFFSET_W](
+                                read_block_word_offset
+                            ),
                             read_block_word_offset.inc(),  # increment block offset
                         ]
                         if self.BLOCK_SIZE > 1
@@ -736,7 +766,11 @@ class CacheGenerator:
                 .Elif(state_reg == States.READ_BLOCK_DONE.value)(
                     latency_counter.inc(),
                     # Stop updating the replacement policy
-                    [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
+                    (
+                        [repl_pol_access(0), repl_pol_replace(0)]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
                     If(fe_read_write_select_i_reg)(
                         # fe write request, write to the cache
                         data_memory[next_block_replacement][address_index][
@@ -769,10 +803,16 @@ class CacheGenerator:
                 )
                 .Elif(state_reg == States.STALL.value)(
                     # Stop updating the replacement policy
-                    [repl_pol_access(0), repl_pol_replace(0)] if self.NUM_WAYS > 1 else [],
+                    (
+                        [repl_pol_access(0), repl_pol_replace(0)]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
                     If(
                         OrList(
-                            AndList(latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1),
+                            AndList(
+                                latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1
+                            ),
                             AndList(
                                 latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
                             ),
@@ -783,13 +823,13 @@ class CacheGenerator:
                         fe_write_done_o_reg(fe_read_write_select_i_reg),
                         hit_valid(0),
                         latency_counter(0),
-                        If(flush_i_reg)(state_reg(States.FLUSH_COMPUTE_NEXT.value)).Else(
-                            state_reg(States.READY.value)
-                        ),
+                        If(flush_i_reg)(
+                            state_reg(States.FLUSH_COMPUTE_NEXT.value)
+                        ).Else(state_reg(States.READY.value)),
                     ).Else(
                         # Stall for the remaining time (or error if this took too much time...?)
                         latency_counter.inc(),
-                    )
+                    ),
                 )
                 .Else(
                     If(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
@@ -818,7 +858,9 @@ class CacheGenerator:
                         write_back_next_state(States.FLUSH_COMPUTE_NEXT.value),
                         state_reg(States.WRITE_BACK_BLOCK.value),
                         # clear dirty bit
-                        dirty_memory[flush_current_block_index][flush_next_set_index](0),
+                        dirty_memory[flush_current_block_index][flush_next_set_index](
+                            0
+                        ),
                     )
                     if self.WRITE_BACK
                     else []
