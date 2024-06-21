@@ -140,7 +140,9 @@ class MemoryAccessArbiter:
             rr_priority = m.Reg("rr_priority", self.NUM_PORTS_CEILED_W)
             Submodule(
                 m,
-                DynamicPriorityEncoderGenerator(self.NUM_PORTS, "arbiter_", False).generate_module(),
+                DynamicPriorityEncoderGenerator(
+                    self.NUM_PORTS, "arbiter_", False
+                ).generate_module(),
                 "dynamic_arbiter_priority_encoder",
                 arg_ports=(
                     ("priority_i", rr_priority),
@@ -151,7 +153,9 @@ class MemoryAccessArbiter:
         else:
             Submodule(
                 m,
-                PriorityEncoderGenerator(self.NUM_PORTS, "arbiter_", False).generate_module(),
+                PriorityEncoderGenerator(
+                    self.NUM_PORTS, "arbiter_", False
+                ).generate_module(),
                 "arbiter_priority_encoder",
                 arg_ports=(
                     ("unencoded_i", buffered_request_valid),
@@ -175,6 +179,7 @@ class MemoryAccessArbiter:
                 be_address_valid(0),
                 be_write_data(0),
                 be_write_data_valid(0),
+                be_read_write_select(0),
                 # frontend buffers
                 [
                     (
@@ -191,6 +196,7 @@ class MemoryAccessArbiter:
                 # internal
                 state_reg(States.READY.value),
                 selected_request(0),
+                buffered_request_valid(0),
                 # fifo
                 (
                     [
@@ -201,6 +207,8 @@ class MemoryAccessArbiter:
                     if self.POLICY == "fifo"
                     else []
                 ),
+                # round robin
+                rr_priority(0) if self.POLICY == "round_robin" else [],
             ).Else(
                 # Always buffer new requests
                 [
