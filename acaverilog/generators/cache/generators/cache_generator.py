@@ -431,6 +431,7 @@ class CacheGenerator:
                         write_back_next_state(0),
                         write_back_tag(0),
                         write_back_word_offset(0),
+                        flush_current_block_index(0),
                         [
                             [
                                 dirty_memory[block_idx][set_idx](0)
