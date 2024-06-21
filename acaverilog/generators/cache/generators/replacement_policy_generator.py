@@ -43,15 +43,16 @@ class ReplacementPolicyGenerator:
         set_index_i = m.Input("set_index_i", max(1, self.NUM_SETS_W))
         block_index_i = m.Input("block_index_i", self.NUM_WAYS_W)
 
-        next_replacement_o = m.Output(
-            f"next_replacement_o", self.NUM_WAYS_W, dims=self.NUM_SETS
-        )
-
         next_replacement_o_reg = m.Reg(
             "next_replacement_o_reg", self.NUM_WAYS_W, dims=self.NUM_SETS
         )
 
-        m.Assign(next_replacement_o(next_replacement_o_reg))
+        next_replacement_o = []
+        for i in range(self.NUM_SETS):
+            next_replacement_o.append(
+                m.Output(f"next_replacement_{i}_o", self.NUM_WAYS_W)
+            )
+            m.Assign(next_replacement_o[i](next_replacement_o_reg[i]))
 
         if self.POLICY == "fifo":
             m.Always(Posedge(clk_i), Negedge(reset_n_i))(

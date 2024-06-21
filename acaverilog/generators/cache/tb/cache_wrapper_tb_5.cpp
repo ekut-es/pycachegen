@@ -6,7 +6,6 @@
 
 #include "Vcache_wrapper_5.h"
 
-// This testbench should be ignored for now, since the latencies are not fully decided yet.
 // Testbench for testing the minimal latency
 // data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
 // num_ways=1, num_sets=2,

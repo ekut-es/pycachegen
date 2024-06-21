@@ -27,7 +27,7 @@ class DynamicPriorityEncoderGenerator:
 
         priority_i = m.Input("priority_i", self.WIDTH_ENCODED)
         unencoded_i = m.Input("unencoded_i", self.WIDTH_UNENCODED)
-        encoded_o = m.OutputReg("encoded_o", self.WIDTH_ENCODED)
+        encoded_o = m.Output("encoded_o", self.WIDTH_ENCODED)
 
         # Add zero padding to the input signal to give it a length of a power of two
         zext_input = m.Wire("zext_input", self.WIDTH_UNENCODED_CEILED)
