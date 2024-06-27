@@ -183,5 +183,10 @@ vivado/cache/cache.tmp
 vivado/cache/cache.gen
 vivado/cache/cache.runs
 vivado/cache/cache.ip_user_files
+vivado/bram_cache/bram_cache.cache
+vivado/bram_cache/bram_cache.hw
+vivado/bram_cache/bram_cache.tmp
+vivado/bram_cache/bram_cache.gen
+vivado/bram_cache/bram_cache.runs
+vivado/bram_cache/bram_cache.ip_user_files
 *.xsa
-
