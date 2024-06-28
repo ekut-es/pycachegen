@@ -7,14 +7,16 @@
       "name": "design_1",
       "rev_ctrl_bd_flag": "RevCtrlBdOff",
       "synth_flow_mode": "Hierarchical",
-      "tool_version": "2023.2"
+      "tool_version": "2023.2",
+      "validated": "true"
     },
     "design_tree": {
       "zynq_ultra_ps_e_0": "",
       "axi_bram_ctrl_0_bram": "",
       "axi_smc": "",
       "rst_ps8_0_99M": "",
-      "axi_slave_bram_cache_0": ""
+      "axi_slave_bram_cache_0": "",
+      "axi_bram_ctrl_0": ""
     },
     "components": {
       "zynq_ultra_ps_e_0": {
@@ -1032,25 +1034,19 @@
         "inst_hier_path": "axi_bram_ctrl_0_bram",
         "parameters": {
           "Memory_Type": {
-            "value": "Single_Port_RAM"
+            "value": "True_Dual_Port_RAM"
           },
           "PRIM_type_to_Implement": {
             "value": "BRAM"
           },
-          "Use_Byte_Write_Enable": {
-            "value": "false"
-          },
           "Use_RSTA_Pin": {
-            "value": "false"
-          },
-          "Write_Depth_A": {
-            "value": "256"
+            "value": "true"
           },
           "Write_Width_A": {
             "value": "32"
           },
           "use_bram_block": {
-            "value": "Stand_Alone"
+            "value": "BRAM_Controller"
           }
         }
       },
@@ -1092,7 +1088,7 @@
             "vlnv": "xilinx.com:interface:aximm_rtl:1.0",
             "parameters": {
               "MAX_BURST_LENGTH": {
-                "value": "256"
+                "value": "1"
               },
               "NUM_READ_OUTSTANDING": {
                 "value": "8"
@@ -1123,7 +1119,7 @@
             "vlnv": "xilinx.com:interface:aximm_rtl:1.0",
             "parameters": {
               "MAX_BURST_LENGTH": {
-                "value": "1"
+                "value": "256"
               },
               "NUM_READ_OUTSTANDING": {
                 "value": "8"
@@ -1159,28 +1155,55 @@
       },
       "axi_slave_bram_cache_0": {
         "vlnv": "user.org:user:axi_slave_bram_cache:1.1",
-        "ip_revision": "4",
+        "ip_revision": "16",
         "xci_name": "design_1_axi_slave_bram_cache_0_1",
         "xci_path": "ip/design_1_axi_slave_bram_cache_0_1/design_1_axi_slave_bram_cache_0_1.xci",
         "inst_hier_path": "axi_slave_bram_cache_0",
         "parameters": {
+          "BRAM_ADDRESS_WIDTH": {
+            "value": "12"
+          },
           "BRAM_DATA_WIDTH": {
             "value": "32"
+          }
+        }
+      },
+      "axi_bram_ctrl_0": {
+        "vlnv": "xilinx.com:ip:axi_bram_ctrl:4.1",
+        "ip_revision": "9",
+        "xci_name": "design_1_axi_bram_ctrl_0_0",
+        "xci_path": "ip/design_1_axi_bram_ctrl_0_0/design_1_axi_bram_ctrl_0_0.xci",
+        "inst_hier_path": "axi_bram_ctrl_0",
+        "parameters": {
+          "SINGLE_PORT_BRAM": {
+            "value": "1"
           }
         }
       }
     },
     "interface_nets": {
+      "axi_bram_ctrl_0_BRAM_PORTA": {
+        "interface_ports": [
+          "axi_bram_ctrl_0_bram/BRAM_PORTA",
+          "axi_bram_ctrl_0/BRAM_PORTA"
+        ]
+      },
       "axi_slave_bram_cache_0_trace_bram": {
         "interface_ports": [
           "axi_slave_bram_cache_0/trace_bram",
-          "axi_bram_ctrl_0_bram/BRAM_PORTA"
+          "axi_bram_ctrl_0_bram/BRAM_PORTB"
         ]
       },
       "axi_smc_M00_AXI": {
         "interface_ports": [
           "axi_smc/M00_AXI",
           "axi_slave_bram_cache_0/S00_AXI"
+        ]
+      },
+      "axi_smc_M01_AXI": {
+        "interface_ports": [
+          "axi_smc/M01_AXI",
+          "axi_bram_ctrl_0/S_AXI"
         ]
       },
       "zynq_ultra_ps_e_0_M_AXI_HPM0_LPD": {
@@ -1195,6 +1218,7 @@
         "ports": [
           "rst_ps8_0_99M/peripheral_aresetn",
           "axi_smc/aresetn",
+          "axi_bram_ctrl_0/s_axi_aresetn",
           "axi_slave_bram_cache_0/s00_axi_aresetn"
         ]
       },
@@ -1204,6 +1228,7 @@
           "zynq_ultra_ps_e_0/maxihpm0_lpd_aclk",
           "axi_smc/aclk",
           "rst_ps8_0_99M/slowest_sync_clk",
+          "axi_bram_ctrl_0/s_axi_aclk",
           "axi_slave_bram_cache_0/s00_axi_aclk"
         ]
       },
@@ -1219,6 +1244,11 @@
         "address_spaces": {
           "Data": {
             "segments": {
+              "SEG_axi_bram_ctrl_0_Mem0": {
+                "address_block": "/axi_bram_ctrl_0/S_AXI/Mem0",
+                "offset": "0x0082000000",
+                "range": "4K"
+              },
               "SEG_axi_slave_bram_cache_0_S00_AXI_reg": {
                 "address_block": "/axi_slave_bram_cache_0/S00_AXI/S00_AXI_reg",
                 "offset": "0x0080000000",
