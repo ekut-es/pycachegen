@@ -4,7 +4,7 @@
     "xci_name": "design_1_axi_slave_bram_cache_0_1",
     "cell_name": "axi_slave_bram_cache_0",
     "component_reference": "user.org:user:axi_slave_bram_cache:1.1",
-    "ip_revision": "16",
+    "ip_revision": "19",
     "gen_directory": "../../../../../../bram_cache.gen/sources_1/bd/design_1/ip/design_1_axi_slave_bram_cache_0_1",
     "parameters": {
       "component_parameters": {
@@ -16,7 +16,8 @@
         "CACHE_DATA_WIDTH": [ { "value": "16", "resolve_type": "user", "format": "long", "usage": "all" } ],
         "CACHE_ADDRESS_WIDTH": [ { "value": "8", "resolve_type": "user", "format": "long", "usage": "all" } ],
         "BRAM_DATA_WIDTH": [ { "value": "32", "value_src": "user", "resolve_type": "user", "format": "long", "usage": "all" } ],
-        "BRAM_ADDRESS_WIDTH": [ { "value": "12", "value_src": "user", "resolve_type": "user", "format": "long", "usage": "all" } ]
+        "BRAM_ADDRESS_WIDTH": [ { "value": "12", "value_src": "user", "resolve_type": "user", "format": "long", "usage": "all" } ],
+        "BRAM_READ_LATENCY": [ { "value": "2", "resolve_type": "user", "format": "long", "usage": "all" } ]
       },
       "model_parameters": {
         "C_S00_AXI_DATA_WIDTH": [ { "value": "32", "resolve_type": "generated", "format": "long", "usage": "all" } ],
@@ -24,7 +25,8 @@
         "CACHE_DATA_WIDTH": [ { "value": "16", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "CACHE_ADDRESS_WIDTH": [ { "value": "8", "resolve_type": "generated", "format": "long", "usage": "all" } ],
         "BRAM_DATA_WIDTH": [ { "value": "32", "resolve_type": "generated", "format": "long", "usage": "all" } ],
-        "BRAM_ADDRESS_WIDTH": [ { "value": "12", "resolve_type": "generated", "format": "long", "usage": "all" } ]
+        "BRAM_ADDRESS_WIDTH": [ { "value": "12", "resolve_type": "generated", "format": "long", "usage": "all" } ],
+        "BRAM_READ_LATENCY": [ { "value": "2", "resolve_type": "generated", "format": "long", "usage": "all" } ]
       },
       "project_parameters": {
         "ARCHITECTURE": [ { "value": "zynquplus" } ],
@@ -41,7 +43,7 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Integrator" } ],
-        "IPREVISION": [ { "value": "16" } ],
+        "IPREVISION": [ { "value": "19" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../../../bram_cache.gen/sources_1/bd/design_1/ip/design_1_axi_slave_bram_cache_0_1" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],

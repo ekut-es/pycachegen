@@ -6,8 +6,9 @@
 		// Users to add parameters here
         parameter integer CACHE_DATA_WIDTH = 16,
         parameter integer CACHE_ADDRESS_WIDTH = 8,
-        parameter integer BRAM_DATA_WIDTH = 16,
+        parameter integer BRAM_DATA_WIDTH = 32,
         parameter integer BRAM_ADDRESS_WIDTH = 8,
+        parameter integer BRAM_READ_LATENCY = 2,
 		// User parameters ends
 		// Do not modify the parameters beyond this line
 

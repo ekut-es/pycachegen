@@ -6,8 +6,9 @@
 		// Users to add parameters here,
         parameter integer CACHE_DATA_WIDTH = 16,
         parameter integer CACHE_ADDRESS_WIDTH = 8,
-        parameter integer BRAM_DATA_WIDTH = 16,
+        parameter integer BRAM_DATA_WIDTH = 32,
         parameter integer BRAM_ADDRESS_WIDTH = 8,
+        parameter integer BRAM_READ_LATENCY = 2,
 		// User parameters ends
 		// Do not modify the parameters beyond this line
 
@@ -448,13 +449,13 @@
     wire cache_port_ready;
 	wire cache_hit;
     
-    // Signals for interacting with the BRAM
-    reg trace_execution_in_progress; // whether we are currently processing the trace
+    // State of the trace
     reg[C_S_AXI_DATA_WIDTH-1 : 0] trace_index; // the index (not the address) of the current instruction
     reg[C_S_AXI_DATA_WIDTH-1 : 0] trace_length; // the number of instructions in the trace
-    reg cache_stall; // the cache tells us when it is ready again but we need to stall for one cycle so it can frist register the request
-    reg[1:0] bram_stall; // the bram apparently needs exactly two cycles to process a read request so we need to stall
-    reg bram_req_sent; // we need to know if we already sent a request to the bram or not
+    reg[$clog2(BRAM_READ_LATENCY+1)-1 : 0] bram_stall; // time for stalling until the bram is done
+    reg[2:0] trace_state;   // 0: not started, 1: send bram request, 2: stall for bram/wait for cache/send trace instruction to cache
+                            // 3: wait for cache to process the last instruction
+                            
     always @(posedge S_AXI_ACLK, negedge S_AXI_ARESETN) begin
         if (S_AXI_ARESETN == 0) begin
             cache_address <= 0;
@@ -462,16 +463,14 @@
             cache_write_data <= 0;
             cache_write_data_valid <= 0;
             cache_read_write_select <= 0;
-            trace_execution_in_progress <= 0;
             bram_enable <= 0;
-            bram_req_sent <= 0;
-            bram_stall <= 0;
             bram_address <= 0;
             bram_write_data <= 0;
             trace_index <= 0;
             trace_length <= 0;
-            cache_stall <= 0;
             cache_flush <= 0;
+            trace_state <= 0;
+            bram_stall <= 0;
             slv_reg4 <= 0;
             slv_reg5 <= 0;
             slv_reg6 <= 0;
@@ -480,60 +479,58 @@
             // write cache outputs to the slave registers so we can at least see something
             slv_reg5 <= {28'b0, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
             slv_reg6 <= {{CACHE_DATA_WIDTH{1'b0}}, cache_read_data};
-            if (trace_execution_in_progress == 1'b1) begin
-                // we are currently processing the trace
-                if (cache_stall == 1'b1) begin
-                    // stall one cycle because we just sent a request to the cache.
-                    // Invalidate the request sent to the cache.
-                    cache_address_valid <= 0;
-                    cache_write_data_valid <= 0;
-                    cache_stall <= 1'b0;
-                end else if (cache_port_ready == 1'b1) begin
-                    if (trace_index == trace_length) begin
-                        // trace is finished
-                        slv_reg7 <= 1;
-                        trace_execution_in_progress <= 1'b0;
-                    end else if (bram_req_sent == 1) begin
-                        // request to BRAM was sent already
-                        if (bram_stall == 0) begin
-                            // BRAM should be done and read data should be valid
-                            bram_req_sent <= 0;
-                            // send request to cache
-                            cache_read_write_select <= bram_read_data[0];
-                            cache_write_data_valid <= bram_read_data[0];
-                            cache_address_valid <= 1'b1;
-                            cache_address <= bram_read_data[CACHE_ADDRESS_WIDTH : 1];
-                            cache_write_data <= bram_read_data[CACHE_DATA_WIDTH + CACHE_ADDRESS_WIDTH : CACHE_ADDRESS_WIDTH+1];
-                            cache_stall <= 1'b1;
-                        end else begin
-                            // BRAM still needs some time
-                            bram_enable <= 1'b0;
-                            bram_stall <= bram_stall - 1;
-                        end
-                    end else begin
-                        // send a new request to the bram
-                        // Each byte must be 8 bits and word size (BRAM_DATA_WIDTH) must be a power of two
-                        bram_address <= {trace_index[BRAM_ADDRESS_WIDTH-$clog2(BRAM_DATA_WIDTH / 8)-1:0], {$clog2(BRAM_DATA_WIDTH / 8){1'b0}}};
-                        bram_enable <= 1'b1;
-                        trace_index <= trace_index + 1;
-                        bram_stall <= 2;
-                        bram_req_sent <= 1;
-                    end
+            if (trace_state == 0) begin
+                // not currently processing the trace
+                if (slv_reg3 != 0) begin
+                    // start processing the trace
+                    trace_state <= 1;
+                    trace_index <= 0;
+                    trace_length <= slv_reg3;
+                    slv_reg7 <= 0; // reset trace_done
+                end else begin
+                    // just pass on normal requests to the cache
+                    cache_address_valid <= slv_reg0[0];
+                    cache_write_data_valid <= slv_reg0[1];
+                    cache_read_write_select <= slv_reg0[2];
+                    cache_flush <= slv_reg0[3];
+                    cache_address <= slv_reg1[CACHE_ADDRESS_WIDTH-1 : 0];
+                    cache_write_data <= slv_reg2[CACHE_DATA_WIDTH-1 : 0];
                 end
-            end else if (slv_reg3 != 0) begin
-                // a trace execution is requested
-                trace_length <= slv_reg3;
-                trace_execution_in_progress <= 1'b1;
-                slv_reg7 <= 0;
-            end else begin
-                // just pass on normal requests to the cache
-                cache_address_valid <= slv_reg0[0];
-                cache_write_data_valid <= slv_reg0[1];
-                cache_read_write_select <= slv_reg0[2];
-                cache_flush <= slv_reg0[3];
-                cache_address <= slv_reg1[CACHE_ADDRESS_WIDTH-1 : 0];
-                cache_write_data <= slv_reg2[CACHE_DATA_WIDTH-1 : 0];     
-            end     
+            end else if (trace_state == 1) begin
+                cache_address_valid <= 0;    // invalidate request to cache that we might have sent if
+                cache_write_data_valid <= 0; // this is not the first instruction we're currently processing
+                if (trace_index < trace_length) begin
+                    // send a new request to the bram
+                    // Each byte must be 8 bits and word size (BRAM_DATA_WIDTH) must be a power of two
+                    bram_address <= {trace_index[BRAM_ADDRESS_WIDTH-$clog2(BRAM_DATA_WIDTH / 8)-1:0], {$clog2(BRAM_DATA_WIDTH / 8){1'b0}}};
+                    bram_enable <= 1'b1;
+                    trace_index <= trace_index + 1;
+                    trace_state <= 2;
+                    bram_stall <= BRAM_READ_LATENCY + 1; // + 1 so the bram can accept the request?
+                end else begin
+                    // this was the final instruction. Waste one cycle so the cache can accept the request.
+                    trace_state <= 3;
+                end
+            end else if (trace_state == 2) begin
+                if (bram_stall != 0) begin
+                    // stall until the bram has processed the request. Should be 2 cycles.
+                    bram_stall <= bram_stall - 1;
+                end else if (cache_port_ready == 1) begin
+                    // bram is done, send request to cache as soon as it becomes ready
+                    cache_read_write_select <= bram_read_data[0];
+                    cache_write_data_valid <= bram_read_data[0];
+                    cache_address_valid <= 1'b1;
+                    cache_address <= bram_read_data[CACHE_ADDRESS_WIDTH : 1];
+                    cache_write_data <= bram_read_data[CACHE_DATA_WIDTH + CACHE_ADDRESS_WIDTH : CACHE_ADDRESS_WIDTH+1];
+                    trace_state <= 1; // fetch the next instruction
+                end
+            end else if (trace_state == 3) begin
+                if (cache_port_ready == 1) begin
+                    // cache is done with the last instruction
+                    trace_state <= 0;
+                    slv_reg7 <= 1; // set trace_done
+                end
+            end
         end     
     end
     
