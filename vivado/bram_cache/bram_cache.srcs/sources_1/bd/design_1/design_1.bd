@@ -7,12 +7,11 @@
       "name": "design_1",
       "rev_ctrl_bd_flag": "RevCtrlBdOff",
       "synth_flow_mode": "Hierarchical",
-      "tool_version": "2023.2",
-      "validated": "true"
+      "tool_version": "2023.2"
     },
     "design_tree": {
       "zynq_ultra_ps_e_0": "",
-      "axi_bram_ctrl_0_bram": "",
+      "trace_bram": "",
       "axi_smc": "",
       "rst_ps8_0_99M": "",
       "axi_slave_bram_cache_0": "",
@@ -1026,12 +1025,12 @@
           }
         }
       },
-      "axi_bram_ctrl_0_bram": {
+      "trace_bram": {
         "vlnv": "xilinx.com:ip:blk_mem_gen:8.4",
         "ip_revision": "7",
         "xci_name": "design_1_axi_bram_ctrl_0_bram_0",
         "xci_path": "ip/design_1_axi_bram_ctrl_0_bram_0/design_1_axi_bram_ctrl_0_bram_0.xci",
-        "inst_hier_path": "axi_bram_ctrl_0_bram",
+        "inst_hier_path": "trace_bram",
         "parameters": {
           "Memory_Type": {
             "value": "True_Dual_Port_RAM"
@@ -1155,7 +1154,7 @@
       },
       "axi_slave_bram_cache_0": {
         "vlnv": "user.org:user:axi_slave_bram_cache:1.1",
-        "ip_revision": "19",
+        "ip_revision": "20",
         "xci_name": "design_1_axi_slave_bram_cache_0_1",
         "xci_path": "ip/design_1_axi_slave_bram_cache_0_1/design_1_axi_slave_bram_cache_0_1.xci",
         "inst_hier_path": "axi_slave_bram_cache_0",
@@ -1184,14 +1183,14 @@
     "interface_nets": {
       "axi_bram_ctrl_0_BRAM_PORTA": {
         "interface_ports": [
-          "axi_bram_ctrl_0_bram/BRAM_PORTA",
+          "trace_bram/BRAM_PORTA",
           "axi_bram_ctrl_0/BRAM_PORTA"
         ]
       },
       "axi_slave_bram_cache_0_trace_bram": {
         "interface_ports": [
           "axi_slave_bram_cache_0/trace_bram",
-          "axi_bram_ctrl_0_bram/BRAM_PORTB"
+          "trace_bram/BRAM_PORTB"
         ]
       },
       "axi_smc_M00_AXI": {

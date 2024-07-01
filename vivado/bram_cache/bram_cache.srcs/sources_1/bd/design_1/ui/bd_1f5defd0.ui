@@ -6,7 +6,7 @@
    "guistr":"# # String gsaved with Nlview 7.5.8 2022-09-21 7111 VDI=41 GEI=38 GUI=JA:10.0 TLS
 #  -string -flagsOSRD
 preplace inst zynq_ultra_ps_e_0 -pg 1 -lvl 1 -x 330 -y 100 -defaultsOSRD
-preplace inst axi_bram_ctrl_0_bram -pg 1 -lvl 4 -x 1380 -y 70 -defaultsOSRD
+preplace inst trace_bram -pg 1 -lvl 4 -x 1380 -y 70 -defaultsOSRD
 preplace inst axi_smc -pg 1 -lvl 2 -x 800 -y 100 -defaultsOSRD
 preplace inst rst_ps8_0_99M -pg 1 -lvl 1 -x 330 -y 310 -defaultsOSRD
 preplace inst axi_slave_bram_cache_0 -pg 1 -lvl 3 -x 1110 -y 220 -defaultsOSRD

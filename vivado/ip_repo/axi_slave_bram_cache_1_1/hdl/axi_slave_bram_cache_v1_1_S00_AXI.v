@@ -453,8 +453,9 @@
     reg[C_S_AXI_DATA_WIDTH-1 : 0] trace_index; // the index (not the address) of the current instruction
     reg[C_S_AXI_DATA_WIDTH-1 : 0] trace_length; // the number of instructions in the trace
     reg[$clog2(BRAM_READ_LATENCY+1)-1 : 0] bram_stall; // time for stalling until the bram is done
-    reg[2:0] trace_state;   // 0: not started, 1: send bram request, 2: stall for bram/wait for cache/send trace instruction to cache
+    reg[2 : 0] trace_state;   // 0: not started, 1: send bram request, 2: stall for bram/wait for cache/send trace instruction to cache
                             // 3: wait for cache to process the last instruction
+    reg[64-1 : 0] latency_counter; // total time spent waiting for the cache
                             
     always @(posedge S_AXI_ACLK, negedge S_AXI_ARESETN) begin
         if (S_AXI_ARESETN == 0) begin
@@ -471,6 +472,7 @@
             cache_flush <= 0;
             trace_state <= 0;
             bram_stall <= 0;
+            latency_counter <= 0;
             slv_reg4 <= 0;
             slv_reg5 <= 0;
             slv_reg6 <= 0;
@@ -499,6 +501,11 @@
             end else if (trace_state == 1) begin
                 cache_address_valid <= 0;    // invalidate request to cache that we might have sent if
                 cache_write_data_valid <= 0; // this is not the first instruction we're currently processing
+                if (trace_index != 0) begin
+                    // increment latency counter, unless we haven't even sent a request yet.
+                    // every cache needs at least one cycle, so we don't need to check if it is done yet.
+                    latency_counter <= latency_counter + 1; 
+                end
                 if (trace_index < trace_length) begin
                     // send a new request to the bram
                     // Each byte must be 8 bits and word size (BRAM_DATA_WIDTH) must be a power of two
@@ -512,6 +519,10 @@
                     trace_state <= 3;
                 end
             end else if (trace_state == 2) begin
+                if (cache_port_ready != 1) begin
+                    // increment latency
+                    latency_counter <= latency_counter + 1;
+                end
                 if (bram_stall != 0) begin
                     // stall until the bram has processed the request. Should be 2 cycles.
                     bram_stall <= bram_stall - 1;
@@ -529,6 +540,8 @@
                     // cache is done with the last instruction
                     trace_state <= 0;
                     slv_reg7 <= 1; // set trace_done
+                end else begin
+                    latency_counter <= latency_counter + 1;
                 end
             end
         end     
