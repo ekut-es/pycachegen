@@ -437,7 +437,7 @@
 	// slv_reg6: hit, rdata_valid, w_done, p_ready
 	// slv_reg7: trace done
 	
-	// Trace structure: one instruction/request per word in the format of {write data, address, write_enable}
+	// Trace structure: one instruction/request per word in the format of {write_enable, (padding), write data, address}
 	// If write_enable is 0, the request is a read request, else it is a write request
 
 	// do some assignments to signals that are currently static
@@ -497,11 +497,12 @@
             slv_reg6 <= {{CACHE_DATA_WIDTH{1'b0}}, cache_read_data};
             if (trace_state == 0) begin
                 // not currently processing the trace
-                if (slv_reg3 != 0) begin
+                trace_length <= slv_reg3; // always accept the new length
+                if (slv_reg3 != 0 && slv_reg3 != trace_length) begin
                     // start processing the trace
+                    // input trace length (slv_reg3) must be not 0 and not the previous length so we don't repeat the trace accidentally
                     trace_state <= 1;
                     trace_index <= 0;
-                    trace_length <= slv_reg3;
                     slv_reg7 <= 0; // reset trace_done
                 end else begin
                     // just pass on normal requests to the cache
@@ -542,11 +543,11 @@
                     bram_stall <= bram_stall - 1;
                 end else if (cache_port_ready == 1) begin
                     // bram is done, send request to cache as soon as it becomes ready
-                    cache_read_write_select <= trace_bram_read_data[0];
-                    cache_write_data_valid <= trace_bram_read_data[0];
+                    cache_read_write_select <= trace_bram_read_data[TRACE_BRAM_DATA_WIDTH-1];
+                    cache_write_data_valid <= trace_bram_read_data[TRACE_BRAM_DATA_WIDTH-1];
                     cache_address_valid <= 1'b1;
-                    cache_address <= trace_bram_read_data[CACHE_ADDRESS_WIDTH : 1];
-                    cache_write_data <= trace_bram_read_data[CACHE_DATA_WIDTH + CACHE_ADDRESS_WIDTH : CACHE_ADDRESS_WIDTH+1];
+                    cache_address <= trace_bram_read_data[CACHE_ADDRESS_WIDTH-1 : 0];
+                    cache_write_data <= trace_bram_read_data[CACHE_DATA_WIDTH + CACHE_ADDRESS_WIDTH - 1 : CACHE_ADDRESS_WIDTH];
                     trace_state <= 1; // fetch the next instruction
                 end
             end else if (trace_state == 3) begin

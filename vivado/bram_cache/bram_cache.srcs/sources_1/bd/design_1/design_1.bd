@@ -1038,9 +1038,6 @@
           "Memory_Type": {
             "value": "True_Dual_Port_RAM"
           },
-          "PRIM_type_to_Implement": {
-            "value": "BRAM"
-          },
           "Use_RSTA_Pin": {
             "value": "true"
           },
@@ -1189,10 +1186,15 @@
       },
       "axi_slave_bram_cache_0": {
         "vlnv": "user.org:user:axi_slave_bram_cache:1.1",
-        "ip_revision": "28",
+        "ip_revision": "30",
         "xci_name": "design_1_axi_slave_bram_cache_0_1",
         "xci_path": "ip/design_1_axi_slave_bram_cache_0_1/design_1_axi_slave_bram_cache_0_1.xci",
-        "inst_hier_path": "axi_slave_bram_cache_0"
+        "inst_hier_path": "axi_slave_bram_cache_0",
+        "parameters": {
+          "STATS_BRAM_DATA_WIDTH": {
+            "value": "32"
+          }
+        }
       },
       "axi_bram_ctrl_trace": {
         "vlnv": "xilinx.com:ip:axi_bram_ctrl:4.1",
@@ -1214,7 +1216,7 @@
         "inst_hier_path": "axi_bram_ctrl_stats",
         "parameters": {
           "DATA_WIDTH": {
-            "value": "64"
+            "value": "32"
           },
           "SINGLE_PORT_BRAM": {
             "value": "1"
