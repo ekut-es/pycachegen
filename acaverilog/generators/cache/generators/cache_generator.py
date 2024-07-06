@@ -65,12 +65,14 @@ class CacheGenerator:
         write_allocate: bool,
         block_size: int,
         prefix: str,
+        be_data_width: int,
+        be_address_width: int,
     ) -> None:
         """Cache Generator.
 
         Args:
             data_width (int): Width of one data word in bits.
-            address_width (int): Width of the addresses in bits.
+            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
@@ -80,6 +82,9 @@ class CacheGenerator:
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
             prefix (str): Prefix to be used for this module's name
+            be_data_width (int): Data width of the next level cache in bits.
+            be_address_width (int): Address width of the next level cache.
+
         """
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
@@ -92,6 +97,8 @@ class CacheGenerator:
         self.WRITE_ALLOCATE = write_allocate
         self.BLOCK_SIZE = block_size
         self.PREFIX = prefix
+        self.BE_DATA_WIDTH = be_data_width
+        self.BE_ADDRESS_WIDTH = be_address_width
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -101,6 +108,10 @@ class CacheGenerator:
         self.WORD_OFFSET_W = int(log2(self.BLOCK_SIZE))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH - self.WORD_OFFSET_W
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
+        self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // 8))
+        self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // 8))
+        self.BYTES_PER_WORD = self.DATA_WIDTH / 8
+        self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH / 8
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -181,6 +192,7 @@ class CacheGenerator:
         fe_write_data_i = m.Input("fe_write_data_i", self.DATA_WIDTH)
         fe_write_data_valid_i = m.Input("fe_write_data_valid_i")
         fe_read_write_select_i = m.Input("fe_read_write_select_i")
+        fe_write_strobe_i = m.Input("fe_write_strobe_i", self.BYTES_PER_WORD)
 
         # Front End Outputs
         fe_read_data_o = m.Output("fe_read_data_o", self.DATA_WIDTH)
@@ -190,23 +202,25 @@ class CacheGenerator:
         fe_hit_o = m.Output("fe_hit_o")
 
         # Back End Inputs
-        be_read_data_i = m.Input("be_read_data_i", self.DATA_WIDTH)
+        be_read_data_i = m.Input("be_read_data_i", self.BE_DATA_WIDTH)
         be_read_data_valid_i = m.Input("be_read_data_valid_i")
         be_write_done_i = m.Input("be_write_done_i")
         be_port_ready_i = m.Input("be_port_ready_i")
 
         # Back End Outputs
-        be_address_o = m.Output("be_address_o", self.ADDRESS_WIDTH)
+        be_address_o = m.Output("be_address_o", self.BE_ADDRESS_WIDTH)
         be_address_valid_o = m.Output("be_address_valid_o")
-        be_write_data_o = m.Output("be_write_data_o", self.DATA_WIDTH)
+        be_write_data_o = m.Output("be_write_data_o", self.BE_DATA_WIDTH)
         be_write_data_valid_o = m.Output("be_write_data_valid_o")
         be_read_write_select_o = m.Output("be_read_write_select_o")
+        be_write_strobe_o = m.Output("be_write_strobe_o", self.BE_BYTES_PER_WORD)
 
         # Front End Input Buffers
         flush_i_reg = m.Reg("flush_i_reg")
         fe_address_i_reg = m.Reg("fe_address_i_reg", self.ADDRESS_WIDTH)
         fe_write_data_i_reg = m.Reg("fe_write_data_i_reg", self.DATA_WIDTH)
         fe_read_write_select_i_reg = m.Reg("fe_read_write_select_i_reg")
+        fe_write_strobe_i_reg = m.Reg("fe_write_strobe_i_reg", self.BYTES_PER_WORD)
 
         # Front End Output Buffers
         fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
@@ -214,11 +228,14 @@ class CacheGenerator:
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
 
         # Back End Output Buffers
-        be_address_o_reg = m.Reg("be_address_o_reg", self.ADDRESS_WIDTH)
+        be_address_o_reg = m.Reg(
+            "be_address_o_reg", self.ADDRESS_WIDTH
+        )  # Make this have the caches own width and then just cut something off later, much easier
         be_address_valid_o_reg = m.Reg("be_address_valid_o_reg")
         be_write_data_o_reg = m.Reg("be_write_data_o_reg", self.DATA_WIDTH)
         be_write_data_valid_o_reg = m.Reg("be_write_data_valid_o_reg")
         be_read_write_select_o_reg = m.Reg("be_read_write_select_o_reg")
+        be_write_strobe_o_reg = m.Reg("be_write_strobe_o_reg", self.BYTES_PER_WORD)
 
         # Frontend Output Buffer Assignments
         m.Assign(fe_read_data_o(fe_read_data_o_reg))
@@ -226,9 +243,46 @@ class CacheGenerator:
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
 
         # Backend Output Buffer Assignments
-        m.Assign(be_address_o(be_address_o_reg))
+        m.Assign(
+            be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :])
+        )  # cut off what the next cache doesn't want
         m.Assign(be_address_valid_o(be_address_valid_o_reg))
-        m.Assign(be_write_data_o(be_write_data_o_reg))
+        # shift the output data into position
+        m.Assign(
+            be_write_data_o[
+                : self.DATA_WIDTH * be_address_o_reg[-self.BE_ADDRESS_WIDTH :]
+            ](0)
+        )
+        m.Assign(
+            be_write_data_o[
+                self.DATA_WIDTH * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1) :
+            ](0)
+        )
+        m.Assign(
+            be_write_data_o[
+                self.DATA_WIDTH
+                * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] : self.DATA_WIDTH
+                * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1)
+            ](be_write_data_o_reg)
+        )
+        # Also shift the write strobe in basically the same way
+        m.Assign(
+            be_write_strobe_o[
+                : self.BYTES_PER_WORD * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] :
+            ](0)
+        )
+        m.Assign(
+            be_write_strobe_o[
+                self.DATA_WIDTH * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1) :
+            ](0)
+        )
+        m.Assign(
+            be_write_strobe_o[
+                self.BYTES_PER_WORD
+                * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] : self.DATA_WIDTH
+                * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1)
+            ](be_write_strobe_o_reg)
+        )
         m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
         m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
@@ -253,6 +307,7 @@ class CacheGenerator:
         address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
         address_index = m.Wire("address_index", max(1, self.INDEX_WIDTH))
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
+        resized_be_read_data = m.Wire("resized_be_read_data", self.DATA_WIDTH)
         if self.BLOCK_SIZE == 1:
             m.Assign(address_word_offset(0))
         else:
@@ -268,6 +323,20 @@ class CacheGenerator:
                 )
             )
         m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
+        m.Assign(
+            resized_be_read_data(
+                be_read_data_i[
+                    self.DATA_WIDTH
+                    * be_address_o_reg[
+                        : self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH
+                    ] : self.DATA_WIDTH
+                    * (
+                        be_address_o_reg[: self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH]
+                        + 1
+                    )
+                ]
+            )
+        )
 
         # Memories
         tag_memory = m.Reg(
@@ -391,6 +460,7 @@ class CacheGenerator:
                 fe_address_i_reg(0),
                 fe_write_data_i_reg(0),
                 fe_read_write_select_i_reg(0),
+                fe_write_strobe_i_reg(0),
                 # frontend output buffers
                 fe_read_data_o_reg(0),
                 fe_read_data_valid_o_reg(0),
@@ -401,6 +471,7 @@ class CacheGenerator:
                 be_write_data_o_reg(0),
                 be_write_data_valid_o_reg(0),
                 be_read_write_select_o_reg(0),
+                be_write_strobe_o_reg(0),
                 # internal registers
                 state_reg(States.READY.value),
                 latency_counter(0),
@@ -603,9 +674,10 @@ class CacheGenerator:
                                         ]
                                     ),
                                     If(
-                                        Or(
+                                        OrList(
                                             Not(fe_read_write_select_i_reg),
                                             self.BLOCK_SIZE > 1,
+                                            fe_write_strobe_i_reg + 1 == 0,
                                         )
                                     )(
                                         write_back_next_state(States.READ_BLOCK.value)
@@ -623,6 +695,7 @@ class CacheGenerator:
                                     Or(
                                         Not(fe_read_write_select_i_reg),
                                         self.BLOCK_SIZE > 1,
+                                        fe_write_strobe_i_reg + 1 == 0,
                                     )
                                 )(
                                     # Read the block from the next level memory
@@ -666,6 +739,7 @@ class CacheGenerator:
                         be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
                             write_back_tag
                         ),
+                        be_write_strobe_o_reg(2**self.DATA_WIDTH - 1),
                         be_read_write_select_o_reg(1),
                         be_write_data_o_reg(
                             data_memory[write_back_block_index][address_index][
@@ -705,6 +779,7 @@ class CacheGenerator:
                         state_reg(send_mem_request_next_state),
                         If(Not(be_read_write_select_o_reg))(
                             # if we just read something, write it to the cache
+                            # if we read stuff we always want to write back the whole word since the fe write request will be applied afterwards
                             data_memory[next_block_replacement][address_index][
                                 # figure out the correct block offset
                                 (
@@ -712,7 +787,7 @@ class CacheGenerator:
                                     if self.BLOCK_SIZE > 1
                                     else 0
                                 )
-                            ](be_read_data_i)
+                            ](resized_be_read_data)
                         ),
                     ),
                 )
@@ -724,7 +799,7 @@ class CacheGenerator:
                         if self.NUM_WAYS > 1
                         else []
                     ),
-                    be_address_o_reg(fe_address_i_reg),
+                    # be_address_o_reg(fe_address_i_reg), # This line is unnecessary and not so cool for synthesis?
                     # prepare memory request
                     (
                         [
@@ -737,7 +812,7 @@ class CacheGenerator:
                         else []
                     ),
                     be_address_o_reg[self.WORD_OFFSET_W :](
-                        fe_address_i_reg[self.WORD_OFFSET_W :]
+                        fe_address_i_reg[self.WORD_OFFSET_W, :]
                     ),
                     be_read_write_select_o_reg(0),
                     If(read_block_word_offset == self.BLOCK_SIZE - 1)(
@@ -748,12 +823,14 @@ class CacheGenerator:
                         send_mem_request_next_state(States.READ_BLOCK.value)
                     ),
                     # Send the memory request except for when its the address to which
-                    # we want to write anyway
+                    # we want to write anyway AND write strobe is all ones
                     If(
                         Not(
-                            And(
+                            AndList(
                                 fe_read_write_select_i_reg,
                                 address_word_offset == read_block_word_offset,
+                                fe_write_strobe_i_reg + 1
+                                == 0,  # write strobe is all ones so we dont need any byte of that word
                             )
                         )
                     )(state_reg(States.SEND_MEM_REQUEST.value)).Elif(
@@ -774,9 +851,16 @@ class CacheGenerator:
                     ),
                     If(fe_read_write_select_i_reg)(
                         # fe write request, write to the cache
-                        data_memory[next_block_replacement][address_index][
-                            address_word_offset
-                        ](fe_write_data_i_reg),
+                        [
+                            If(fe_write_strobe_i_reg[i])(
+                                data_memory[next_block_replacement][address_index][
+                                    address_word_offset
+                                ][8 * i : 8 * (i + 1)](
+                                    fe_write_data_i_reg[8 * i : 8 * (i + 1)]
+                                )
+                            )
+                            for i in range(self.BYTES_PER_WORD)
+                        ],
                         # stall if write-back, else write to next level memory
                         (
                             [
@@ -788,6 +872,7 @@ class CacheGenerator:
                                 be_write_data_o_reg(fe_write_data_i_reg),
                                 be_read_write_select_o_reg(1),
                                 be_write_data_valid_o_reg(1),
+                                be_write_strobe_o_reg(fe_write_strobe_i_reg),
                                 send_mem_request_next_state(States.STALL.value),
                                 state_reg(States.SEND_MEM_REQUEST.value),
                             ]
