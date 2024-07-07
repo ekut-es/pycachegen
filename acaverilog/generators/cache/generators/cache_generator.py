@@ -110,8 +110,8 @@ class CacheGenerator:
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
         self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // 8))
         self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // 8))
-        self.BYTES_PER_WORD = self.DATA_WIDTH / 8
-        self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH / 8
+        self.BYTES_PER_WORD = self.DATA_WIDTH // 8
+        self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // 8
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -323,20 +323,23 @@ class CacheGenerator:
                 )
             )
         m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
-        m.Assign(
-            resized_be_read_data(
-                be_read_data_i[
-                    self.DATA_WIDTH
-                    * be_address_o_reg[
-                        : self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH
-                    ] : self.DATA_WIDTH
-                    * (
-                        be_address_o_reg[: self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH]
-                        + 1
-                    )
-                ]
+        if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
+            m.Assign(resized_be_read_data(be_read_data_i))
+        else:
+            m.Assign(
+                resized_be_read_data(
+                    be_read_data_i[
+                        self.DATA_WIDTH
+                        * be_address_o_reg[
+                            : self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH
+                        ] : self.DATA_WIDTH
+                        * (
+                            be_address_o_reg[: self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH]
+                            + 1
+                        )
+                    ]
+                )
             )
-        )
 
         # Memories
         tag_memory = m.Reg(
@@ -692,7 +695,7 @@ class CacheGenerator:
                             ).Else(
                                 # No write-back needed
                                 If(
-                                    Or(
+                                    OrList(
                                         Not(fe_read_write_select_i_reg),
                                         self.BLOCK_SIZE > 1,
                                         fe_write_strobe_i_reg + 1 == 0,
