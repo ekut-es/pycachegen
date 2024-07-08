@@ -784,7 +784,7 @@ class CacheGenerator:
                         be_address_o_reg[self.INDEX_WIDTH + self.WORD_OFFSET_W :](
                             write_back_tag
                         ),
-                        be_write_strobe_o_reg(2**self.DATA_WIDTH - 1),
+                        be_write_strobe_o_reg(2**self.BYTES_PER_WORD - 1),
                         be_read_write_select_o_reg(1),
                         [
                             be_write_data_o_reg[byte_idx](
@@ -869,7 +869,7 @@ class CacheGenerator:
                         else []
                     ),
                     be_address_o_reg[self.WORD_OFFSET_W :](
-                        fe_address_i_reg[self.WORD_OFFSET_W, :]
+                        fe_address_i_reg[self.WORD_OFFSET_W :]
                     ),
                     be_read_write_select_o_reg(0),
                     If(read_block_word_offset == self.BLOCK_SIZE - 1)(
