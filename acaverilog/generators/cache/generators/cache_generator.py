@@ -570,6 +570,7 @@ class CacheGenerator:
                         fe_address_i_reg(fe_address_i),
                         fe_write_data_i_reg(fe_write_data_i),
                         fe_read_write_select_i_reg(fe_read_write_select_i),
+                        fe_write_strobe_i_reg(fe_write_strobe_i),
                         # increment latency counter
                         latency_counter.inc(),
                     ),

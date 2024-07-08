@@ -42,6 +42,8 @@ class FunctionalMemoryGenerator:
     def __init__(self, data_width: int, address_width: int) -> None:
         self.data_width = data_width
         self.address_width = address_width
+        self.BYTE_SIZE = 8
+        self.BYTES_PER_WORD = data_width // self.BYTE_SIZE
         # non configurable atm
         self.read_latency = 10
         self.write_latency = 15
@@ -124,6 +126,7 @@ class FunctionalMemoryGenerator:
         write_data_i = m.Input(f"write_data_i", DATA_WIDTH)
         write_data_valid_i = m.Input(f"write_data_valid_i")
         read_write_select_i = m.Input(f"read_write_select_i")
+        write_strobe_i = m.Input("write_strobe_i", self.BYTES_PER_WORD)
 
         # outputs
         read_data_o = m.Output(f"read_data_o", DATA_WIDTH)
@@ -144,29 +147,33 @@ class FunctionalMemoryGenerator:
         )
 
         # input buffer
-        address = (m.Reg(f"address", ADDRESS_WIDTH))
-        address_valid = (m.Reg(f"address_valid"))
-        write_data = (m.Reg(f"write_data", DATA_WIDTH))
-        write_data_valid = (m.Reg(f"write_data_valid"))
-        read_write_select = (m.Reg(f"read_write_select"))
+        address = m.Reg(f"address", ADDRESS_WIDTH)
+        address_valid = m.Reg(f"address_valid")
+        write_data = m.Reg(f"write_data", DATA_WIDTH)
+        write_data_valid = m.Reg(f"write_data_valid")
+        read_write_select = m.Reg(f"read_write_select")
+        write_strobe = m.Reg("write_strobe", self.BYTES_PER_WORD)
 
         # output buffer
-        read_data = m.Reg(f"read_data", DATA_WIDTH)
+        read_data = m.Reg(f"read_data", self.BYTE_SIZE, self.BYTES_PER_WORD)
         read_data_valid = m.Reg(f"read_data_valid")
         write_done = m.Reg(f"write_done")
 
         # internal
-        data_memory = m.Reg("data_memory", DATA_WIDTH, dims=pow(2, ADDRESS_WIDTH.value))
-        read_in_progress = (m.Reg(f"read_in_progress"))
-        write_in_progress = (m.Reg(f"write_in_progress"))
-
-        m.Assign(
-            port_ready_o(
-                AndList(read_in_progress == 0, write_in_progress == 0)
-            )
+        data_memory = m.Reg(
+            "data_memory",
+            self.BYTE_SIZE,
+            dims=(pow(2, ADDRESS_WIDTH.value), self.BYTES_PER_WORD),
         )
+        read_in_progress = m.Reg(f"read_in_progress")
+        write_in_progress = m.Reg(f"write_in_progress")
 
-        m.Assign(read_data_o(read_data))
+        m.Assign(port_ready_o(AndList(read_in_progress == 0, write_in_progress == 0)))
+
+        for i in range(self.BYTES_PER_WORD):
+            m.Assign(
+                read_data_o[self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)](read_data[i])
+            )
         m.Assign(read_data_valid_o(read_data_valid))
         m.Assign(write_done_o(write_done))
 
@@ -179,21 +186,24 @@ class FunctionalMemoryGenerator:
                 write_data(0),
                 write_data_valid(0),
                 read_write_select(0),
-                read_data(0),
+                [read_data[i](0) for i in range(self.BYTES_PER_WORD)],
                 read_data_valid(0),
                 write_done(0),
                 read_in_progress(0),
                 write_in_progress(0),
-                [data_memory[i](0) for i in range(pow(2, ADDRESS_WIDTH.value))]
+                write_strobe(0),
+                [
+                    [
+                        data_memory[word_idx][byte_idx](0)
+                        for byte_idx in range(self.BYTES_PER_WORD)
+                    ]
+                    for word_idx in range(pow(2, ADDRESS_WIDTH.value))
+                ],
             ).Else(
                 # nothing in progress
                 If(port_ready_o == 1)(
                     # initialize read: buffer data and set latency counter
-                    If(
-                        AndList(
-                            read_write_select_i == 0, address_valid_i == 1
-                        )
-                    )(
+                    If(AndList(read_write_select_i == 0, address_valid_i == 1))(
                         read_in_progress(1),
                         read_latency_counter(READ_LATENCY),
                         address(address_i),
@@ -216,41 +226,42 @@ class FunctionalMemoryGenerator:
                         write_data(write_data_i),
                         read_data_valid(0),
                         write_done(0),
+                        write_strobe(write_strobe_i),
                     ),
                 ).Else(
                     # decrement read latency counter if read in progress
-                    If(
-                        AndList(
-                            read_in_progress == 1, read_latency_counter != 0
-                        )
-                    )(read_latency_counter(read_latency_counter - 1)),
+                    If(AndList(read_in_progress == 1, read_latency_counter != 0))(
+                        read_latency_counter(read_latency_counter - 1)
+                    ),
                     # decrement write latency counter if write in progress
-                    If(
-                        AndList(
-                            write_in_progress == 1, write_latency_counter != 0
-                        )
-                    )(write_latency_counter(write_latency_counter - 1)),
+                    If(AndList(write_in_progress == 1, write_latency_counter != 0))(
+                        write_latency_counter(write_latency_counter - 1)
+                    ),
                     # finish read
-                    If(
-                        AndList(
-                            read_in_progress == 1, read_latency_counter == 0
-                        )
-                    )(
+                    If(AndList(read_in_progress == 1, read_latency_counter == 0))(
                         read_in_progress(0),
                         address_valid(0),
-                        read_data(data_memory[address]),
+                        [
+                            read_data[i](data_memory[address][i])
+                            for i in range(self.BYTES_PER_WORD)
+                        ],
                         read_data_valid(1),
                     ),
                     # finish write
-                    If(
-                        AndList(
-                            write_in_progress == 1, write_latency_counter == 0
-                        )
-                    )(
+                    If(AndList(write_in_progress == 1, write_latency_counter == 0))(
                         write_in_progress(0),
                         address_valid(0),
                         write_done(1),
-                        data_memory[address](write_data),
+                        [
+                            If(write_strobe[i])(
+                                data_memory[address][i](
+                                    write_data[
+                                        self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)
+                                    ]
+                                )
+                            )
+                            for i in range(self.BYTES_PER_WORD)
+                        ],
                     ),
                 )
             ),
