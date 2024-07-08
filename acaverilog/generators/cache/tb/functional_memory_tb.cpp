@@ -26,6 +26,7 @@ int sc_main(int argc, char **argv)
     sc_signal<uint32_t> write_data_i;
     sc_signal<bool> write_data_valid_i;
     sc_signal<bool> read_write_select_i;
+    sc_signal<uint32_t> write_strobe_i;
 
     sc_signal<uint32_t> read_data_o;
     sc_signal<bool> read_data_valid_o;
@@ -42,6 +43,7 @@ int sc_main(int argc, char **argv)
     memory->write_data_i(write_data_i);
     memory->write_data_valid_i(write_data_valid_i);
     memory->read_write_select_i(read_write_select_i);
+    memory->write_strobe_i(write_strobe_i);
 
     memory->read_data_o(read_data_o);
     memory->read_data_valid_o(read_data_valid_o);
@@ -89,6 +91,7 @@ int sc_main(int argc, char **argv)
         write_data_i.write(data);
         write_data_valid_i.write(1);
         read_write_select_i.write(1);
+        write_strobe_i.write(0b11);
         tick(1);
         address_valid_i.write(0);
         tick(1);
