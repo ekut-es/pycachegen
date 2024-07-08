@@ -12,6 +12,7 @@ from veriloggen import (
     Not,
     Or,
     And,
+    Cond,
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -112,6 +113,7 @@ class CacheGenerator:
         self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // 8))
         self.BYTES_PER_WORD = self.DATA_WIDTH // 8
         self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // 8
+        self.BYTE_SIZE = 8
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -223,7 +225,9 @@ class CacheGenerator:
         fe_write_strobe_i_reg = m.Reg("fe_write_strobe_i_reg", self.BYTES_PER_WORD)
 
         # Front End Output Buffers
-        fe_read_data_o_reg = m.Reg("fe_read_data_o_reg", self.DATA_WIDTH)
+        fe_read_data_o_reg = m.Reg(
+            "fe_read_data_o_reg", self.BYTE_SIZE, self.BYTES_PER_WORD
+        )
         fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
 
@@ -232,13 +236,20 @@ class CacheGenerator:
             "be_address_o_reg", self.ADDRESS_WIDTH
         )  # Make this have the caches own width and then just cut something off later, much easier
         be_address_valid_o_reg = m.Reg("be_address_valid_o_reg")
-        be_write_data_o_reg = m.Reg("be_write_data_o_reg", self.DATA_WIDTH)
+        be_write_data_o_reg = m.Reg(
+            "be_write_data_o_reg", self.BYTE_SIZE, self.BYTES_PER_WORD
+        )
         be_write_data_valid_o_reg = m.Reg("be_write_data_valid_o_reg")
         be_read_write_select_o_reg = m.Reg("be_read_write_select_o_reg")
         be_write_strobe_o_reg = m.Reg("be_write_strobe_o_reg", self.BYTES_PER_WORD)
 
         # Frontend Output Buffer Assignments
-        m.Assign(fe_read_data_o(fe_read_data_o_reg))
+        for i in range(self.BYTES_PER_WORD):
+            m.Assign(
+                fe_read_data_o[self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)](
+                    fe_read_data_o_reg[i]
+                )
+            )
         m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
 
@@ -247,42 +258,48 @@ class CacheGenerator:
             be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :])
         )  # cut off what the next cache doesn't want
         m.Assign(be_address_valid_o(be_address_valid_o_reg))
-        # shift the output data into position
-        m.Assign(
-            be_write_data_o[
-                : self.DATA_WIDTH * be_address_o_reg[-self.BE_ADDRESS_WIDTH :]
-            ](0)
-        )
-        m.Assign(
-            be_write_data_o[
-                self.DATA_WIDTH * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1) :
-            ](0)
-        )
-        m.Assign(
-            be_write_data_o[
-                self.DATA_WIDTH
-                * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] : self.DATA_WIDTH
-                * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1)
-            ](be_write_data_o_reg)
-        )
-        # Also shift the write strobe in basically the same way
-        m.Assign(
-            be_write_strobe_o[
-                : self.BYTES_PER_WORD * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] :
-            ](0)
-        )
-        m.Assign(
-            be_write_strobe_o[
-                self.DATA_WIDTH * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1) :
-            ](0)
-        )
-        m.Assign(
-            be_write_strobe_o[
-                self.BYTES_PER_WORD
-                * be_address_o_reg[-self.BE_ADDRESS_WIDTH :] : self.DATA_WIDTH
-                * (be_address_o_reg[-self.BE_ADDRESS_WIDTH :] + 1)
-            ](be_write_strobe_o_reg)
-        )
+        # shift the output data and write strobe into position
+        for i in range(self.BE_BYTES_PER_WORD):
+            if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
+                m.Assign(
+                    be_write_data_o[self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)](
+                        be_write_data_o_reg[i]
+                    )
+                )
+                m.Assign(be_write_strobe_o[i](be_write_strobe_o_reg[i]))
+            else:
+                m.Assign(
+                    be_write_data_o[self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)](
+                        Cond(
+                            And(
+                                i
+                                >= self.BYTES_PER_WORD
+                                * be_address_o_reg[: -self.BE_ADDRESS_WIDTH],
+                                i
+                                < self.BYTES_PER_WORD
+                                * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1),
+                            ),
+                            be_write_data_o_reg[i],
+                            0,
+                        )
+                    )
+                )
+                m.Assign(
+                    be_write_strobe_o[i](
+                        Cond(
+                            And(
+                                i
+                                >= self.BYTES_PER_WORD
+                                * be_address_o_reg[: -self.BE_ADDRESS_WIDTH],
+                                i
+                                < self.BYTES_PER_WORD
+                                * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1),
+                            ),
+                            be_write_strobe_o_reg[i],
+                            0,
+                        )
+                    )
+                )
         m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
         m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
@@ -330,13 +347,8 @@ class CacheGenerator:
                 resized_be_read_data(
                     be_read_data_i[
                         self.DATA_WIDTH
-                        * be_address_o_reg[
-                            : self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH
-                        ] : self.DATA_WIDTH
-                        * (
-                            be_address_o_reg[: self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH]
-                            + 1
-                        )
+                        * be_address_o_reg[: -self.BE_ADDRESS_WIDTH] : self.DATA_WIDTH
+                        * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1)
                     ]
                 )
             )
@@ -348,8 +360,8 @@ class CacheGenerator:
         valid_memory = m.Reg("valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
         data_memory = m.Reg(
             f"data_memory",
-            self.DATA_WIDTH,
-            dims=(self.NUM_WAYS, self.NUM_SETS, self.BLOCK_SIZE),
+            self.BYTE_SIZE,
+            dims=(self.NUM_WAYS, self.NUM_SETS, self.BLOCK_SIZE, self.BYTES_PER_WORD),
         )
 
         # Things that are only needed for write back
@@ -465,13 +477,13 @@ class CacheGenerator:
                 fe_read_write_select_i_reg(0),
                 fe_write_strobe_i_reg(0),
                 # frontend output buffers
-                fe_read_data_o_reg(0),
+                [fe_read_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
                 fe_read_data_valid_o_reg(0),
                 fe_write_done_o_reg(0),
                 # backend outputs
                 be_address_o_reg(0),
                 be_address_valid_o_reg(0),
-                be_write_data_o_reg(0),
+                [be_write_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
                 be_write_data_valid_o_reg(0),
                 be_read_write_select_o_reg(0),
                 be_write_strobe_o_reg(0),
@@ -489,7 +501,12 @@ class CacheGenerator:
                             tag_memory[block_idx][set_idx](0),
                             valid_memory[block_idx][set_idx](0),
                             [
-                                data_memory[block_idx][set_idx][word_idx](0)
+                                [
+                                    data_memory[block_idx][set_idx][word_idx][byte_idx](
+                                        0
+                                    )
+                                    for byte_idx in range(self.BYTES_PER_WORD)
+                                ]
                                 for word_idx in range(self.BLOCK_SIZE)
                             ],
                         ]
@@ -590,9 +607,14 @@ class CacheGenerator:
                         ),
                         If(fe_read_write_select_i_reg)(
                             # write
-                            data_memory[hit_index][address_index][address_word_offset](
-                                fe_write_data_i_reg
-                            ),
+                            [
+                                If(fe_write_strobe_i_reg[byte_idx])(
+                                    data_memory[hit_index][address_index][
+                                        address_word_offset
+                                    ][byte_idx](fe_write_data_i_reg[self.BYTE_SIZE * byte_idx : self.BYTE_SIZE * (byte_idx + 1)])
+                                )
+                                for byte_idx in range(self.BYTES_PER_WORD)
+                            ],
                             (
                                 [
                                     dirty_memory[hit_index][address_index](1),
@@ -603,7 +625,16 @@ class CacheGenerator:
                                     # in case of write through, we still need to write to the next level memory
                                     be_address_o_reg(fe_address_i_reg),
                                     be_write_data_valid_o_reg(1),
-                                    be_write_data_o_reg(fe_write_data_i_reg),
+                                    [
+                                        be_write_data_o_reg[i](
+                                            fe_write_data_i_reg[
+                                                self.BYTE_SIZE
+                                                * i : self.BYTE_SIZE
+                                                * (i + 1)
+                                            ]
+                                        )
+                                        for i in range(self.BYTES_PER_WORD)
+                                    ],
                                     be_read_write_select_o_reg(1),
                                     state_reg(States.SEND_MEM_REQUEST.value),
                                     send_mem_request_next_state(States.STALL.value),
@@ -611,11 +642,14 @@ class CacheGenerator:
                             ),
                         ).Else(
                             # read
-                            fe_read_data_o_reg(
-                                data_memory[hit_index][address_index][
-                                    address_word_offset
-                                ]
-                            ),
+                            [
+                                fe_read_data_o_reg[byte_idx](
+                                    data_memory[hit_index][address_index][
+                                        address_word_offset
+                                    ][byte_idx]
+                                )
+                                for byte_idx in range(self.BYTES_PER_WORD)
+                            ],
                             state_reg(States.STALL.value),
                         ),
                     ).Else(
@@ -623,7 +657,14 @@ class CacheGenerator:
                         If(And(not self.WRITE_ALLOCATE, fe_read_write_select_i_reg))(
                             # write request and write-no-allocate -> only write to memory
                             be_address_o_reg(fe_address_i_reg),
-                            be_write_data_o_reg(fe_write_data_i_reg),
+                            [
+                                be_write_data_o_reg[i](
+                                    fe_write_data_i_reg[
+                                        self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)
+                                    ]
+                                )
+                                for i in range(self.BYTES_PER_WORD)
+                            ],
                             be_write_data_valid_o_reg(1),
                             be_read_write_select_o_reg(1),
                             state_reg(States.SEND_MEM_REQUEST.value),
@@ -744,11 +785,14 @@ class CacheGenerator:
                         ),
                         be_write_strobe_o_reg(2**self.DATA_WIDTH - 1),
                         be_read_write_select_o_reg(1),
-                        be_write_data_o_reg(
-                            data_memory[write_back_block_index][address_index][
-                                write_back_word_offset
-                            ]
-                        ),
+                        [
+                            be_write_data_o_reg[byte_idx](
+                                data_memory[write_back_block_index][address_index][
+                                    write_back_word_offset
+                                ][byte_idx]
+                            )
+                            for byte_idx in range(self.BYTES_PER_WORD)
+                        ],
                         be_write_data_valid_o_reg(1),
                         # state changes
                         state_reg(States.SEND_MEM_REQUEST.value),
@@ -783,14 +827,23 @@ class CacheGenerator:
                         If(Not(be_read_write_select_o_reg))(
                             # if we just read something, write it to the cache
                             # if we read stuff we always want to write back the whole word since the fe write request will be applied afterwards
-                            data_memory[next_block_replacement][address_index][
-                                # figure out the correct block offset
-                                (
-                                    be_address_o_reg[: self.WORD_OFFSET_W]
-                                    if self.BLOCK_SIZE > 1
-                                    else 0
+                            [
+                                data_memory[next_block_replacement][address_index][
+                                    # figure out the correct block offset
+                                    (
+                                        be_address_o_reg[: self.WORD_OFFSET_W]
+                                        if self.BLOCK_SIZE > 1
+                                        else 0
+                                    )
+                                ][byte_idx](
+                                    resized_be_read_data[
+                                        self.BYTE_SIZE
+                                        * byte_idx : self.BYTE_SIZE
+                                        * (byte_idx + 1)
+                                    ]
                                 )
-                            ](resized_be_read_data)
+                                for byte_idx in range(self.BYTES_PER_WORD)
+                            ]
                         ),
                     ),
                 )
@@ -858,8 +911,10 @@ class CacheGenerator:
                             If(fe_write_strobe_i_reg[i])(
                                 data_memory[next_block_replacement][address_index][
                                     address_word_offset
-                                ][8 * i : 8 * (i + 1)](
-                                    fe_write_data_i_reg[8 * i : 8 * (i + 1)]
+                                ][i](
+                                    fe_write_data_i_reg[
+                                        self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)
+                                    ]
                                 )
                             )
                             for i in range(self.BYTES_PER_WORD)
@@ -872,7 +927,16 @@ class CacheGenerator:
                             if self.WRITE_BACK
                             else [
                                 be_address_o_reg(fe_address_i_reg),
-                                be_write_data_o_reg(fe_write_data_i_reg),
+                                [
+                                    be_write_data_o_reg[i](
+                                        fe_write_data_i_reg[
+                                            self.BYTE_SIZE
+                                            * i : self.BYTE_SIZE
+                                            * (i + 1)
+                                        ]
+                                    )
+                                    for i in range(self.BYTES_PER_WORD)
+                                ],
                                 be_read_write_select_o_reg(1),
                                 be_write_data_valid_o_reg(1),
                                 be_write_strobe_o_reg(fe_write_strobe_i_reg),
@@ -882,11 +946,14 @@ class CacheGenerator:
                         ),
                     ).Else(
                         # fe read request, hand the data out
-                        fe_read_data_o_reg(
-                            data_memory[next_block_replacement][address_index][
-                                address_word_offset
-                            ]
-                        ),
+                        [
+                            fe_read_data_o_reg[byte_idx](
+                                data_memory[next_block_replacement][address_index][
+                                    address_word_offset
+                                ][byte_idx]
+                            )
+                            for byte_idx in range(self.BYTES_PER_WORD)
+                        ],
                         state_reg(States.STALL.value),
                     ),
                 )
