@@ -28,7 +28,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "4 1 priority \"16 8 4 2 plru_tree 6 8 1 0 1\" \"16 8\""
     "5 1 priority \"16 8 1 2 plru_tree 6 8 1 0 1\" \"16 8\""
     "6 1 priority \"16 8 4 2 plru_tree 4 11 0 1 1\" \"16 8\""
-    "7 1 priority \"16 8 2 2 plru_tree 6 8 1 1 1\" \"16 8\""
+    "7 1 priority \"16 8 2 2 plru_tree 6 10 1 1 1\" \"16 8\""
     "8 1 priority \"16 8 2 2 plru_tree 4 11 0 0 1\" \"16 8\""
     "9 1 priority \"16 8 2 2 plru_tree 4 11 0 1 1\" \"16 8\""
     "10 1 priority \"16 8 2 2 plru_tree 4 11 0 1 1\" \"16 8\""

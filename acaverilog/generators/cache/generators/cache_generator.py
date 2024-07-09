@@ -126,34 +126,32 @@ class CacheGenerator:
         min_hit = 0
 
         # miss latencies
-        if self.BLOCK_SIZE == 1:
-            min_miss = max(min_miss, 5)
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5)
+            min_miss = max(min_miss, 5) # write miss
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
-            min_miss = max(min_miss, 7)
+            min_miss = max(min_miss, 7) # write miss
         if True:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
-        if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and self.WRITE_BACK:
-            min_miss = max(min_miss, 3 + 3 * self.BLOCK_SIZE)
-        if self.WRITE_ALLOCATE and self.BLOCK_SIZE > 1 and not self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # read miss
+        if self.WRITE_ALLOCATE and self.WRITE_BACK:
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # write miss
+        if self.WRITE_ALLOCATE and not self.WRITE_BACK:
+            min_miss = max(min_miss, 7 + 3 * self.BLOCK_SIZE) # write miss
         if self.WRITE_BACK and self.BLOCK_SIZE == 1 and self.WRITE_ALLOCATE:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # write miss + dirty
         if self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)
-        if self.WRITE_ALLOCATE and self.WRITE_BACK and self.BLOCK_SIZE > 1:
-            min_miss = max(min_miss, 3 + 6 * self.BLOCK_SIZE)
+            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE) # read miss + dirty
+        if self.WRITE_ALLOCATE and self.WRITE_BACK:
+            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE) # write miss + dirty
         if not self.WRITE_ALLOCATE:
             min_miss = max(min_miss, 6)
 
         # hit latencies
         if True:
-            min_hit = max(min_hit, 4)
+            min_hit = max(min_hit, 4) # read hit
         if not self.WRITE_BACK:
-            min_hit = max(min_hit, 6)
+            min_hit = max(min_hit, 6) # write hit
         if self.WRITE_BACK:
-            min_hit = max(min_hit, 4)
+            min_hit = max(min_hit, 4) # write hit
 
         return min_hit, min_miss
 
