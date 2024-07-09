@@ -7,11 +7,12 @@
 #include "Vcache_wrapper_13.h"
 
 // Testbench for testing multiple words per block
-// data_width=16, address_width=8, num_ports=1, arbiter_policy=priority
-// num_ways=2, num_sets=2,
+// num_ports=1, arbiter_policy=priority
+// L1: data_width=16, address_width=8, num_ways=2, num_sets=2,
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
 // write_through=false, write_allocate=true,
 // block_size=4
+// Main Memory: data_width=16, address_width=8
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
