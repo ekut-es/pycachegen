@@ -41,7 +41,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "17 1 priority \"16 8 2 1 fifo 4 11 0 1 1\" \"16 8 2 2 fifo 4 11 0 1 1\" \"16 8\""
     "18 4 fifo \"16 8 4 2 plru_mru 4 11 0 1 1\" \"16 8\""
     "19 5 round_robin \"16 8 4 2 plru_mru 4 11 0 1 1\" \"16 8\""
-    "20 1 priority \"8 8 1 4 plru_tree 4 17 0 1 2\" \"16 7 1 4 plru_tree 4 29 0 1 4\" \"64 5\""
+    "20 1 priority \"8 6 1 4 plru_tree 4 11 0 1 1\" \"64 3 1 2 plru_tree 4 29 0 1 1\" \"128 2\""
 )
 list(LENGTH CACHE_WRAPPER_ARG_LIST NUM_TESTBENCHES)
 
