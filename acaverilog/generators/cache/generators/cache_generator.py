@@ -15,7 +15,7 @@ from veriloggen import (
     Cond,
     Case,
     When,
-    Always,
+    
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -737,7 +737,7 @@ class CacheGenerator:
                                         OrList(
                                             Not(fe_read_write_select_i_reg),
                                             self.BLOCK_SIZE > 1,
-                                            fe_write_strobe_i_reg + 1 == 0,
+                                            fe_write_strobe_i_reg != 2**self.BYTES_PER_WORD - 1,
                                         )
                                     )(
                                         write_back_next_state(States.READ_BLOCK.value)
@@ -755,7 +755,7 @@ class CacheGenerator:
                                     OrList(
                                         Not(fe_read_write_select_i_reg),
                                         self.BLOCK_SIZE > 1,
-                                        fe_write_strobe_i_reg + 1 == 0,
+                                        fe_write_strobe_i_reg != 2**self.BYTES_PER_WORD - 1,
                                     )
                                 )(
                                     # Read the block from the next level memory

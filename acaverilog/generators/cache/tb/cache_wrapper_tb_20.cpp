@@ -171,7 +171,7 @@ int sc_main(int argc, char** argv) {
         read(7, 0x17, 0);   // 3 should also get inserted into the same word in the L2 cache
 
         write(8, 0x18, 0);
-        write(12, 0x1C, 0); // 8 should get instered into another word in the L2 cache
+        write(12, 0x1C, 0); // 8 should get inserted into another word in the L2 cache
 
         write(32, 0x30, 0);
         write(36, 0x34, 0); // this should get inserted into the first word in the L2 cache,
