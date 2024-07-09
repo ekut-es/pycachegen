@@ -127,31 +127,31 @@ class CacheGenerator:
 
         # miss latencies
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5) # write miss
+            min_miss = max(min_miss, 5)  # write miss
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
-            min_miss = max(min_miss, 7) # write miss
+            min_miss = max(min_miss, 7)  # write miss
         if True:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # read miss
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # read miss
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # write miss
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # write miss
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
-            min_miss = max(min_miss, 7 + 3 * self.BLOCK_SIZE) # write miss
+            min_miss = max(min_miss, 7 + 3 * self.BLOCK_SIZE)  # write miss
         if self.WRITE_BACK and self.BLOCK_SIZE == 1 and self.WRITE_ALLOCATE:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE) # write miss + dirty
+            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # write miss + dirty
         if self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE) # read miss + dirty
+            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)  # read miss + dirty
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE) # write miss + dirty
+            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)  # write miss + dirty
         if not self.WRITE_ALLOCATE:
             min_miss = max(min_miss, 6)
 
         # hit latencies
         if True:
-            min_hit = max(min_hit, 4) # read hit
+            min_hit = max(min_hit, 4)  # read hit
         if not self.WRITE_BACK:
-            min_hit = max(min_hit, 6) # write hit
+            min_hit = max(min_hit, 6)  # write hit
         if self.WRITE_BACK:
-            min_hit = max(min_hit, 4) # write hit
+            min_hit = max(min_hit, 4)  # write hit
 
         return min_hit, min_miss
 
@@ -277,7 +277,7 @@ class CacheGenerator:
                                 < self.BYTES_PER_WORD
                                 * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1),
                             ),
-                            be_write_data_o_reg[i],
+                            be_write_data_o_reg[i % self.BYTES_PER_WORD],
                             0,
                         )
                     )
@@ -293,7 +293,7 @@ class CacheGenerator:
                                 < self.BYTES_PER_WORD
                                 * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1),
                             ),
-                            be_write_strobe_o_reg[i],
+                            be_write_strobe_o_reg[i % self.BYTES_PER_WORD],
                             0,
                         )
                     )
@@ -342,13 +342,23 @@ class CacheGenerator:
             m.Assign(resized_be_read_data(be_read_data_i))
         else:
             m.Assign(
-                resized_be_read_data(
-                    be_read_data_i[
-                        self.DATA_WIDTH
-                        * be_address_o_reg[: -self.BE_ADDRESS_WIDTH] : self.DATA_WIDTH
-                        * (be_address_o_reg[: -self.BE_ADDRESS_WIDTH] + 1)
-                    ]
+                resized_be_read_data((
+                    be_read_data_i
+                    << (
+                        (
+                            (self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD)
+                            - 1
+                            - be_address_o_reg[: -self.BE_ADDRESS_WIDTH]
+                        )
+                        * self.BYTES_PER_WORD
+                        * self.BYTE_SIZE
+                    )
                 )
+                >> (
+                    ((self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD) - 1)
+                    * self.BYTES_PER_WORD
+                    * self.BYTE_SIZE
+                ))[:(self.BYTE_SIZE * self.BYTES_PER_WORD)]
             )
 
         # Memories
@@ -610,7 +620,13 @@ class CacheGenerator:
                                 If(fe_write_strobe_i_reg[byte_idx])(
                                     data_memory[hit_index][address_index][
                                         address_word_offset
-                                    ][byte_idx](fe_write_data_i_reg[self.BYTE_SIZE * byte_idx : self.BYTE_SIZE * (byte_idx + 1)])
+                                    ][byte_idx](
+                                        fe_write_data_i_reg[
+                                            self.BYTE_SIZE
+                                            * byte_idx : self.BYTE_SIZE
+                                            * (byte_idx + 1)
+                                        ]
+                                    )
                                 )
                                 for byte_idx in range(self.BYTES_PER_WORD)
                             ],
