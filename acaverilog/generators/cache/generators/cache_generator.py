@@ -637,6 +637,7 @@ class CacheGenerator:
                                         for i in range(self.BYTES_PER_WORD)
                                     ],
                                     be_read_write_select_o_reg(1),
+                                    be_write_strobe_o_reg(fe_write_strobe_i_reg),
                                     state_reg(States.SEND_MEM_REQUEST.value),
                                     send_mem_request_next_state(States.STALL.value),
                                 ]
@@ -668,6 +669,7 @@ class CacheGenerator:
                             ],
                             be_write_data_valid_o_reg(1),
                             be_read_write_select_o_reg(1),
+                            be_write_strobe_o_reg(fe_write_strobe_i_reg),
                             state_reg(States.SEND_MEM_REQUEST.value),
                             send_mem_request_next_state(States.STALL.value),
                         ).Else(
