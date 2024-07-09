@@ -157,7 +157,7 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(0, 0x100, 0);
+        write(0, 0x10, 0);
 
         tick(10);
     } catch (std::runtime_error& e) {

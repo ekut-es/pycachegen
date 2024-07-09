@@ -13,6 +13,8 @@ from veriloggen import (
     Or,
     And,
     Cond,
+    Case,
+    When,
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -114,6 +116,7 @@ class CacheGenerator:
         self.BYTES_PER_WORD = self.DATA_WIDTH // 8
         self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // 8
         self.BYTE_SIZE = 8
+        self.BE_BYTE_MULTIPLIER = self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -322,7 +325,6 @@ class CacheGenerator:
         address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
         address_index = m.Wire("address_index", max(1, self.INDEX_WIDTH))
         address_tag = m.Wire("address_tag", self.TAG_WIDTH)
-        resized_be_read_data = m.Wire("resized_be_read_data", self.DATA_WIDTH)
         if self.BLOCK_SIZE == 1:
             m.Assign(address_word_offset(0))
         else:
@@ -338,27 +340,29 @@ class CacheGenerator:
                 )
             )
         m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
+
+        # The BE might return read data that is wider than our own data.
+        # Therefore we should slice the be read data accordingly (based on the address we requested)
+        resized_be_read_data = m.Reg("resized_be_read_data", self.DATA_WIDTH)
         if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
-            m.Assign(resized_be_read_data(be_read_data_i))
+            m.Always(be_read_data_i)(
+                resized_be_read_data(be_read_data_i, blk=True)
+            )
         else:
-            m.Assign(
-                resized_be_read_data((
-                    be_read_data_i
-                    << (
-                        (
-                            (self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD)
-                            - 1
-                            - be_address_o_reg[: -self.BE_ADDRESS_WIDTH]
+            m.Always(be_read_data_i, be_address_o_reg)(
+                Case(be_address_o_reg[: -self.BE_ADDRESS_WIDTH])(
+                    *[
+                        When(i)(
+                            resized_be_read_data(
+                                be_read_data_i[
+                                    self.DATA_WIDTH * i : self.DATA_WIDTH * (i + 1)
+                                ],
+                                blk=True,
+                            )
                         )
-                        * self.BYTES_PER_WORD
-                        * self.BYTE_SIZE
-                    )
+                        for i in range(self.BE_BYTE_MULTIPLIER)
+                    ]
                 )
-                >> (
-                    ((self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD) - 1)
-                    * self.BYTES_PER_WORD
-                    * self.BYTE_SIZE
-                ))[:(self.BYTE_SIZE * self.BYTES_PER_WORD)]
             )
 
         # Memories
