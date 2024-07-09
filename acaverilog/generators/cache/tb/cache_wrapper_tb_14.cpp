@@ -67,16 +67,17 @@ int sc_main(int argc, char** argv) {
         sc_start(amount, SC_NS);
     };
 
-    auto read_assert = [&](int expected) {
+    auto read_assert = [&](int address, int expected) {
         if (read_data_o.read() == expected) {
-            std::cout << "Read Successful at cycle "
-                      << sc_time_stamp().to_default_time_units() << std::endl;
+            std::cout << "Read  at address " << address << " at cycle "
+                      << sc_time_stamp().to_default_time_units()
+                      << " successful" << std::endl;
         } else {
-            cerr << "Read failed at "
-                 << sc_time_stamp().to_default_time_units() << "; expected "
-                 << std::to_string(expected) << " got "
-                 << std::to_string(read_data_o.read()) << "; continuing"
-                 << std::endl;
+            std::cerr << "Read  at address " << address << " at cycle "
+                      << sc_time_stamp().to_default_time_units()
+                      << " FAILED; expected " << std::to_string(expected)
+                      << " got " << std::to_string(read_data_o.read())
+                      << "; continuing" << std::endl;
         }
     };
 
@@ -98,7 +99,7 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             tick(1);
         }
-        read_assert(expected);
+        read_assert(address, expected);
         hit_assert(hit);
     };
 
@@ -114,8 +115,9 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             tick(1);
         }
-        std::cout << "Write to address " << std::to_string(address)
-                  << std::endl;
+        std::cout << "Write at address " << std::to_string(address)
+                  << " at cycle " << sc_time_stamp().to_default_time_units()
+                  << " successful" << std::endl;
         hit_assert(hit);
     };
 
@@ -124,11 +126,12 @@ int sc_main(int argc, char** argv) {
         tick(1);
         flush_i.write(0);
         tick(1);
-        while(!port_ready_o.read()){
+        while (!port_ready_o.read()) {
             tick(1);
         }
         std::cout << "Flush complete" << std::endl;
     };
+
 
     std::cout << "Vcache_wrapper_14 start!" << std::endl;
 
