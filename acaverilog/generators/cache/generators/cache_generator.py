@@ -120,7 +120,10 @@ class CacheGenerator:
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
-        that occur in the worst case possible.
+        that occur in the worst case possible. Note that this worst case also
+        considers write strobe input signals which are not all ones which can only
+        happen in multi layer cache scenarios if the processor doesn't do any byte
+        operations.
 
         Returns:
             tuple[int, int]: hit latency, miss latency.
@@ -235,7 +238,7 @@ class CacheGenerator:
         # Back End Output Buffers
         be_address_o_reg = m.Reg(
             "be_address_o_reg", self.ADDRESS_WIDTH
-        )  # Make this have the caches own width and then just cut something off later, much easier
+        )  # This has the caches own width and we then just cut something off later, much easier
         be_address_valid_o_reg = m.Reg("be_address_valid_o_reg")
         be_write_data_o_reg = m.Reg(
             "be_write_data_o_reg", self.BYTE_SIZE, self.BYTES_PER_WORD
@@ -255,11 +258,13 @@ class CacheGenerator:
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
 
         # Backend Output Buffer Assignments
-        m.Assign(
-            be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :])
-        )  # cut off what the next cache doesn't want
+        m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
+        m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
+        # The output address register has our own address length, so we need to cut it down
+        m.Assign(be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :]))
         m.Assign(be_address_valid_o(be_address_valid_o_reg))
-        # shift the output data and write strobe into position
+        # The output data also has our own data width, so we need to
+        # shift the output data and accordingly create a write strobe signal
         for i in range(self.BE_BYTES_PER_WORD):
             if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
                 m.Assign(
@@ -301,8 +306,6 @@ class CacheGenerator:
                         )
                     )
                 )
-        m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
-        m.Assign(be_read_write_select_o(be_read_write_select_o_reg))
 
         ## Internal
         # Registers
@@ -321,14 +324,14 @@ class CacheGenerator:
         m.Assign(fe_port_ready_o(state_reg == States.READY.value))
         m.Assign(fe_hit_o(hit_vector != 0))
 
-        # Wires with assignments
+        # Wires with assignments for basic cache signals
         address_word_offset = m.Wire("address_word_offset", max(1, self.WORD_OFFSET_W))
-        address_index = m.Wire("address_index", max(1, self.INDEX_WIDTH))
-        address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         if self.BLOCK_SIZE == 1:
             m.Assign(address_word_offset(0))
         else:
             m.Assign(address_word_offset(fe_address_i_reg[: self.WORD_OFFSET_W]))
+
+        address_index = m.Wire("address_index", max(1, self.INDEX_WIDTH))
         if self.NUM_SETS == 1:
             m.Assign(address_index(0))
         else:
@@ -339,15 +342,15 @@ class CacheGenerator:
                     ]
                 )
             )
+
+        address_tag = m.Wire("address_tag", self.TAG_WIDTH)
         m.Assign(address_tag(fe_address_i_reg[self.WORD_OFFSET_W + self.INDEX_WIDTH :]))
 
         # The BE might return read data that is wider than our own data.
         # Therefore we should slice the be read data accordingly (based on the address we requested)
         resized_be_read_data = m.Reg("resized_be_read_data", self.DATA_WIDTH)
         if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
-            m.Always(be_read_data_i)(
-                resized_be_read_data(be_read_data_i, blk=True)
-            )
+            m.Always(be_read_data_i)(resized_be_read_data(be_read_data_i, blk=True))
         else:
             m.Always(be_read_data_i, be_address_o_reg)(
                 Case(be_address_o_reg[: -self.BE_ADDRESS_WIDTH])(
