@@ -349,20 +349,58 @@ class CacheGenerator:
         else:
             if self.READ_BLOCK_WC > 1:
                 be_read_data_word_offset = m.Reg(
-                    "be_read_data_word_offset",
-                    self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH,
+                    "be_read_data_word_offset", max(1, self.WORD_OFFSET_W)
                 )
             else:
                 be_read_data_word_offset = m.Wire(
-                    "be_read_data_word_offset",
-                    self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH,
+                    "be_read_data_word_offset", max(1, self.WORD_OFFSET_W)
                 )
                 m.Assign(be_read_data_word_offset(0))
+
+            # this variable specifies the index of the word (our word width) inside the
+            # BE read data. It depends on the address we set and the be_read_data_word_offset,
+            # which will get incremented when reading a block into this cache (we do this because
+            # we only want to send one memory request and get as many of our word from that read data
+            # as possible). So what I'd like to do is actually just use
+            # be_address_o_reg[: -self.BE_ADDRESS_WIDTH]+be_read_data_word_offset
+            # But I cant do that because these two things might have different widths and verilator does
+            # not like that but Veriloggen does not seem to offer any padding functionality...
+            be_read_data_total_word_offset = m.Wire(
+                "be_read_data_total_word_offset",
+                self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH,
+            )
+            if self.BLOCK_SIZE == 1:
+                m.Assign(
+                    be_read_data_total_word_offset(
+                        be_address_o_reg[: -self.BE_ADDRESS_WIDTH]
+                    )
+                )
+            elif self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH == self.WORD_OFFSET_W:
+                m.Assign(be_read_data_total_word_offset(be_read_data_word_offset))
+            elif self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH > self.WORD_OFFSET_W:
+                m.Assign(
+                    be_read_data_total_word_offset[: self.WORD_OFFSET_W](
+                        be_read_data_word_offset
+                    )
+                )
+                m.Assign(
+                    be_read_data_total_word_offset[self.WORD_OFFSET_W :](
+                        be_address_o_reg[self.WORD_OFFSET_W : -self.BE_ADDRESS_WIDTH]
+                    )
+                )
+            else:
+                m.Assign(
+                    be_read_data_total_word_offset(
+                        be_read_data_word_offset[
+                            : self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH
+                        ]
+                    )
+                )
+
             m.Always(be_read_data_i, be_address_o_reg, be_read_data_word_offset)(
-                Case(
-                    be_address_o_reg[: -self.BE_ADDRESS_WIDTH]
-                    + be_read_data_word_offset
-                )(
+                # iterate over the be read data in steps of our own data width and check if
+                # when it is the word that we want to read
+                Case(be_read_data_total_word_offset)(
                     *[
                         When(i)(
                             resized_be_read_data(
@@ -859,8 +897,9 @@ class CacheGenerator:
                     # memory gets ready again (that means that the request was processed)
                     If(And(Not(be_address_valid_o_reg), be_port_ready_i))(
                         latency_counter.inc(),
-                        state_reg(send_mem_request_next_state),
-                        If(Not(be_read_write_select_o_reg))(
+                        If(be_read_write_select_o_reg)(
+                            state_reg(send_mem_request_next_state)
+                        ).Else(
                             (
                                 # Write all the words we need from the BE read data into the cache and
                                 # then go on to the next state
@@ -919,8 +958,10 @@ class CacheGenerator:
                             be_address_o_reg[: self.WORD_OFFSET_W](
                                 read_block_word_offset
                             ),
-                            read_block_word_offset(
-                                read_block_word_offset + self.READ_BLOCK_WC
+                            (
+                                read_block_word_offset.add(self.READ_BLOCK_WC)
+                                if self.BLOCK_SIZE != self.READ_BLOCK_WC
+                                else []
                             ),  # increment block offset
                         ]
                         if self.BLOCK_SIZE > 1
