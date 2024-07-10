@@ -106,17 +106,16 @@ class CacheGenerator:
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
-        self.NUM_SETS_W = int(log2(self.NUM_SETS))
-        self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.WORD_OFFSET_W = int(log2(self.BLOCK_SIZE))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH - self.WORD_OFFSET_W
+        self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
-        self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // 8))
-        self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // 8))
-        self.BYTES_PER_WORD = self.DATA_WIDTH // 8
-        self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // 8
         self.BYTE_SIZE = 8
+        self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // self.BYTE_SIZE))
+        self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // self.BYTE_SIZE))
+        self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
+        self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // self.BYTE_SIZE
         self.BE_BYTE_MULTIPLIER = self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
