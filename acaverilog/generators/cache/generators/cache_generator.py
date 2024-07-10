@@ -15,7 +15,6 @@ from veriloggen import (
     Cond,
     Case,
     When,
-    
 )
 
 from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
@@ -117,6 +116,11 @@ class CacheGenerator:
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
         self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // self.BYTE_SIZE
         self.BE_BYTE_MULTIPLIER = self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD
+        self.READ_BLOCK_WC = min(
+            self.BE_BYTE_MULTIPLIER, self.BLOCK_SIZE
+        )  # the words read from the BE cache can be bigger than our own words so
+        # we might be able to extract multiple words from that single word. This
+        # variable specifies how many times we can do that per BE word.
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -343,8 +347,22 @@ class CacheGenerator:
         if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
             m.Always(be_read_data_i)(resized_be_read_data(be_read_data_i, blk=True))
         else:
-            m.Always(be_read_data_i, be_address_o_reg)(
-                Case(be_address_o_reg[: -self.BE_ADDRESS_WIDTH])(
+            if self.READ_BLOCK_WC > 1:
+                be_read_data_word_offset = m.Reg(
+                    "be_read_data_word_offset",
+                    self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH,
+                )
+            else:
+                be_read_data_word_offset = m.Wire(
+                    "be_read_data_word_offset",
+                    self.ADDRESS_WIDTH - self.BE_ADDRESS_WIDTH,
+                )
+                m.Assign(be_read_data_word_offset(0))
+            m.Always(be_read_data_i, be_address_o_reg, be_read_data_word_offset)(
+                Case(
+                    be_address_o_reg[: -self.BE_ADDRESS_WIDTH]
+                    + be_read_data_word_offset
+                )(
                     *[
                         When(i)(
                             resized_be_read_data(
@@ -551,6 +569,7 @@ class CacheGenerator:
                     if self.NUM_WAYS > 1
                     else []
                 ),
+                be_read_data_word_offset(0) if self.READ_BLOCK_WC > 1 else [],
             ).Else(
                 If(state_reg == States.READY.value)(
                     # Cache is ready for a new request
@@ -736,7 +755,8 @@ class CacheGenerator:
                                         OrList(
                                             Not(fe_read_write_select_i_reg),
                                             self.BLOCK_SIZE > 1,
-                                            fe_write_strobe_i_reg != 2**self.BYTES_PER_WORD - 1,
+                                            fe_write_strobe_i_reg
+                                            != 2**self.BYTES_PER_WORD - 1,
                                         )
                                     )(
                                         write_back_next_state(States.READ_BLOCK.value)
@@ -754,7 +774,8 @@ class CacheGenerator:
                                     OrList(
                                         Not(fe_read_write_select_i_reg),
                                         self.BLOCK_SIZE > 1,
-                                        fe_write_strobe_i_reg != 2**self.BYTES_PER_WORD - 1,
+                                        fe_write_strobe_i_reg
+                                        != 2**self.BYTES_PER_WORD - 1,
                                     )
                                 )(
                                     # Read the block from the next level memory
@@ -840,13 +861,34 @@ class CacheGenerator:
                         latency_counter.inc(),
                         state_reg(send_mem_request_next_state),
                         If(Not(be_read_write_select_o_reg))(
+                            (
+                                # Write all the words we need from the BE read data into the cache and
+                                # then go on to the next state
+                                state_reg(send_mem_request_next_state)
+                                if self.READ_BLOCK_WC == 1
+                                else If(
+                                    be_read_data_word_offset == self.READ_BLOCK_WC - 1
+                                )(
+                                    state_reg(send_mem_request_next_state),
+                                    be_read_data_word_offset(0),
+                                ).Else(
+                                    be_read_data_word_offset.inc()
+                                )
+                            ),
                             # if we just read something, write it to the cache
                             # if we read stuff we always want to write back the whole word since the fe write request will be applied afterwards
+                            # so we do not need to worry about any write strobe things
                             [
                                 data_memory[next_block_replacement][address_index][
                                     # figure out the correct block offset
                                     (
                                         be_address_o_reg[: self.WORD_OFFSET_W]
+                                        + (
+                                            0
+                                            if self.ADDRESS_WIDTH
+                                            == self.BE_ADDRESS_WIDTH
+                                            else be_read_data_word_offset
+                                        )
                                         if self.BLOCK_SIZE > 1
                                         else 0
                                     )
@@ -858,7 +900,7 @@ class CacheGenerator:
                                     ]
                                 )
                                 for byte_idx in range(self.BYTES_PER_WORD)
-                            ]
+                            ],
                         ),
                     ),
                 )
@@ -877,7 +919,9 @@ class CacheGenerator:
                             be_address_o_reg[: self.WORD_OFFSET_W](
                                 read_block_word_offset
                             ),
-                            read_block_word_offset.inc(),  # increment block offset
+                            read_block_word_offset(
+                                read_block_word_offset + self.READ_BLOCK_WC
+                            ),  # increment block offset
                         ]
                         if self.BLOCK_SIZE > 1
                         else []
@@ -886,7 +930,7 @@ class CacheGenerator:
                         fe_address_i_reg[self.WORD_OFFSET_W :]
                     ),
                     be_read_write_select_o_reg(0),
-                    If(read_block_word_offset == self.BLOCK_SIZE - 1)(
+                    If(read_block_word_offset == self.BLOCK_SIZE - self.READ_BLOCK_WC)(
                         # We're done, go back
                         send_mem_request_next_state(States.READ_BLOCK_DONE.value)
                     ).Else(
@@ -894,7 +938,8 @@ class CacheGenerator:
                         send_mem_request_next_state(States.READ_BLOCK.value)
                     ),
                     # Send the memory request except for when its the address to which
-                    # we want to write anyway AND write strobe is all ones
+                    # we want to write anyway AND write strobe is all ones AND we would not
+                    # read any other byte from the word the BE would give is in this request (self.READ_BLOCK_WC == 1)
                     If(
                         Not(
                             AndList(
@@ -902,6 +947,7 @@ class CacheGenerator:
                                 address_word_offset == read_block_word_offset,
                                 fe_write_strobe_i_reg + 1
                                 == 0,  # write strobe is all ones so we dont need any byte of that word
+                                self.READ_BLOCK_WC == 1,
                             )
                         )
                     )(state_reg(States.SEND_MEM_REQUEST.value)).Elif(
