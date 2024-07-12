@@ -43,6 +43,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "19 5 round_robin \"16 8 4 2 plru_mru 4 11 0 1 1\" \"16 8\""
     "20 1 priority \"8 6 1 4 plru_tree 4 11 0 1 1\" \"64 3 1 2 plru_tree 4 29 0 1 1\" \"128 2\""
     "21 1 priority \"8 6 1 2 plru_tree 6 17 1 0 4\" \"64 3\""
+    "22 1 priority \"8 16 2 4 plru_tree 4 11 0 1 1\" \"8 16\""
 )
 list(LENGTH CACHE_WRAPPER_ARG_LIST NUM_TESTBENCHES)
 
