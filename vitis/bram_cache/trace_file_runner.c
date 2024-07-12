@@ -41,17 +41,17 @@ int main()
 	volatile Xuint32* cache_read_data = cache_baseaddr_p + 6;
 	volatile Xuint32* cache_trace_done = cache_baseaddr_p + 7;
 
-	unsigned char trace_data[] = test_trace_32_16_bin;
-	unsigned int trace_len = test_trace_32_16_bin_len;
+//	unsigned char trace_data[] = test_trace_32_16_bin;
+//	unsigned int trace_len = test_trace_32_16_bin_len;
 	unsigned int trace_bytes_per_word = (trace_data_width / 8);
 
     init_platform();
 
     xil_printf("Writing the trace to the BRAM...\n\r");
-	for(int i = 0; i < trace_len; i += trace_bytes_per_word){
+	for(int i = 0; i < test_trace_32_16_bin_len; i += trace_bytes_per_word){
 		unsigned int word = 0;
 		for(int j = 0; j < trace_bytes_per_word; j++){
-			word |= (trace_data[i+j] << (trace_data_width - (j + 1) * 8));
+			word |= (test_trace_32_16_bin[i+j] << (trace_data_width - (j + 1) * 8));
 		}
     	*(trace_bram_baseaddr_p + i) = word;
 	}
@@ -62,9 +62,9 @@ int main()
     }
 
     xil_printf("Starting trace processing.\n\r");
-    *cache_trace_length = trace_len;
+    *cache_trace_length = test_trace_32_16_bin_len;
 
-    while(true){
+    while(1){
     	if(*cache_trace_done == 1) {
     		break;
     	}
@@ -81,7 +81,7 @@ int main()
 
     	xil_printf("Reading from address 0x%x... ", i);
 
-    	while(true){
+    	while(1){
     		if((*cache_hit_rdval_wdone_pready & 0b0101) == 0b0101) {
     			xil_printf("0x%x\n\r", *cache_read_data);
     			break;

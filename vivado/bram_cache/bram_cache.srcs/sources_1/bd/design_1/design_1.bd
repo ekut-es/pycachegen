@@ -1035,10 +1035,28 @@
         "xci_path": "ip/design_1_axi_bram_ctrl_0_bram_0/design_1_axi_bram_ctrl_0_bram_0.xci",
         "inst_hier_path": "trace_bram",
         "parameters": {
+          "Enable_B": {
+            "value": "Use_ENB_Pin"
+          },
           "Memory_Type": {
             "value": "True_Dual_Port_RAM"
           },
+          "PRIM_type_to_Implement": {
+            "value": "BRAM"
+          },
+          "Port_B_Clock": {
+            "value": "100"
+          },
+          "Port_B_Enable_Rate": {
+            "value": "100"
+          },
+          "Port_B_Write_Rate": {
+            "value": "50"
+          },
           "Use_RSTA_Pin": {
+            "value": "true"
+          },
+          "Use_RSTB_Pin": {
             "value": "true"
           },
           "Write_Width_A": {
@@ -1186,13 +1204,22 @@
       },
       "axi_slave_bram_cache_0": {
         "vlnv": "user.org:user:axi_slave_bram_cache:1.1",
-        "ip_revision": "30",
+        "ip_revision": "35",
         "xci_name": "design_1_axi_slave_bram_cache_0_1",
         "xci_path": "ip/design_1_axi_slave_bram_cache_0_1/design_1_axi_slave_bram_cache_0_1.xci",
         "inst_hier_path": "axi_slave_bram_cache_0",
         "parameters": {
+          "CACHE_ADDRESS_WIDTH": {
+            "value": "16"
+          },
+          "CACHE_DATA_WIDTH": {
+            "value": "8"
+          },
           "STATS_BRAM_DATA_WIDTH": {
             "value": "32"
+          },
+          "TRACE_BRAM_ADDRESS_WIDTH": {
+            "value": "16"
           }
         }
       },
@@ -1290,9 +1317,9 @@
       "rst_ps8_0_99M_peripheral_aresetn": {
         "ports": [
           "rst_ps8_0_99M/peripheral_aresetn",
-          "axi_smc/aresetn",
-          "axi_bram_ctrl_trace/s_axi_aresetn",
           "axi_bram_ctrl_stats/s_axi_aresetn",
+          "axi_bram_ctrl_trace/s_axi_aresetn",
+          "axi_smc/aresetn",
           "axi_slave_bram_cache_0/s00_axi_aresetn"
         ]
       },
@@ -1300,10 +1327,10 @@
         "ports": [
           "zynq_ultra_ps_e_0/pl_clk0",
           "zynq_ultra_ps_e_0/maxihpm0_lpd_aclk",
-          "axi_smc/aclk",
           "rst_ps8_0_99M/slowest_sync_clk",
-          "axi_bram_ctrl_trace/s_axi_aclk",
           "axi_bram_ctrl_stats/s_axi_aclk",
+          "axi_bram_ctrl_trace/s_axi_aclk",
+          "axi_smc/aclk",
           "axi_slave_bram_cache_0/s00_axi_aclk"
         ]
       },
@@ -1322,7 +1349,7 @@
               "SEG_axi_bram_ctrl_0_Mem0": {
                 "address_block": "/axi_bram_ctrl_trace/S_AXI/Mem0",
                 "offset": "0x0082000000",
-                "range": "4K"
+                "range": "64K"
               },
               "SEG_axi_bram_ctrl_stats_Mem0": {
                 "address_block": "/axi_bram_ctrl_stats/S_AXI/Mem0",
