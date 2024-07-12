@@ -160,11 +160,13 @@ class FunctionalMemoryGenerator:
         write_done = m.Reg(f"write_done")
 
         # internal
-        data_memory = m.Reg(
-            "data_memory",
-            self.BYTE_SIZE,
-            dims=(pow(2, ADDRESS_WIDTH.value), self.BYTES_PER_WORD),
-        )
+        data_memory = []
+        for i in range(self.BYTES_PER_WORD):
+            data_memory.append(m.Reg(
+                f"data_memory_{i}",
+                self.BYTE_SIZE,
+                dims=(pow(2, ADDRESS_WIDTH.value)),
+            ))
         read_in_progress = m.Reg(f"read_in_progress")
         write_in_progress = m.Reg(f"write_in_progress")
 
@@ -220,7 +222,7 @@ class FunctionalMemoryGenerator:
                     read_in_progress(0),
                     address_valid(0),
                     [
-                        read_data[i](data_memory[address][i])
+                        read_data[i](data_memory[i][address])
                         for i in range(self.BYTES_PER_WORD)
                     ],
                     read_data_valid(1),
@@ -232,7 +234,7 @@ class FunctionalMemoryGenerator:
                     write_done(1),
                     [
                         If(write_strobe[i])(
-                            data_memory[address][i](
+                            data_memory[i][address](
                                 write_data[
                                     self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)
                                 ]
