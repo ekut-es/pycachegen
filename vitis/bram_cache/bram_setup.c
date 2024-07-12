@@ -84,7 +84,7 @@ int main()
     }
 
     xil_printf("Starting trace processing.\n\r");
-    *cache_trace_length = trace_length; // no idea why * 4 is needed here
+    *cache_trace_length = trace_length;
 
     for (int i = 0; i < trace_timeout; i++) {
     	if (*cache_trace_done == 1) {
