@@ -116,6 +116,9 @@ class CacheGenerator:
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
         self.BE_BYTES_PER_WORD = self.BE_DATA_WIDTH // self.BYTE_SIZE
         self.BE_BYTE_MULTIPLIER = self.BE_BYTES_PER_WORD // self.BYTES_PER_WORD
+        self.READ_BLOCK_REQUESTS_NEEDED = ceil(
+            self.BYTES_PER_WORD * self.BLOCK_SIZE / self.BE_BYTES_PER_WORD
+        )
         self.READ_BLOCK_WC = min(
             self.BE_BYTE_MULTIPLIER, self.BLOCK_SIZE
         )  # the words read from the BE cache can be bigger than our own words so
@@ -141,17 +144,33 @@ class CacheGenerator:
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
             min_miss = max(min_miss, 7)  # write miss
         if True:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # read miss
+            min_miss = max(
+                min_miss, 5 + self.READ_BLOCK_REQUESTS_NEEDED * (2 + self.READ_BLOCK_WC)
+            )  # read miss
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # write miss
+            min_miss = max(
+                min_miss, 5 + self.READ_BLOCK_REQUESTS_NEEDED * (2 + self.READ_BLOCK_WC)
+            )  # write miss
         if self.WRITE_ALLOCATE and not self.WRITE_BACK:
-            min_miss = max(min_miss, 7 + 3 * self.BLOCK_SIZE)  # write miss
+            min_miss = max(
+                min_miss, 7 + self.READ_BLOCK_REQUESTS_NEEDED * (2 + self.READ_BLOCK_WC)
+            )  # write miss
         if self.WRITE_BACK and self.BLOCK_SIZE == 1 and self.WRITE_ALLOCATE:
             min_miss = max(min_miss, 5 + 3 * self.BLOCK_SIZE)  # write miss + dirty
         if self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)  # read miss + dirty
+            min_miss = max(
+                min_miss,
+                5
+                + 3 * self.BLOCK_SIZE
+                + self.READ_BLOCK_REQUESTS_NEEDED * (2 + self.READ_BLOCK_WC),
+            )  # read miss + dirty
         if self.WRITE_ALLOCATE and self.WRITE_BACK:
-            min_miss = max(min_miss, 5 + 6 * self.BLOCK_SIZE)  # write miss + dirty
+            min_miss = max(
+                min_miss,
+                5
+                + 3 * self.BLOCK_SIZE
+                + self.READ_BLOCK_REQUESTS_NEEDED * (2 + self.READ_BLOCK_WC),
+            )  # write miss + dirty
         if not self.WRITE_ALLOCATE:
             min_miss = max(min_miss, 6)
 
