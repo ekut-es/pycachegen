@@ -4,19 +4,16 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_20.h"
+#include "Vcache_wrapper_23.h"
 
-// Testbench for testing different data widths with a block size of 1.
+// Testbench for testing that multiple words will be taken from the BE read data
+// without sending a new memory request for each word. Two BE words span one block.
 // num_ports=1, arbiter_policy=priority
-// L1: data_width=8, address_width=6, num_ways=1, num_sets=4,
-// replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
-// write_through=false, write_allocate=true,
-// block_size=1
-// L2: data_width=64, address_width=3, num_ways=1, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
-// write_through=false, write_allocate=true,
-// block_size=1
-// Main Memory: data_width=128, address_width=2
+// L1: data_width=8, address_width=6, num_ways=1, num_sets=2,
+// replacement_policy=plru_tree, hit_latency=6, miss_latency=17,
+// write_through=true, write_allocate=false,
+// block_size=4
+// Main Memory: data_width=16, address_width=5
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -44,8 +41,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_20> cache_wrapper{
-        new Vcache_wrapper_20{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_23> cache_wrapper{
+        new Vcache_wrapper_23{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -138,7 +135,7 @@ int sc_main(int argc, char** argv) {
     };
 
 
-    std::cout << "Vcache_wrapper_20 start!" << std::endl;
+    std::cout << "Vcache_wrapper_23 start!" << std::endl;
 
     tick(0);
 
@@ -146,7 +143,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_20.vcd");
+        trace->open("Vcache_wrapper_tb_23.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -158,33 +155,24 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         write(0, 0x10, 0);
-        read(0, 0x10, 1);
+        write(1, 0x11, 0);
+        write(2, 0x12, 0);
+        write(3, 0x13, 0);
 
-        write(4, 0x14, 0);  // this should write back the block in the L1 cache and cause L2 to do a read block operation
-        read(0, 0x10, 0);   // this should be stored in the L2 cache and the 0x14 at address 4, which gets written back,
-                            // should be stored within the same word as address 0 in the L2 cache
-        
-        read(4, 0x14, 0);   // check that this gets retrieved correctly from the L2 cache
-
+        write(4, 0x14, 0);
+        write(5, 0x15, 0);
+        write(6, 0x16, 0);
         write(7, 0x17, 0);
-        write(3, 0x13, 0);  // 7 should also get inserted into the same word in the L2 cache
-        read(7, 0x17, 0);   // 3 should also get inserted into the same word in the L2 cache
 
-        write(8, 0x18, 0);
-        write(12, 0x1C, 0); // 8 should get inserted into another word in the L2 cache
+        read(2, 0x12, 0);
+        read(0, 0x10, 1);
+        read(1, 0x11, 1);
+        read(3, 0x13, 1);
 
-        write(32, 0x30, 0);
-        write(36, 0x34, 0); // this should get inserted into the first word in the L2 cache,
-                            // thus causing a write back to main memory
-
-        read(36, 0x34, 1);  // check that all the data can still be correctly retrieved from somewhere
-        read(32, 0x30, 0);
-        read(12, 0x1C, 0);
-        read(8, 0x18, 0);
-        read(7, 0x17, 1);
-        read(3, 0x13, 0);
-        read(4, 0x14, 0);
-        read(0, 0x10, 0); 
+        read(7, 0x17, 0);
+        read(4, 0x14, 1);
+        read(5, 0x15, 1);
+        read(6, 0x16, 1);
 
         tick(10);
     } catch (std::runtime_error& e) {
@@ -198,6 +186,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_20 done!" << std::endl;
+    std::cout << "Vcache_wrapper_23 done!" << std::endl;
     return 0;
 }
