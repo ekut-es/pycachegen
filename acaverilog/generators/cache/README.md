@@ -30,6 +30,8 @@ Inside `/vitis` directories with programs for the Vivado designs:
         +-------------------+-------+----------------------------------------------+-----------+
     Where `w` is the width of the whole instruction, `d` is the width of the write data and `a` is the address width.
 
+    Once you have a file with the instructions, use `xxd -i <filename.bin> > <filename.h>` to convert it to a C header file, include it in the trace runner program and replace the data and length variables if they are named differently than the ones used in the program.
+
     To synthesize a matching cache wrapper, you will, in addition to the general steps listed below, need to do a few things:
     1. In the controller for the trace BRAM, set the data width you need (depends on your data and address width of course).
     2. In the address editor, set the width of the address range for the trace BRAM so it fits all your instructions. Note that the addresses are word addressed, so if you select 4k you can fit 4096 instructions no matter how wide they are.
