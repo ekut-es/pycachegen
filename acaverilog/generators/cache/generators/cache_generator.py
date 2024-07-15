@@ -26,16 +26,9 @@ from acaverilog.generators.cache.generators.priority_encoder_generator import (
     PriorityEncoderGenerator,
 )
 from acaverilog.generators.cache.cache_config_validation import (
-    assert_address_config_valid,
-    assert_is_power_of_two,
-    assert_data_width_valid,
-    assert_replacement_policy_is_valid,
-    assert_same_address_space,
-    assert_be_data_width_valid,
     ConfigurationError,
+    CacheConfig
 )
-
-REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
 
 
 class States(Enum):
@@ -55,66 +48,28 @@ class States(Enum):
 class CacheGenerator:
     def __init__(
         self,
-        data_width: int,
-        address_width: int,
-        num_ways: int,
-        num_sets: int,
-        replacement_policy: str,
-        hit_latency: int,
-        miss_latency: int,
-        write_through: bool,
-        write_allocate: bool,
-        block_size: int,
+        config: CacheConfig,
         prefix: str,
-        be_data_width: int,
-        be_address_width: int,
     ) -> None:
         """Cache Generator.
 
         Args:
-            data_width (int): Width of one data word in bits.
-            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
-            num_ways (int): Number of ways. Must be a power of 2.
-            num_sets (int): Number of sets. Must be a power of 2.
-            replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
-            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need).
-            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need).
-            write_through (bool): Use write-through or write-back policy
-            write_allocate (bool): Use write-allocate or write-no-allocate policy
-            block_size (int): Number of words per block. Must be a power of 2.
-            prefix (str): Prefix to be used for this module's name
-            be_data_width (int): Data width of the next level cache in bits. Must be of the form (8 * 2**n) where n>=0. Must be greater than the cache's own data_width.
-            be_address_width (int): Address width of the next level cache.
+            config (CacheConfig): Cache configuration.
+            prefix (str): A prefix to use for the module name.
         """
-        assert_data_width_valid(data_width)
-        assert_data_width_valid(be_data_width)
-        assert_is_power_of_two(num_ways, "num_ways")
-        assert_is_power_of_two(num_sets, "num_sets")
-        assert_is_power_of_two(block_size, "block_size")
-        assert_replacement_policy_is_valid(replacement_policy, REPLACEMENT_POLICIES)
-        assert_same_address_space(
-            dw1=data_width, aw1=address_width, dw2=be_data_width, aw2=be_address_width
-        )
-        assert_address_config_valid(
-            address_width=address_width,
-            num_sets=num_sets,
-            num_ways=num_ways,
-            block_size=block_size,
-        )
-        assert_be_data_width_valid(data_width, be_data_width)
-        self.DATA_WIDTH = data_width
-        self.ADDRESS_WIDTH = address_width
-        self.NUM_WAYS = num_ways
-        self.NUM_SETS = num_sets
-        self.REPLACEMENT_POLICY = replacement_policy
-        self.HIT_LATENCY = hit_latency
-        self.MISS_LATENCY = miss_latency
-        self.WRITE_BACK = not write_through
-        self.WRITE_ALLOCATE = write_allocate
-        self.BLOCK_SIZE = block_size
+        self.DATA_WIDTH = config.DATA_WIDTH
+        self.ADDRESS_WIDTH = config.ADDRESS_WIDTH
+        self.NUM_WAYS = config.NUM_WAYS
+        self.NUM_SETS = config.NUM_SETS
+        self.REPLACEMENT_POLICY = config.REPLACEMENT_POLICY
+        self.HIT_LATENCY = config.HIT_LATENCY
+        self.MISS_LATENCY = config.MISS_LATENCY
+        self.WRITE_BACK = config.WRITE_BACK
+        self.WRITE_ALLOCATE = config.WRITE_ALLOCATE
+        self.BLOCK_SIZE = config.BLOCK_SIZE
+        self.BE_DATA_WIDTH = config.BE_DATA_WIDTH
+        self.BE_ADDRESS_WIDTH = config.BE_ADDRESS_WIDTH
         self.PREFIX = prefix
-        self.BE_DATA_WIDTH = be_data_width
-        self.BE_ADDRESS_WIDTH = be_address_width
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))

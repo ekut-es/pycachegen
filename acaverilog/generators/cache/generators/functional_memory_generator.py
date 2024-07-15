@@ -3,37 +3,31 @@ from veriloggen import Module, Posedge, Negedge, If, AndList, Not, For, Or, And
 
 from acaverilog.generators.cache.cache_config_validation import (
     assert_data_width_valid,
-    assert_greater_equal
+    assert_greater_equal,
+    MemoryConfig
 )
-
 
 
 
 class FunctionalMemoryGenerator:
 
     def __init__(
-        self, data_width: int, address_width: int, read_latency: int, write_latency: int
+        self, config: MemoryConfig
     ) -> None:
         """Generator for a data memory that can hold data, hence it's called functional.
 
-        Args:
-            data_width (int): Width of one data word in bits.
-            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
-            read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-        """
-        assert_greater_equal(read_latency, 2, "read_latency")
-        assert_greater_equal(write_latency, 2, "write_latency")
-        assert_data_width_valid(data_width)
 
-        self.DATA_WIDTH = data_width
-        self.ADDRESS_WIDTH = address_width
-        self.READ_LATENCY = read_latency
-        self.WRITE_LATENCY = write_latency
+        Args:
+            config (MemoryConfig): Configuration for this memory.
+        """
+        self.DATA_WIDTH = config.DATA_WIDTH
+        self.ADDRESS_WIDTH = config.ADDRESS_WIDTH
+        self.READ_LATENCY = config.READ_LATENCY
+        self.WRITE_LATENCY = config.WRITE_LATENCY
 
         # internal constants
         self.BYTE_SIZE = 8
-        self.BYTES_PER_WORD = data_width // self.BYTE_SIZE
+        self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
         self.LATENCY_COUNTER_SIZE = ceil(
             log2(max(self.WRITE_LATENCY, self.READ_LATENCY))
         )
@@ -179,7 +173,7 @@ class FunctionalMemoryGenerator:
 
 if __name__ == "__main__":
     memory_generator = FunctionalMemoryGenerator(
-        data_width=16, address_width=3, read_latency=10, write_latency=15
+        MemoryConfig(data_width=16, address_width=3, read_latency=10, write_latency=15)
     )
     m = memory_generator.generate_module()
     m.to_verilog("../src/functional_memory.v", for_verilator=True)

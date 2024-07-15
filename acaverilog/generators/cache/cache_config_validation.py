@@ -1,5 +1,7 @@
 from math import log2
 
+REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
+
 
 class ConfigurationError(ValueError):
     """An error that gets thrown when a module was configured incorrectly."""
@@ -126,7 +128,7 @@ def assert_be_data_width_valid(data_width, be_data_width) -> None:
 
 def assert_greater_equal(i: int, threshold: int, name: str) -> None:
     """Throws an error if the given value is not greater or equal to the treshold.
-    
+
     Args:
         i (int): the value to compare
         threshold (int): the threshold to compare against
@@ -137,3 +139,87 @@ def assert_greater_equal(i: int, threshold: int, name: str) -> None:
     """
     if i < threshold:
         raise ConfigurationError(f"{name} is {i} but needs to be at least {threshold}")
+
+
+class CacheConfig:
+    def __init__(
+        self,
+        data_width: int,
+        address_width: int,
+        num_ways: int,
+        num_sets: int,
+        replacement_policy: str,
+        hit_latency: int,
+        miss_latency: int,
+        write_through: bool,
+        write_allocate: bool,
+        block_size: int,
+        be_data_width: int,
+        be_address_width: int,
+    ) -> None:
+        """Class to store and validate a configuration for the cache.
+
+        Args:
+            data_width (int): Width of one data word in bits.
+            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
+            num_ways (int): Number of ways. Must be a power of 2.
+            num_sets (int): Number of sets. Must be a power of 2.
+            replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
+            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need).
+            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need).
+            write_through (bool): Use write-through or write-back policy
+            write_allocate (bool): Use write-allocate or write-no-allocate policy
+            block_size (int): Number of words per block. Must be a power of 2.
+            be_data_width (int): Data width of the next level cache in bits. Must be of the form (8 * 2**n) where n>=0. Must be greater than the cache's own data_width.
+            be_address_width (int): Address width of the next level cache.
+        """
+        assert_data_width_valid(data_width)
+        assert_data_width_valid(be_data_width)
+        assert_is_power_of_two(num_ways, "num_ways")
+        assert_is_power_of_two(num_sets, "num_sets")
+        assert_is_power_of_two(block_size, "block_size")
+        assert_replacement_policy_is_valid(replacement_policy, REPLACEMENT_POLICIES)
+        assert_same_address_space(
+            dw1=data_width, aw1=address_width, dw2=be_data_width, aw2=be_address_width
+        )
+        assert_address_config_valid(
+            address_width=address_width,
+            num_sets=num_sets,
+            num_ways=num_ways,
+            block_size=block_size,
+        )
+        assert_be_data_width_valid(data_width, be_data_width)
+        self.DATA_WIDTH = data_width
+        self.ADDRESS_WIDTH = address_width
+        self.NUM_WAYS = num_ways
+        self.NUM_SETS = num_sets
+        self.REPLACEMENT_POLICY = replacement_policy
+        self.HIT_LATENCY = hit_latency
+        self.MISS_LATENCY = miss_latency
+        self.WRITE_BACK = not write_through
+        self.WRITE_ALLOCATE = write_allocate
+        self.BLOCK_SIZE = block_size
+        self.BE_DATA_WIDTH = be_data_width
+        self.BE_ADDRESS_WIDTH = be_address_width
+
+
+class MemoryConfig:
+    def __init__(
+        self, data_width: int, address_width: int, read_latency: int, write_latency: int
+    ) -> None:
+        """Class to store and validate a configuration for the functional memory.
+
+        Args:
+            data_width (int): Width of one data word in bits.
+            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
+            read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
+            write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
+        """
+        assert_greater_equal(read_latency, 2, "read_latency")
+        assert_greater_equal(write_latency, 2, "write_latency")
+        assert_data_width_valid(data_width)
+
+        self.DATA_WIDTH = data_width
+        self.ADDRESS_WIDTH = address_width
+        self.READ_LATENCY = read_latency
+        self.WRITE_LATENCY = write_latency
