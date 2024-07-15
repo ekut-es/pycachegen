@@ -9,7 +9,7 @@
 // Testbench for testing a direct mapped cache
 // num_ports=1, arbiter_policy=priority
 // L1: data_width=16, address_width=8, num_ways=1, num_sets=4,
-// replacement_policy=fifo, hit_latency=6, miss_latency=6,
+// replacement_policy=fifo, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false,
 // block_size=1
 // Main Memory: data_width=16, address_width=8

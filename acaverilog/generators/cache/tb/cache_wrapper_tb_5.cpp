@@ -26,8 +26,8 @@ int sc_main(int argc, char** argv) {
 
     const int hit_latency = 6;
     const int miss_latency = 8;
-    const int read_latency = 11;
-    const int write_latency = 16;
+    const int read_latency = 10;
+    const int write_latency = 15;
 
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;

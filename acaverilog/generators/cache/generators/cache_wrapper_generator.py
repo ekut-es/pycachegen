@@ -11,7 +11,6 @@ from veriloggen import (
     OrList,
     Not,
 )
-from itertools import chain
 
 from acaverilog.generators.cache.generators.cache_generator import CacheGenerator
 from acaverilog.generators.cache.generators.functional_memory_generator import (
@@ -44,8 +43,11 @@ class CacheWrapperGenerator:
         self.WRITE_THROUGH = [bool(int(config[7])) for config in cache_configs]
         self.WRITE_ALLOCATE = [bool(int(config[8])) for config in cache_configs]
         self.BLOCK_SIZE = [int(config[9]) for config in cache_configs]
-        self.DATA_WIDTH.append(int(args[-1].split()[0]))  # main memory data width
-        self.ADDRESS_WIDTH.append(int(args[-1].split()[1]))  # main memory address width
+        memory_config = args[-1].split()
+        self.DATA_WIDTH.append(int(memory_config[0]))
+        self.ADDRESS_WIDTH.append(int(memory_config[1]))
+        self.MEMORY_READ_LATENCY = int(memory_config[2])
+        self.MEMORY_WRITE_LATENCY = int(memory_config[3])
         self.BYTE_SIZE = 8
 
     def generate_module(self) -> Module:
@@ -73,7 +75,10 @@ class CacheWrapperGenerator:
             )
 
         memory = FunctionalMemoryGenerator(
-            data_width=self.DATA_WIDTH[-1], address_width=self.ADDRESS_WIDTH[-1]
+            data_width=self.DATA_WIDTH[-1],
+            address_width=self.ADDRESS_WIDTH[-1],
+            read_latency=self.MEMORY_READ_LATENCY,
+            write_latency=self.MEMORY_WRITE_LATENCY,
         ).generate_module()
 
         # Common Inputs
@@ -181,7 +186,7 @@ class CacheWrapperGenerator:
                     ("be_write_data_o", be_write_data[0]),
                     ("be_write_data_valid_o", be_write_data_valid[0]),
                     ("be_read_write_select_o", be_read_write_select[0]),
-                    ("be_write_strobe_o", be_write_strobe[0])
+                    ("be_write_strobe_o", be_write_strobe[0]),
                 ),
             )
         else:
@@ -267,7 +272,7 @@ class CacheWrapperGenerator:
                     ("be_write_data_o", be_write_data[0]),
                     ("be_write_data_valid_o", be_write_data_valid[0]),
                     ("be_read_write_select_o", be_read_write_select[0]),
-                    ("be_write_strobe_o", be_write_strobe[0])
+                    ("be_write_strobe_o", be_write_strobe[0]),
                 ),
             )
 
@@ -330,14 +335,17 @@ class CacheWrapperGenerator:
                 ("write_data_i", be_write_data[-1]),
                 ("write_data_valid_i", be_write_data_valid[-1]),
                 ("read_write_select_i", be_read_write_select[-1]),
-                ("write_strobe_i", be_write_strobe[-1])
+                ("write_strobe_i", be_write_strobe[-1]),
             ),
         )
         return m
 
 
 if __name__ == "__main__":
-    # argv: (file name), number for output file suffix, num ports, arbiter policy, [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]... [main memory data width, main memory address width]
+    # argv:
+    # (file name), number for output file suffix, num ports, arbiter policy,
+    # [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
+    # [main memory data width, main memory address width, read latency, write latency]
     cache_wrapper_generator = CacheWrapperGenerator(*sys.argv[2:])
     m = cache_wrapper_generator.generate_module()
     m.to_verilog(f"../src/cache_wrapper_{sys.argv[1]}.v", for_verilator=True)

@@ -122,3 +122,18 @@ def assert_be_data_width_valid(data_width, be_data_width) -> None:
         raise ConfigurationError(
             "The data width cannot be greater than the backend data width"
         )
+
+
+def assert_greater_equal(i: int, threshold: int, name: str) -> None:
+    """Throws an error if the given value is not greater or equal to the treshold.
+    
+    Args:
+        i (int): the value to compare
+        threshold (int): the threshold to compare against
+        name (str): the name of the parameter `i` to be shown in the error message
+
+    Raises:
+        ConfigurationError: Error that gets thrown if i<threshold
+    """
+    if i < threshold:
+        raise ConfigurationError(f"{name} is {i} but needs to be at least {threshold}")

@@ -9,11 +9,11 @@
 // Testbench for testing different data widths with a block size of 1.
 // num_ports=1, arbiter_policy=priority
 // L1: data_width=8, address_width=6, num_ways=1, num_sets=4,
-// replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
+// replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,
 // block_size=1
 // L2: data_width=64, address_width=3, num_ways=1, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
+// replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,
 // block_size=1
 // Main Memory: data_width=128, address_width=2

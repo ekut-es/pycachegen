@@ -77,8 +77,8 @@ class CacheGenerator:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
-            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
-            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Must be at least 6.
+            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need).
+            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need).
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.

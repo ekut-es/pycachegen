@@ -10,7 +10,7 @@
 // without sending a new memory request for each word. One BE word spans two blocks.
 // num_ports=1, arbiter_policy=priority
 // L1: data_width=8, address_width=6, num_ways=1, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=6, miss_latency=17,
+// replacement_policy=plru_tree, hit_latency=6, miss_latency=11,
 // write_through=true, write_allocate=false,
 // block_size=4
 // Main Memory: data_width=64, address_width=3
