@@ -6,7 +6,6 @@ from veriloggen import (
     Posedge,
     Negedge,
     If,
-    For,
     AndList,
     OrList,
     Not,
@@ -26,10 +25,17 @@ from acaverilog.generators.cache.generators.replacement_policy_generator import 
 from acaverilog.generators.cache.generators.priority_encoder_generator import (
     PriorityEncoderGenerator,
 )
+from acaverilog.generators.cache.cache_config_validation import (
+    assert_address_config_valid,
+    assert_is_power_of_two,
+    assert_data_width_valid,
+    assert_replacement_policy_is_valid,
+    assert_same_address_space,
+    assert_be_data_width_valid,
+    ConfigurationError,
+)
 
-# from acadl import ACADLObject
-
-# from .acadl_object_generator import ACADLObjectGenerator
+REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
 
 
 class States(Enum):
@@ -46,15 +52,7 @@ class States(Enum):
     FLUSH_PREPARE_WRITE_BACK = 10
 
 
-# class CacheGenerator(ACADLObjectGenerator):
 class CacheGenerator:
-
-    # def __init__(
-    #     self,
-    #     acadl_object: ACADLObject,
-    # ) -> None:
-    #     super().__init__(acadl_object)
-
     def __init__(
         self,
         data_width: int,
@@ -85,10 +83,25 @@ class CacheGenerator:
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
             prefix (str): Prefix to be used for this module's name
-            be_data_width (int): Data width of the next level cache in bits.
+            be_data_width (int): Data width of the next level cache in bits. Must be of the form (8 * 2**n) where n>=0. Must be greater than the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
-
         """
+        assert_data_width_valid(data_width)
+        assert_data_width_valid(be_data_width)
+        assert_is_power_of_two(num_ways, "num_ways")
+        assert_is_power_of_two(num_sets, "num_sets")
+        assert_is_power_of_two(block_size, "block_size")
+        assert_replacement_policy_is_valid(replacement_policy, REPLACEMENT_POLICIES)
+        assert_same_address_space(
+            dw1=data_width, aw1=address_width, dw2=be_data_width, aw2=be_address_width
+        )
+        assert_address_config_valid(
+            address_width=address_width,
+            num_sets=num_sets,
+            num_ways=num_ways,
+            block_size=block_size,
+        )
+        assert_be_data_width_valid(data_width, be_data_width)
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.NUM_WAYS = num_ways
@@ -124,6 +137,17 @@ class CacheGenerator:
         )  # the words read from the BE cache can be bigger than our own words so
         # we might be able to extract multiple words from that single word. This
         # variable specifies how many times we can do that per BE word.
+        self.validate_latencies()
+        min_latencies = self.get_min_worst_case_latencies()
+        own_latencies = (self.HIT_LATENCY, self.MISS_LATENCY)
+        if min_latencies == own_latencies:
+            print(
+                f"{self.PREFIX} uses the minimum latencies (hit/miss): {min_latencies}"
+            )
+        else:
+            print(
+                f"{self.PREFIX} uses latencies higher than the minimum latencies (hit/miss): {min_latencies}"
+            )
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
         """Compute the minimum hit and miss latency for the current configuration
@@ -189,7 +213,7 @@ class CacheGenerator:
         the current configuration.
 
         Raises:
-            ValueError: Raises an error if the latencies are set too low.
+            ConfigurationError: Raises an error if the latencies are set too low.
         """
         min_latencies = self.get_min_worst_case_latencies()
         config_valid = (
@@ -198,17 +222,13 @@ class CacheGenerator:
         )
 
         if not config_valid:
-            raise ValueError(
+            raise ConfigurationError(
                 "The configured latencies are too low. "
                 + "The minimum worst case latencies for this configuration are "
                 f"{min_latencies[0]} (hit) and {min_latencies[1]} (miss)."
             )
 
     def generate_module(self) -> Module:
-        self.validate_latencies()
-        print(
-            f"{self.PREFIX} min latencies (hit/miss): {self.get_min_worst_case_latencies()}"
-        )
         # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
