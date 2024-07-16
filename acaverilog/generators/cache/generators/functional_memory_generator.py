@@ -4,16 +4,13 @@ from veriloggen import Module, Posedge, Negedge, If, AndList, Not, For, Or, And
 from acaverilog.generators.cache.cache_config_validation import (
     assert_data_width_valid,
     assert_greater_equal,
-    MemoryConfig
+    MemoryConfig,
 )
-
 
 
 class FunctionalMemoryGenerator:
 
-    def __init__(
-        self, config: MemoryConfig
-    ) -> None:
+    def __init__(self, config: MemoryConfig) -> None:
         """Generator for a data memory that can hold data, hence it's called functional.
 
 
@@ -25,6 +22,8 @@ class FunctionalMemoryGenerator:
         self.READ_LATENCY = config.READ_LATENCY
         self.WRITE_LATENCY = config.WRITE_LATENCY
         self.BYTE_SIZE = config.BYTE_SIZE
+        self.MIN_ADDRESS = config.MIN_ADDRESS
+        self.MAX_ADDRESS = config.MAX_ADDRESS
 
         # internal constants
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
@@ -72,7 +71,7 @@ class FunctionalMemoryGenerator:
                 m.Reg(
                     f"data_memory_{i}",
                     self.BYTE_SIZE,
-                    dims=(pow(2, self.ADDRESS_WIDTH)),
+                    dims=(self.MAX_ADDRESS - self.MIN_ADDRESS + 1),
                 )
             )
 
@@ -101,11 +100,21 @@ class FunctionalMemoryGenerator:
             ).Else(
                 If(port_ready_o == 1)(
                     If(
-                        And(
+                        AndList(
                             address_valid_i == 1,
                             Or(
                                 read_write_select_i == 0,
                                 And(read_write_select_i == 1, write_data_valid_i == 1),
+                            ),
+                            (
+                                address_i <= self.MAX_ADDRESS - 1
+                                if (2**self.ADDRESS_WIDTH != self.MAX_ADDRESS + 1)
+                                else True
+                            ),
+                            (
+                                address_i >= self.MIN_ADDRESS
+                                if (self.MIN_ADDRESS != 0)
+                                else True
                             ),
                         )
                     )(
@@ -143,7 +152,7 @@ class FunctionalMemoryGenerator:
                         If(read_write_select == 0)(
                             # finish read
                             [
-                                read_data[i](data_memory[i][address])
+                                read_data[i](data_memory[i][address - self.MIN_ADDRESS])
                                 for i in range(self.BYTES_PER_WORD)
                             ],
                             read_data_valid(1),
@@ -152,7 +161,7 @@ class FunctionalMemoryGenerator:
                             write_done(1),
                             [
                                 If(write_strobe[i])(
-                                    data_memory[i][address](
+                                    data_memory[i][address - self.MIN_ADDRESS](
                                         write_data[
                                             self.BYTE_SIZE
                                             * i : self.BYTE_SIZE

@@ -4,16 +4,12 @@
 
 #include <iostream>
 
-#include "Vcache_wrapper_10.h"
+#include "Vcache_wrapper_28.h"
 
-// Testbench for testing the flush in a set-associative cache
+// Testbench for testing memory address ranges
 // num_ports=1, arbiter_policy=priority, byte_size=8
-// L1: data_width=16, address_width=8, num_ways=2, num_sets=2,
-// replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
-// write_through=false, write_allocate=true,
-// block_size=1
 // Main Memory: data_width=16, address_width=8, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=42, max_address=48
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -41,8 +37,8 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
 
-    const std::unique_ptr<Vcache_wrapper_10> cache_wrapper{
-        new Vcache_wrapper_10{"cache_wrapper"}};
+    const std::unique_ptr<Vcache_wrapper_28> cache_wrapper{
+        new Vcache_wrapper_28{"cache_wrapper"}};
 
     cache_wrapper->clk_i(clk_i);
     cache_wrapper->reset_n_i(reset_n_i);
@@ -135,7 +131,7 @@ int sc_main(int argc, char** argv) {
     };
 
 
-    std::cout << "Vcache_wrapper_10 start!" << std::endl;
+    std::cout << "Vcache_wrapper_28 start!" << std::endl;
 
     tick(0);
 
@@ -143,7 +139,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->trace(trace, 99);
 
     if (vcd_file_path.empty()) {
-        trace->open("Vcache_wrapper_tb_10.vcd");
+        trace->open("Vcache_wrapper_tb_28.vcd");
     } else {
         trace->open(vcd_file_path.c_str());
     }
@@ -154,17 +150,44 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(2, 0x20, false);
-        write(3, 0x30, false);
-        write(4, 0x40, false);
+        address_i.write(0);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        address_i.write(41);
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        address_i.write(49);
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        address_i.write(255);
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
+        tick(1);
+        assert(port_ready_o.read());
 
-        flush();
+        read(42, 0, 0);
+        read(43, 0, 0);
+        read(47, 0, 0);
+        read(48, 0, 0);
 
-        read(2, 0x20, true);
-        read(3, 0x30, true);
-        read(4, 0x40, true);
-
-        write(6, 0x60, false); // manually check that this doesn't cause a write-back
+        write(45, 0x145, 0);
+        read(45, 0x145, 0);
 
         tick(10);
     } catch (std::runtime_error& e) {
@@ -178,6 +201,6 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    std::cout << "Vcache_wrapper_10 done!" << std::endl;
+    std::cout << "Vcache_wrapper_28 done!" << std::endl;
     return 0;
 }

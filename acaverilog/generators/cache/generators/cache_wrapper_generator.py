@@ -301,7 +301,7 @@ if __name__ == "__main__":
     # argv:
     # (file name), number for output file suffix, num ports, arbiter policy, byte size
     # [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
-    # [main memory data width, main memory address width, read latency, write latency]
+    # [main memory data width, main memory address width, read latency, write latency, min address, max address]
     args = copy.copy(sys.argv[1:]) # make a copy just to be sure
     FILE_SUFFIX = args.pop(0)
     NUM_PORTS = int(args.pop(0))
@@ -324,6 +324,8 @@ if __name__ == "__main__":
     ADDRESS_WIDTH.append(int(raw_memory_config[1]))
     MEMORY_READ_LATENCY = int(raw_memory_config[2])
     MEMORY_WRITE_LATENCY = int(raw_memory_config[3])
+    MEMORY_MIN_ADDRESS = int(raw_memory_config[4], base=0)
+    MEMORY_MAX_ADDRESS = int(raw_memory_config[5], base=0)
 
     cache_configs = []
     for i in range(len(raw_cache_configs)):
@@ -350,7 +352,9 @@ if __name__ == "__main__":
         address_width=ADDRESS_WIDTH[-1],
         read_latency=MEMORY_READ_LATENCY,
         write_latency=MEMORY_WRITE_LATENCY,
-        byte_size=BYTE_SIZE
+        byte_size=BYTE_SIZE,
+        min_address=MEMORY_MIN_ADDRESS,
+        max_address=MEMORY_MAX_ADDRESS
     )
 
     cache_wrapper_generator = CacheWrapperGenerator(

@@ -17,6 +17,7 @@
 // write_through=false, write_allocate=true,
 // block_size=1
 // Main Memory: data_width=128, address_width=2, read_latency=10, write_latency=15
+// min_address=0, max_address=3
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

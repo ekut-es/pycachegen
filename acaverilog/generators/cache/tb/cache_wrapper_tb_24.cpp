@@ -10,6 +10,7 @@
 // without caches.
 // num_ports=1, arbiter_policy=priority, byte_size=8
 // Main Memory: data_width=16, address_width=3, read_latency=10, write_latency=15
+// min_address=0, max_address=7
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);

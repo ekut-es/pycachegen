@@ -1,4 +1,4 @@
-from math import log2
+from math import log2, floor
 
 REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
 
@@ -77,7 +77,9 @@ def assert_data_width_valid(data_width: int, byte_size: int) -> None:
         ConfigurationError: Error that gets thrown if the data width is invalid.
     """
     if data_width % byte_size != 0 or not is_power_of_two(data_width // byte_size):
-        raise ConfigurationError("Data width must have the form (byte_size * 2**n) with n >= 0")
+        raise ConfigurationError(
+            "Data width must have the form (byte_size * 2**n) with n >= 0"
+        )
 
 
 def assert_address_config_valid(
@@ -141,6 +143,29 @@ def assert_greater_equal(i: int, threshold: int, name: str) -> None:
         raise ConfigurationError(f"{name} is {i} but needs to be at least {threshold}")
 
 
+def assert_address_range_valid(
+    min_address: int, max_address: int, address_width: int
+) -> None:
+    """Throws an error if the given address range has size 0 or if it is not within the boundaries
+    set by the address width.
+
+    Args:
+        min_address (int): The smallest address (inclusive)
+        max_address (int): The greatest address (inclusive)
+        address_width (int): The width of the address in bits.
+    """
+    if min_address > max_address:
+        raise ConfigurationError(
+            f"min_address ({min_address}) needs to be smaller or equal to max_address ({max_address})"
+        )
+    bits_needed = 1 if max_address == 0 else (floor(log2(max_address)) + 1)
+    if bits_needed > address_width:
+        raise ConfigurationError(
+            f"max_address is {max_address} and needs at least {bits_needed} address bits, "
+            + f"but the address is only {address_width} bits wide"
+        )
+
+
 class CacheConfig:
     def __init__(
         self,
@@ -156,7 +181,7 @@ class CacheConfig:
         block_size: int,
         be_data_width: int,
         be_address_width: int,
-        byte_size: int
+        byte_size: int,
     ) -> None:
         """Class to store and validate a configuration for the cache.
 
@@ -210,7 +235,14 @@ class CacheConfig:
 
 class MemoryConfig:
     def __init__(
-        self, data_width: int, address_width: int, read_latency: int, write_latency: int, byte_size: int
+        self,
+        data_width: int,
+        address_width: int,
+        read_latency: int,
+        write_latency: int,
+        byte_size: int,
+        min_address: int,
+        max_address: int,
     ) -> None:
         """Class to store and validate a configuration for the functional memory.
 
@@ -220,13 +252,18 @@ class MemoryConfig:
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             byte_size (int): Number of bits per byte.
+            min_address (int): The smallest address (inclusive). Requests to smaller addresses will be ignored.
+            max_address (int): The greatest address (inclusive). Requests to greater addresses will be ignored.
         """
         assert_greater_equal(read_latency, 2, "read_latency")
         assert_greater_equal(write_latency, 2, "write_latency")
         assert_data_width_valid(data_width, byte_size)
+        assert_address_range_valid(min_address, max_address, address_width)
 
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.READ_LATENCY = read_latency
         self.WRITE_LATENCY = write_latency
         self.BYTE_SIZE = byte_size
+        self.MIN_ADDRESS = min_address
+        self.MAX_ADDRESS = max_address
