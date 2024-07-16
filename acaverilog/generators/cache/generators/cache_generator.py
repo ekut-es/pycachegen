@@ -27,7 +27,7 @@ from acaverilog.generators.cache.generators.priority_encoder_generator import (
 )
 from acaverilog.generators.cache.cache_config_validation import (
     ConfigurationError,
-    CacheConfig
+    CacheConfig,
 )
 
 
@@ -889,7 +889,18 @@ class CacheGenerator:
                     be_address_valid_o_reg(0),
                     # After waiting for one cycle, continue as soon as the next level
                     # memory gets ready again (that means that the request was processed)
-                    If(And(Not(be_address_valid_o_reg), be_port_ready_i))(
+                    If(
+                        And(
+                            Not(be_address_valid_o_reg),
+                            Or(
+                                And(be_read_write_select_o_reg, be_write_done_i),
+                                And(
+                                    Not(be_read_write_select_o_reg),
+                                    be_read_data_valid_i,
+                                ),
+                            ),
+                        )
+                    )(
                         latency_counter.inc(),
                         If(be_read_write_select_o_reg)(
                             state_reg(send_mem_request_next_state)
