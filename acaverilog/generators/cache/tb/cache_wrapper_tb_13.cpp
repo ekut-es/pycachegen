@@ -12,7 +12,7 @@
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=29,
 // write_through=false, write_allocate=true,
 // block_size=4
-// Main Memory: data_width=16, address_width=8
+// Main Memory: data_width=16, address_width=8, read_latency=10, write_latency=15
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
