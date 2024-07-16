@@ -99,11 +99,11 @@ class CacheGenerator:
         own_latencies = (self.HIT_LATENCY, self.MISS_LATENCY)
         if min_latencies == own_latencies:
             print(
-                f"{self.PREFIX} uses the minimum latencies (hit/miss): {min_latencies}"
+                f"{self.PREFIX}: using the minimum latencies ({min_latencies}) (hit/miss)"
             )
         else:
             print(
-                f"{self.PREFIX} uses latencies other than the minimum latencies (hit/miss): {min_latencies}"
+                f"{self.PREFIX}: latencies ({own_latencies}) differ from the minimum latencies ({min_latencies}) (hit/miss)"
             )
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
