@@ -2,10 +2,10 @@
 
 Inside the `generators/` directory there are python files that can generate verilog source code. There are generators for a functional memory (based on the normal memory, but modified so that it can also hold data), for the cache and for a cache wrapper. There's also some generators for other modules that get instantiated within the named modules, so they're not relevant to the user.
 
-The cache wrapper wraps the cache and the functional memory in one module. It can create linear cache architectures (so no two caches on the same level). It can also create an arbiter so that you can have multiple access ports.
+The cache wrapper wraps the cache and the functional memory in one module. It can create linear cache architectures (so no two caches on the same level). It can also create an arbiter so that you can have multiple access ports. Creating caches is optional - the cache wrapper can also simply create a memory, optionally with an arbiter.
 
 # Testbenches
-To run the testbenches, create a `/build` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` and the `functional_memory_generator.py` to create verilog source files in the `src/` directory and to verilate them. Inside `tb/` there are testbenches for the functional memory as well as several for the cache wrapper with different configurations. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one.
+To run the testbenches, create a `/build` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one.
 
 You can then call ninja and execute the executables of the testbenches as well as inspect the traces.
 

@@ -172,6 +172,7 @@ class FunctionalMemoryGenerator:
 
 
 if __name__ == "__main__":
+    # TODO Remove this
     memory_generator = FunctionalMemoryGenerator(
         MemoryConfig(data_width=16, address_width=3, read_latency=10, write_latency=15)
     )

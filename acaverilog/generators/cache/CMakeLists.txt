@@ -45,6 +45,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "21 1 priority \"8 6 1 2 plru_tree 6 11 1 0 4\" \"64 3 10 15\""
     "22 1 priority \"8 16 2 4 plru_tree 4 11 0 1 1\" \"8 16 10 15\""
     "23 1 priority \"8 6 1 2 plru_tree 6 13 1 0 4\" \"16 5 10 15\""
+    "24 1 priority \"16 3 10 15\""
 )
 list(LENGTH CACHE_WRAPPER_ARG_LIST NUM_TESTBENCHES)
 
@@ -76,18 +77,3 @@ foreach(i RANGE 1 ${NUM_TESTBENCHES})
     )
     verilator_link_systemc(Vcache_wrapper_tb_${current_idx})
 endforeach()
-
-# Functional memory test bench
-execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/generators/functional_memory_generator.py"
-)
-add_executable(Vfunctional_memory_tb tb/functional_memory_tb.cpp)
-set_property(
-    TARGET Vfunctional_memory_tb
-    PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
-)
-verilate(Vfunctional_memory_tb SYSTEMC COVERAGE TRACE
-    INCLUDE_DIRS "src"
-    SOURCES src/functional_memory.v
-)
-verilator_link_systemc(Vfunctional_memory_tb)
