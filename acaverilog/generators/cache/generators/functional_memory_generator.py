@@ -24,9 +24,9 @@ class FunctionalMemoryGenerator:
         self.ADDRESS_WIDTH = config.ADDRESS_WIDTH
         self.READ_LATENCY = config.READ_LATENCY
         self.WRITE_LATENCY = config.WRITE_LATENCY
+        self.BYTE_SIZE = config.BYTE_SIZE
 
         # internal constants
-        self.BYTE_SIZE = 8
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
         self.LATENCY_COUNTER_SIZE = ceil(
             log2(max(self.WRITE_LATENCY, self.READ_LATENCY))

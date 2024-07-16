@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_17.h"
 
 // Testbench for testing two layers of caches
-// num_ports=1, arbiter_policy=priority
+// num_ports=1, arbiter_policy=priority, byte_size=8
 // L1: data_width=16, address_width=8, num_ways=2, num_sets=1,
 // write_through=false, write_allocate=true,
 // replacement_policy=fifo, hit_latency=4, miss_latency=11

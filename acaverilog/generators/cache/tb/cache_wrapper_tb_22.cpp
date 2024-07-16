@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_22.h"
 
 // Testbench for testing weird data and address widths (8/16)
-// num_ports=1, arbiter_policy=priority
+// num_ports=1, arbiter_policy=priority, byte_size=8
 // L1: data_width=8, address_width=16, num_ways=2, num_sets=4,
 // replacement_policy=plru_tree, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,

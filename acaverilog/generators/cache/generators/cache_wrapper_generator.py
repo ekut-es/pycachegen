@@ -1,4 +1,5 @@
 import sys
+import copy
 from veriloggen import (
     Module,
     Submodule,
@@ -14,6 +15,7 @@ from acaverilog.generators.cache.generators.memory_access_arbiter import (
 from acaverilog.generators.cache.cache_config_validation import (
     CacheConfig,
     MemoryConfig,
+    ConfigurationError,
 )
 
 
@@ -30,13 +32,22 @@ class CacheWrapperGenerator:
         memory_config: MemoryConfig,
         *cache_configs: CacheConfig,
     ) -> None:
-        # TODO add arbiter policy parameter validation
+        if not all(
+            (
+                cache_config.BYTE_SIZE == memory_config.BYTE_SIZE
+                for cache_config in cache_configs
+            )
+        ):
+            raise ConfigurationError(
+                "The byte size must be the same for all caches and the memory."
+            )
+
         self.MEMORY_CONFIG = memory_config
         self.CACHE_CONFIGS = cache_configs
         self.NUM_PORTS = num_ports
         self.ARBITER_POLICY = arbiter_policy
         self.NUM_CACHES = len(cache_configs)
-        self.BYTE_SIZE = 8
+        self.BYTE_SIZE = memory_config.BYTE_SIZE
         if self.NUM_CACHES > 0:
             self.FE_DATA_WIDTH = cache_configs[0].DATA_WIDTH
             self.FE_ADDRESS_WIDTH = cache_configs[0].ADDRESS_WIDTH
@@ -288,15 +299,17 @@ class CacheWrapperGenerator:
 
 if __name__ == "__main__":
     # argv:
-    # (file name), number for output file suffix, num ports, arbiter policy,
+    # (file name), number for output file suffix, num ports, arbiter policy, byte size
     # [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
     # [main memory data width, main memory address width, read latency, write latency]
-    file_suffix = sys.argv[1]
-    num_ports = int(sys.argv[2])
-    arbiter_policy = sys.argv[3]
-    raw_cache_configs = (
-        [config.split() for config in sys.argv[4:-1]] if len(sys.argv) > 5 else []
-    )
+    args = copy.copy(sys.argv[1:]) # make a copy just to be sure
+    FILE_SUFFIX = args.pop(0)
+    NUM_PORTS = int(args.pop(0))
+    ARBITER_POLICY = args.pop(0)
+    BYTE_SIZE = int(args.pop(0))
+    raw_memory_config = args.pop().split()
+    raw_cache_configs = [config.split() for config in args]
+
     DATA_WIDTH = [int(config[0]) for config in raw_cache_configs]
     ADDRESS_WIDTH = [int(config[1]) for config in raw_cache_configs]
     NUM_WAYS = [int(config[2]) for config in raw_cache_configs]
@@ -307,7 +320,6 @@ if __name__ == "__main__":
     WRITE_THROUGH = [bool(int(config[7])) for config in raw_cache_configs]
     WRITE_ALLOCATE = [bool(int(config[8])) for config in raw_cache_configs]
     BLOCK_SIZE = [int(config[9]) for config in raw_cache_configs]
-    raw_memory_config = sys.argv[-1].split()
     DATA_WIDTH.append(int(raw_memory_config[0]))
     ADDRESS_WIDTH.append(int(raw_memory_config[1]))
     MEMORY_READ_LATENCY = int(raw_memory_config[2])
@@ -329,6 +341,7 @@ if __name__ == "__main__":
                 block_size=BLOCK_SIZE[i],
                 be_data_width=DATA_WIDTH[i + 1],
                 be_address_width=ADDRESS_WIDTH[i + 1],
+                byte_size=BYTE_SIZE
             )
         )
 
@@ -337,13 +350,14 @@ if __name__ == "__main__":
         address_width=ADDRESS_WIDTH[-1],
         read_latency=MEMORY_READ_LATENCY,
         write_latency=MEMORY_WRITE_LATENCY,
+        byte_size=BYTE_SIZE
     )
 
     cache_wrapper_generator = CacheWrapperGenerator(
-        num_ports,
-        arbiter_policy,
+        NUM_PORTS,
+        ARBITER_POLICY,
         memory_config,
         *cache_configs,
     )
     m = cache_wrapper_generator.generate_module()
-    m.to_verilog(f"../src/cache_wrapper_{file_suffix}.v", for_verilator=True)
+    m.to_verilog(f"../src/cache_wrapper_{FILE_SUFFIX}.v", for_verilator=True)

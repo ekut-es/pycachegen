@@ -8,7 +8,7 @@
 
 // Testbench for testing that multiple words will be taken from the BE read data
 // without sending a new memory request for each word. Two BE words span one block.
-// num_ports=1, arbiter_policy=priority
+// num_ports=1, arbiter_policy=priority, byte_size=8
 // L1: data_width=8, address_width=6, num_ways=1, num_sets=2,
 // replacement_policy=plru_tree, hit_latency=6, miss_latency=13,
 // write_through=true, write_allocate=false,

@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_18.h"
 
 // Testbench for testing multiple ports with an arbiter with fifo policy
-// num_ports=4, arbiter_policy=fifo
+// num_ports=4, arbiter_policy=fifo, byte_size=8
 // L1: data_width=16, address_width=8, num_ways=4, num_sets=2,
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,

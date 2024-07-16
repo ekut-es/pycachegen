@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_25.h"
 
 // Testbench for testing multiple ports with an arbiter without caches
-// num_ports=2, arbiter_policy=priority
+// num_ports=2, arbiter_policy=priority, byte_size=8
 // Main Memory: data_width=16, address_width=8, read_latency=10, write_latency=15
 
 int sc_main(int argc, char** argv) {

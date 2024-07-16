@@ -7,7 +7,7 @@
 #include "Vcache_wrapper_15.h"
 
 // Testbench for testing plru_mru replacement policy
-// num_ports=1, arbiter_policy=priority
+// num_ports=1, arbiter_policy=priority, byte_size=8
 // L1: data_width=16, address_width=8, num_ways=4, num_sets=2,
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true,

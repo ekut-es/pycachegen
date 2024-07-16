@@ -67,8 +67,8 @@ def assert_same_address_space(dw1: int, aw1: int, dw2: int, aw2: int) -> None:
         )
 
 
-def assert_data_width_valid(data_width: int) -> None:
-    """Throws an error if the data width is not of the form 8 * 2**n with n >= 0.
+def assert_data_width_valid(data_width: int, byte_size: int) -> None:
+    """Throws an error if the data width is not of the form (byte_size * 2**n) with n >= 0.
 
     Args:
         data_width (int): data width to be checked
@@ -76,8 +76,8 @@ def assert_data_width_valid(data_width: int) -> None:
     Raises:
         ConfigurationError: Error that gets thrown if the data width is invalid.
     """
-    if data_width % 8 != 0 or not is_power_of_two(data_width // 8):
-        raise ConfigurationError("Data width must have the form (8 * 2**n) with n >= 0")
+    if data_width % byte_size != 0 or not is_power_of_two(data_width // byte_size):
+        raise ConfigurationError("Data width must have the form (byte_size * 2**n) with n >= 0")
 
 
 def assert_address_config_valid(
@@ -156,6 +156,7 @@ class CacheConfig:
         block_size: int,
         be_data_width: int,
         be_address_width: int,
+        byte_size: int
     ) -> None:
         """Class to store and validate a configuration for the cache.
 
@@ -172,11 +173,12 @@ class CacheConfig:
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
-            be_data_width (int): Data width of the next level cache in bits. Must be of the form (8 * 2**n) where n>=0. Must be greater than the cache's own data_width.
+            be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater than the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
+            byte_size (int): Number of bits per byte.
         """
-        assert_data_width_valid(data_width)
-        assert_data_width_valid(be_data_width)
+        assert_data_width_valid(data_width, byte_size)
+        assert_data_width_valid(be_data_width, byte_size)
         assert_is_power_of_two(num_ways, "num_ways")
         assert_is_power_of_two(num_sets, "num_sets")
         assert_is_power_of_two(block_size, "block_size")
@@ -203,11 +205,12 @@ class CacheConfig:
         self.BLOCK_SIZE = block_size
         self.BE_DATA_WIDTH = be_data_width
         self.BE_ADDRESS_WIDTH = be_address_width
+        self.BYTE_SIZE = byte_size
 
 
 class MemoryConfig:
     def __init__(
-        self, data_width: int, address_width: int, read_latency: int, write_latency: int
+        self, data_width: int, address_width: int, read_latency: int, write_latency: int, byte_size: int
     ) -> None:
         """Class to store and validate a configuration for the functional memory.
 
@@ -216,12 +219,14 @@ class MemoryConfig:
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
+            byte_size (int): Number of bits per byte.
         """
         assert_greater_equal(read_latency, 2, "read_latency")
         assert_greater_equal(write_latency, 2, "write_latency")
-        assert_data_width_valid(data_width)
+        assert_data_width_valid(data_width, byte_size)
 
         self.DATA_WIDTH = data_width
         self.ADDRESS_WIDTH = address_width
         self.READ_LATENCY = read_latency
         self.WRITE_LATENCY = write_latency
+        self.BYTE_SIZE = byte_size

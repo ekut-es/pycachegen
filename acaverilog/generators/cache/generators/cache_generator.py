@@ -69,6 +69,7 @@ class CacheGenerator:
         self.BLOCK_SIZE = config.BLOCK_SIZE
         self.BE_DATA_WIDTH = config.BE_DATA_WIDTH
         self.BE_ADDRESS_WIDTH = config.BE_ADDRESS_WIDTH
+        self.BYTE_SIZE = config.BYTE_SIZE
         self.PREFIX = prefix
 
         # Internal Constants
@@ -80,7 +81,6 @@ class CacheGenerator:
             log2(max(2, self.HIT_LATENCY, self.MISS_LATENCY))
         )
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
-        self.BYTE_SIZE = 8
         self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // self.BYTE_SIZE))
         self.BE_BYTE_OFFSET_W = int(log2(self.BE_DATA_WIDTH // self.BYTE_SIZE))
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
