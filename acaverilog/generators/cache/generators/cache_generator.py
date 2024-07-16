@@ -186,7 +186,6 @@ class CacheGenerator:
             )
 
     def generate_module(self) -> Module:
-        # m = Module(self.base_file_name)
         m = Module(f"{self.PREFIX}cache")
 
         # Front End Inputs
@@ -264,10 +263,7 @@ class CacheGenerator:
         m.Assign(be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :]))
         m.Assign(be_address_valid_o(be_address_valid_o_reg))
         # The output data also has our own data width, so we need to
-        # shift the output data and accordingly create a write strobe signal
-        # m.Always(be_write_strobe_o_reg, be_write_data_o_reg, be_address_o_reg)(
-        #     [If(be_address_o_reg[: -self.BE_ADDRESS_WIDTH]) for i in range(self.BE_BYTES_PER_WORD)]
-        # )
+        # shift the output data and the write strobe signal
         for i in range(self.BE_BYTES_PER_WORD):
             if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH:
                 m.Assign(
