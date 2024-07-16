@@ -76,7 +76,9 @@ class CacheGenerator:
         self.INDEX_WIDTH = int(log2(self.NUM_SETS))
         self.WORD_OFFSET_W = int(log2(self.BLOCK_SIZE))
         self.TAG_WIDTH = self.ADDRESS_WIDTH - self.INDEX_WIDTH - self.WORD_OFFSET_W
-        self.LATENCY_COUNTER_SIZE = ceil(log2(max(self.HIT_LATENCY, self.MISS_LATENCY)))
+        self.LATENCY_COUNTER_SIZE = ceil(
+            log2(max(2, self.HIT_LATENCY, self.MISS_LATENCY))
+        )
         self.STATE_REG_WIDTH = ceil(log2(len(States)))
         self.BYTE_SIZE = 8
         self.BYTE_OFFSET_W = int(log2(self.DATA_WIDTH // self.BYTE_SIZE))
@@ -101,7 +103,7 @@ class CacheGenerator:
             )
         else:
             print(
-                f"{self.PREFIX} uses latencies higher than the minimum latencies (hit/miss): {min_latencies}"
+                f"{self.PREFIX} uses latencies other than the minimum latencies (hit/miss): {min_latencies}"
             )
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
@@ -165,16 +167,16 @@ class CacheGenerator:
 
     def validate_latencies(self) -> None:
         """Validates that the configured latencies are achievable for
-        the current configuration.
+        the current configuration. A latency of 0 is also accepted and
+        will cause the cache to not stall artificially.
 
         Raises:
             ConfigurationError: Raises an error if the latencies are set too low.
         """
         min_latencies = self.get_min_worst_case_latencies()
         config_valid = (
-            min_latencies[0] <= self.HIT_LATENCY
-            and min_latencies[1] <= self.MISS_LATENCY
-        )
+            min_latencies[0] <= self.HIT_LATENCY or self.HIT_LATENCY == 0
+        ) and (min_latencies[1] <= self.MISS_LATENCY or self.MISS_LATENCY == 0)
 
         if not config_valid:
             raise ConfigurationError(
@@ -1074,10 +1076,18 @@ class CacheGenerator:
                     If(
                         OrList(
                             AndList(
-                                latency_counter == self.HIT_LATENCY - 1, fe_hit_o == 1
+                                Or(
+                                    self.HIT_LATENCY == 0,
+                                    latency_counter == self.HIT_LATENCY - 1,
+                                ),
+                                fe_hit_o == 1,
                             ),
                             AndList(
-                                latency_counter == self.MISS_LATENCY - 1, fe_hit_o == 0
+                                Or(
+                                    self.MISS_LATENCY == 0,
+                                    latency_counter == self.MISS_LATENCY - 1,
+                                ),
+                                fe_hit_o == 0,
                             ),
                         )
                     )(
