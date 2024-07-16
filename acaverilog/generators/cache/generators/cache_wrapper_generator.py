@@ -1,15 +1,7 @@
 import sys
-from math import ceil, log2
 from veriloggen import (
     Module,
     Submodule,
-    Posedge,
-    Negedge,
-    If,
-    For,
-    AndList,
-    OrList,
-    Not,
 )
 
 from acaverilog.generators.cache.generators.cache_generator import CacheGenerator
@@ -55,8 +47,9 @@ class CacheWrapperGenerator:
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")
 
-        caches = []
+        ## Create the Caches if there are any
 
+        caches = []
         for i in range(self.NUM_CACHES):
             caches.append(
                 CacheGenerator(
@@ -65,20 +58,19 @@ class CacheWrapperGenerator:
                 ).generate_module()
             )
 
+        ## Create the Memory
         memory = FunctionalMemoryGenerator(config=self.MEMORY_CONFIG).generate_module()
 
         # Common Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
-        flush_i = m.Input("flush_i")
+        flush_i = m.Input(
+            "flush_i"
+        )  # FIXME Flush needs to be propagated through all caches
         # Output the cache hit status of the l1 cache
         hit_o = m.Output("hit_o")
-        # L1 Cache will always be written to with whole words
-        l1_write_strobe = m.Wire(
-            "l1_write_strobe", self.FE_DATA_WIDTH // self.BYTE_SIZE
-        )
-        m.Assign(l1_write_strobe((2 ** (self.FE_DATA_WIDTH // self.BYTE_SIZE)) - 1))
 
+        ## Create Ports for the very front end (potentially the interface to the arbiter)
         # Frontend Inputs
         address_i = []
         address_valid_i = []
@@ -90,7 +82,6 @@ class CacheWrapperGenerator:
         read_data_valid_o = []
         write_done_o = []
         port_ready_o = []
-
         for i in range(self.NUM_PORTS):
             address_i.append(m.Input(f"address_{i}_i", self.FE_ADDRESS_WIDTH))
             address_valid_i.append(m.Input(f"address_valid_{i}_i"))
@@ -102,6 +93,7 @@ class CacheWrapperGenerator:
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
+        ## Create the interfaces between the caches and between the last cache and the memory
         # hit signal is purely for testing atm
         request_hit = []
         # Cache Backend <- Next level memory
@@ -109,7 +101,6 @@ class CacheWrapperGenerator:
         be_read_data_valid = []
         be_write_done = []
         be_port_ready = []
-
         # Cache Backend -> Next level memory
         be_address = []
         be_address_valid = []
@@ -142,61 +133,32 @@ class CacheWrapperGenerator:
                 )
             )
 
-        # Assign the hit status of the l1 cache
-        m.Assign(hit_o(request_hit[0]))
-
-        if self.NUM_PORTS == 1:
-            # first level cache connected to frontend ports
-            Submodule(
-                m,
-                caches[0],
-                "l1_cache",
-                arg_ports=(
-                    # Common
-                    ("clk_i", clk_i),
-                    ("reset_n_i", reset_n_i),
-                    ("flush_i", flush_i),
-                    # Hit signal
-                    ("fe_hit_o", request_hit[0]),
-                    # Cache In
-                    ("fe_address_i", address_i[0]),
-                    ("fe_address_valid_i", address_valid_i[0]),
-                    ("fe_write_data_i", write_data_i[0]),
-                    ("fe_write_data_valid_i", write_data_valid_i[0]),
-                    ("fe_read_write_select_i", read_write_select_i[0]),
-                    ("fe_write_strobe_i", l1_write_strobe),
-                    # Cache Out
-                    ("fe_read_data_o", read_data_o[0]),
-                    ("fe_read_data_valid_o", read_data_valid_o[0]),
-                    ("fe_write_done_o", write_done_o[0]),
-                    ("fe_port_ready_o", port_ready_o[0]),
-                    # Backend Cache <- Memory
-                    ("be_read_data_i", be_read_data[0]),
-                    ("be_read_data_valid_i", be_read_data_valid[0]),
-                    ("be_write_done_i", be_write_done[0]),
-                    ("be_port_ready_i", be_port_ready[0]),
-                    # Backend Cache -> Memory
-                    ("be_address_o", be_address[0]),
-                    ("be_address_valid_o", be_address_valid[0]),
-                    ("be_write_data_o", be_write_data[0]),
-                    ("be_write_data_valid_o", be_write_data_valid[0]),
-                    ("be_read_write_select_o", be_read_write_select[0]),
-                    ("be_write_strobe_o", be_write_strobe[0]),
-                ),
-            )
+        # Assign the hit status of the l1 cache if there is one
+        if self.NUM_CACHES > 0:
+            m.Assign(hit_o(request_hit[0]))
         else:
-            # arbiter -> cache
-            arbiter_address = m.Wire("arbiter_address", self.FE_ADDRESS_WIDTH)
-            arbiter_address_valid = m.Wire("arbiter_address_valid")
-            arbiter_write_data = m.Wire("arbiter_write_data", self.FE_DATA_WIDTH)
-            arbiter_write_data_valid = m.Wire("arbiter_write_data_valid")
-            arbiter_read_write_select = m.Wire("arbiter_read_write_select")
-            # arbiter <- cache
-            arbiter_port_ready = m.Wire("arbiter_port_ready")
-            arbiter_read_data = m.Wire("arbiter_read_data", self.FE_DATA_WIDTH)
-            arbiter_read_data_valid = m.Wire("arbiter_read_data_valid")
-            arbiter_write_done = m.Wire("arbiter_write_done")
+            m.Assign(hit_o(0))
 
+        ## Create the interface for the ports of the L1 cache (or the memory if there are no caches)
+        l1_address = m.Wire(f"l1_address", self.FE_ADDRESS_WIDTH)
+        l1_address_valid = m.Wire(f"l1_address_valid")
+        l1_write_data = m.Wire(f"l1_write_data", self.FE_DATA_WIDTH)
+        l1_write_data_valid = m.Wire(f"l1_write_data_valid")
+        l1_read_write_select = m.Wire(f"l1_read_write_select")
+        l1_read_data = m.Wire(f"l1_read_data", self.FE_DATA_WIDTH)
+        l1_read_data_valid = m.Wire(f"l1_read_data_valid")
+        l1_write_done = m.Wire(f"l1_write_done")
+        l1_port_ready = m.Wire(f"l1_port_ready")
+        l1_write_strobe = m.Wire(
+            "l1_write_strobe", self.FE_DATA_WIDTH // self.BYTE_SIZE
+        )
+        m.Assign(
+            l1_write_strobe((2 ** (self.FE_DATA_WIDTH // self.BYTE_SIZE)) - 1)
+        )  # FE will always do word operations
+        # so we can just assign all ones here
+
+        if self.NUM_PORTS > 1:
+            ## Create an arbiter
             arbiter = MemoryAccessArbiter(
                 num_ports=self.NUM_PORTS,
                 address_width=self.FE_ADDRESS_WIDTH,
@@ -207,16 +169,17 @@ class CacheWrapperGenerator:
             arbiter_port_mapping = [
                 ("clk_i", clk_i),
                 ("reset_n_i", reset_n_i),
-                ("be_port_ready_i", arbiter_port_ready),
-                ("be_read_data_i", arbiter_read_data),
-                ("be_read_data_valid_i", arbiter_read_data_valid),
-                ("be_write_done_i", arbiter_write_done),
-                ("be_address_o", arbiter_address),
-                ("be_address_valid_o", arbiter_address_valid),
-                ("be_write_data_o", arbiter_write_data),
-                ("be_write_data_valid_o", arbiter_write_data_valid),
-                ("be_read_write_select_o", arbiter_read_write_select),
+                ("be_port_ready_i", l1_port_ready),
+                ("be_read_data_i", l1_read_data),
+                ("be_read_data_valid_i", l1_read_data_valid),
+                ("be_write_done_i", l1_write_done),
+                ("be_address_o", l1_address),
+                ("be_address_valid_o", l1_address_valid),
+                ("be_write_data_o", l1_write_data),
+                ("be_write_data_valid_o", l1_write_data_valid),
+                ("be_read_write_select_o", l1_read_write_select),
             ]
+
             for i in range(self.NUM_PORTS):
                 arbiter_port_mapping.extend(
                     [
@@ -232,47 +195,32 @@ class CacheWrapperGenerator:
                     ]
                 )
             Submodule(m, arbiter, "arbiter", arg_ports=arbiter_port_mapping)
-            # first level cache connected to arbiter
-            Submodule(
-                m,
-                caches[0],
-                "l1_cache",
-                arg_ports=(
-                    # Common
-                    ("clk_i", clk_i),
-                    ("reset_n_i", reset_n_i),
-                    ("flush_i", flush_i),
-                    # Hit signal
-                    ("fe_hit_o", request_hit[0]),
-                    # Cache In
-                    ("fe_address_i", arbiter_address),
-                    ("fe_address_valid_i", arbiter_address_valid),
-                    ("fe_write_data_i", arbiter_write_data),
-                    ("fe_write_data_valid_i", arbiter_write_data_valid),
-                    ("fe_read_write_select_i", arbiter_read_write_select),
-                    ("fe_write_strobe_i", l1_write_strobe),
-                    # Cache Out
-                    ("fe_read_data_o", arbiter_read_data),
-                    ("fe_read_data_valid_o", arbiter_read_data_valid),
-                    ("fe_write_done_o", arbiter_write_done),
-                    ("fe_port_ready_o", arbiter_port_ready),
-                    # Backend Cache <- Memory
-                    ("be_read_data_i", be_read_data[0]),
-                    ("be_read_data_valid_i", be_read_data_valid[0]),
-                    ("be_write_done_i", be_write_done[0]),
-                    ("be_port_ready_i", be_port_ready[0]),
-                    # Backend Cache -> Memory
-                    ("be_address_o", be_address[0]),
-                    ("be_address_valid_o", be_address_valid[0]),
-                    ("be_write_data_o", be_write_data[0]),
-                    ("be_write_data_valid_o", be_write_data_valid[0]),
-                    ("be_read_write_select_o", be_read_write_select[0]),
-                    ("be_write_strobe_o", be_write_strobe[0]),
-                ),
-            )
+        else:
+            ## Directly connect the L1 interface wires to the in-/outputs
+            m.Assign(l1_address(address_i[0]))
+            m.Assign(l1_address_valid(address_valid_i[0]))
+            m.Assign(l1_write_data(write_data_i[0]))
+            m.Assign(l1_write_data_valid(write_data_valid_i[0]))
+            m.Assign(l1_read_write_select(read_write_select_i[0]))
+            m.Assign(read_data_o[0](l1_read_data))
+            m.Assign(read_data_valid_o[0](l1_read_data_valid))
+            m.Assign(write_done_o[0](l1_write_done))
+            m.Assign(port_ready_o[0](l1_port_ready))
 
-        # all other caches
-        for i in range(1, self.NUM_CACHES):
+        ## Use the L1 interface wires for the very first cache/memory
+        be_read_data.insert(0, l1_read_data)
+        be_read_data_valid.insert(0, l1_read_data_valid)
+        be_write_done.insert(0, l1_write_done)
+        be_port_ready.insert(0, l1_port_ready)
+        be_address.insert(0, l1_address)
+        be_address_valid.insert(0, l1_address_valid)
+        be_write_data.insert(0, l1_write_data)
+        be_write_data_valid.insert(0, l1_write_data_valid)
+        be_read_write_select.insert(0, l1_read_write_select)
+        be_write_strobe.insert(0, l1_write_strobe)
+
+        ## Connect all caches
+        for i in range(self.NUM_CACHES):
             Submodule(
                 m,
                 caches[i],
@@ -285,32 +233,33 @@ class CacheWrapperGenerator:
                     # Hit signal
                     ("fe_hit_o", request_hit[i]),
                     # Cache In
-                    ("fe_address_i", be_address[i - 1]),
-                    ("fe_address_valid_i", be_address_valid[i - 1]),
-                    ("fe_write_data_i", be_write_data[i - 1]),
-                    ("fe_write_data_valid_i", be_write_data_valid[i - 1]),
-                    ("fe_read_write_select_i", be_read_write_select[i - 1]),
-                    ("fe_write_strobe_i", be_write_strobe[i - 1]),
+                    ("fe_address_i", be_address[i]),
+                    ("fe_address_valid_i", be_address_valid[i]),
+                    ("fe_write_data_i", be_write_data[i]),
+                    ("fe_write_data_valid_i", be_write_data_valid[i]),
+                    ("fe_read_write_select_i", be_read_write_select[i]),
+                    ("fe_write_strobe_i", be_write_strobe[i]),
                     # Cache Out
-                    ("fe_read_data_o", be_read_data[i - 1]),
-                    ("fe_read_data_valid_o", be_read_data_valid[i - 1]),
-                    ("fe_write_done_o", be_write_done[i - 1]),
-                    ("fe_port_ready_o", be_port_ready[i - 1]),
+                    ("fe_read_data_o", be_read_data[i]),
+                    ("fe_read_data_valid_o", be_read_data_valid[i]),
+                    ("fe_write_done_o", be_write_done[i]),
+                    ("fe_port_ready_o", be_port_ready[i]),
                     # Cache Backend <- Memory
-                    ("be_read_data_i", be_read_data[i]),
-                    ("be_read_data_valid_i", be_read_data_valid[i]),
-                    ("be_write_done_i", be_write_done[i]),
-                    ("be_port_ready_i", be_port_ready[i]),
+                    ("be_read_data_i", be_read_data[i + 1]),
+                    ("be_read_data_valid_i", be_read_data_valid[i + 1]),
+                    ("be_write_done_i", be_write_done[i + 1]),
+                    ("be_port_ready_i", be_port_ready[i + 1]),
                     # Cache Backend -> Memory
-                    ("be_address_o", be_address[i]),
-                    ("be_address_valid_o", be_address_valid[i]),
-                    ("be_write_data_o", be_write_data[i]),
-                    ("be_write_data_valid_o", be_write_data_valid[i]),
-                    ("be_read_write_select_o", be_read_write_select[i]),
-                    ("be_write_strobe_o", be_write_strobe[i]),
+                    ("be_address_o", be_address[i + 1]),
+                    ("be_address_valid_o", be_address_valid[i + 1]),
+                    ("be_write_data_o", be_write_data[i + 1]),
+                    ("be_write_data_valid_o", be_write_data_valid[i + 1]),
+                    ("be_read_write_select_o", be_read_write_select[i + 1]),
+                    ("be_write_strobe_o", be_write_strobe[i + 1]),
                 ),
             )
 
+        # The memory gets the last in-/outputs
         Submodule(
             m,
             memory,
@@ -333,6 +282,7 @@ class CacheWrapperGenerator:
                 ("write_strobe_i", be_write_strobe[-1]),
             ),
         )
+
         return m
 
 
