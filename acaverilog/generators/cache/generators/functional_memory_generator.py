@@ -179,12 +179,3 @@ class FunctionalMemoryGenerator:
         ),
 
         return m
-
-
-if __name__ == "__main__":
-    # TODO Remove this
-    memory_generator = FunctionalMemoryGenerator(
-        MemoryConfig(data_width=16, address_width=3, read_latency=10, write_latency=15)
-    )
-    m = memory_generator.generate_module()
-    m.to_verilog("../src/functional_memory.v", for_verilator=True)
