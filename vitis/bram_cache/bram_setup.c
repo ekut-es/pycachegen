@@ -49,7 +49,7 @@ int main()
 	volatile Xuint32* cache_address = cache_baseaddr_p + 1;
 	volatile Xuint32* cache_write_data = cache_baseaddr_p + 2;
 	volatile Xuint32* cache_trace_length = cache_baseaddr_p + 3;
-	volatile Xuint32* cache_hit_rdval_wdone_pready = cache_baseaddr_p + 5;
+	volatile Xuint32* cache_fdone_hit_rdval_wdone_pready = cache_baseaddr_p + 5;
 	volatile Xuint32* cache_read_data = cache_baseaddr_p + 6;
 	volatile Xuint32* cache_trace_done = cache_baseaddr_p + 7;
 
@@ -105,7 +105,7 @@ int main()
     	xil_printf("Reading from address 0x%x... ", i);
 
     	for(int j = 0; j < cache_read_timeout; j++){
-    		if((*cache_hit_rdval_wdone_pready & 0b0101) == 0b0101) {
+    		if((*cache_fdone_hit_rdval_wdone_pready & 0b00101) == 0b00101) {
     			xil_printf("0x%x\n\r", *cache_read_data);
     			break;
     		}

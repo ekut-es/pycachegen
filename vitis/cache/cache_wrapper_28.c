@@ -32,7 +32,7 @@ int main()
     volatile Xuint32* axi_slave_flush_sel_wval_addrval = axi_slave_base_addr_p;
     volatile Xuint32* axi_slave_address = axi_slave_base_addr_p + 1;
     volatile Xuint32* axi_slave_write_data = axi_slave_base_addr_p + 2;
-    volatile Xuint32* axi_slave_hit_rdval_wdone_pready = axi_slave_base_addr_p + 5;
+    volatile Xuint32* axi_slave_fdone_hit_rdval_wdone_pready = axi_slave_base_addr_p + 5;
     volatile Xuint32* axi_slave_read_data = axi_slave_base_addr_p + 6;
 
     xil_printf("Writing and reading from an existing address\n\r");
@@ -40,22 +40,22 @@ int main()
     *axi_slave_write_data = 4242;
     *axi_slave_flush_sel_wval_addrval = 0b0111;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
-    xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+    xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
     *axi_slave_address = 42;
     *axi_slave_flush_sel_wval_addrval = 0b0001;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
     xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-    xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+    xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
     *axi_slave_address = 48;
     *axi_slave_write_data = 4848;
     *axi_slave_flush_sel_wval_addrval = 0b0111;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
-    xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+    xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
     *axi_slave_address = 48;
     *axi_slave_flush_sel_wval_addrval = 0b0001;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
     xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-    xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+    xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     print("Successfully ran Hello World application");
     cleanup_platform();

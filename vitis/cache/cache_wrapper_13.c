@@ -34,7 +34,7 @@ int main()
 	volatile Xuint32* axi_slave_flush_sel_wval_addrval = axi_slave_base_addr_p;
 	volatile Xuint32* axi_slave_address = axi_slave_base_addr_p + 1;
 	volatile Xuint32* axi_slave_write_data = axi_slave_base_addr_p + 2;
-	volatile Xuint32* axi_slave_hit_rdval_wdone_pready = axi_slave_base_addr_p + 5;
+	volatile Xuint32* axi_slave_fdone_hit_rdval_wdone_pready = axi_slave_base_addr_p + 5;
 	volatile Xuint32* axi_slave_read_data = axi_slave_base_addr_p + 6;
 
 	xil_printf("WRITE\n\r");
@@ -43,28 +43,28 @@ int main()
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("just writing some stuff to waste some time\n\r");
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 9;
 	*axi_slave_write_data = 19;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 10;
 	*axi_slave_write_data = 110;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 11;
 	*axi_slave_write_data = 111;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 
 	xil_printf("READ\n\r");
@@ -73,14 +73,14 @@ int main()
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("just writing some stuff to waste some time\n\r");
 	xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("READ\n\r");
 	*axi_slave_address = 16;
 	*axi_slave_flush_sel_wval_addrval = 0b0001;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 
 	xil_printf("WRITE\n\r");
@@ -88,28 +88,28 @@ int main()
 	*axi_slave_write_data = 116;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 17;
 	*axi_slave_write_data = 117;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 18;
 	*axi_slave_write_data = 118;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 	xil_printf("WRITE\n\r");
 	*axi_slave_address = 19;
 	*axi_slave_write_data = 119;
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 
 	xil_printf("WRITE\n\r");
@@ -118,7 +118,7 @@ int main()
 	*axi_slave_flush_sel_wval_addrval = 0b0111;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("just writing some stuff to waste some time\n\r");
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 
 	xil_printf("READ\n\r");
@@ -127,7 +127,7 @@ int main()
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("just writing some stuff to waste some time\n\r");
 	xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
 
 	xil_printf("READ\n\r");
@@ -135,7 +135,7 @@ int main()
 	*axi_slave_flush_sel_wval_addrval = 0b0001;
 	*axi_slave_flush_sel_wval_addrval = 0b0000;
 	xil_printf("Read data: %d\n\r", *axi_slave_read_data);
-	xil_printf("hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_hit_rdval_wdone_pready);
+	xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     print("Successfully ran Hello World application");
     cleanup_platform();
