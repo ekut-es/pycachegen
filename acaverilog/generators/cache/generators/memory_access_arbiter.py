@@ -29,7 +29,7 @@ class States(Enum):
 
 class MemoryAccessArbiter:
     def __init__(
-        self, num_ports: int, address_width: int, data_width: int, policy: str
+        self, num_ports: int, address_width: int, data_width: int, policy: str, enable_reset: bool
     ) -> None:
         """Generator for an arbiter for memories/caches with the native memory interface.
 
@@ -38,11 +38,13 @@ class MemoryAccessArbiter:
             address_width (int): Address width.
             data_width (int): Data word width.
             policy (str): Policy for the order in which incoming request will be processed. Can be either "priority", "fifo" or "round_robin".
+            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         self.NUM_PORTS = num_ports
         self.ADDRESS_WIDTH = address_width
         self.DATA_WIDTH = data_width
         self.POLICY = policy
+        self.ENABLE_RESET = enable_reset
         self.NUM_PORTS_CEILED_W = ceil(log2(self.NUM_PORTS))
         self.NUM_PORTS_CEILED = 2 ** (self.NUM_PORTS_CEILED_W)
         # Fifo buffer must have one additional element so we know when it's full and empty
@@ -172,8 +174,8 @@ class MemoryAccessArbiter:
             fifo_read_idx = m.Reg("fifo_read_idx", self.FIFO_BUFFER_LENGTH_W)
             fifo_write_idx = m.Reg("fifo_write_idx", self.FIFO_BUFFER_LENGTH_W)
 
-        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-            If(Not(reset_n_i))(
+        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                 # backend buffers
                 be_address(0),
                 be_address_valid(0),

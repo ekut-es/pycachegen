@@ -24,6 +24,7 @@ class FunctionalMemoryGenerator:
         self.BYTE_SIZE = config.BYTE_SIZE
         self.MIN_ADDRESS = config.MIN_ADDRESS
         self.MAX_ADDRESS = config.MAX_ADDRESS
+        self.ENABLE_RESET = config.ENABLE_RESET
 
         # internal constants
         self.BYTES_PER_WORD = self.DATA_WIDTH // self.BYTE_SIZE
@@ -61,7 +62,6 @@ class FunctionalMemoryGenerator:
         read_data = m.Reg("read_data", self.BYTE_SIZE, self.BYTES_PER_WORD)
         read_data_valid = m.Reg("read_data_valid")
         write_done = m.Reg("write_done")
-        port_ready = m.Reg("port_ready")
 
         # internal
         latency_counter = m.Reg("latency_counter", self.LATENCY_COUNTER_SIZE)
@@ -74,6 +74,7 @@ class FunctionalMemoryGenerator:
                     dims=(self.MAX_ADDRESS - self.MIN_ADDRESS + 1),
                 )
             )
+        processing_request = m.Reg("processing_request")
 
         # output buffer assignments
         for i in range(self.BYTES_PER_WORD):
@@ -82,11 +83,11 @@ class FunctionalMemoryGenerator:
             )
         m.Assign(read_data_valid_o(read_data_valid))
         m.Assign(write_done_o(write_done))
-        m.Assign(port_ready_o(port_ready))
+        m.Assign(port_ready_o(Not(processing_request)))
 
-        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
             # nothing in progress
-            If(reset_n_i == 0)(
+            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                 # no data_memory reset because that would create a huge number of lines
                 latency_counter(0),
                 address(0),
@@ -95,10 +96,10 @@ class FunctionalMemoryGenerator:
                 [read_data[i](0) for i in range(self.BYTES_PER_WORD)],
                 read_data_valid(0),
                 write_done(0),
-                port_ready(1),
+                processing_request(0),
                 write_strobe(0),
             ).Else(
-                If(port_ready_o == 1)(
+                If(Not(processing_request))(
                     If(
                         AndList(
                             address_valid_i == 1,
@@ -125,7 +126,7 @@ class FunctionalMemoryGenerator:
                         read_write_select(read_write_select_i),
                         read_data_valid(0),
                         write_done(0),
-                        port_ready(0),
+                        processing_request(1),
                         latency_counter.inc(),
                     ),
                 ).Else(
@@ -147,7 +148,7 @@ class FunctionalMemoryGenerator:
                         latency_counter.inc()
                     ).Else(
                         # we have stalled for long enough
-                        port_ready(1),
+                        processing_request(0),
                         latency_counter(0),
                         If(read_write_select == 0)(
                             # finish read

@@ -182,6 +182,8 @@ class CacheConfig:
         be_data_width: int,
         be_address_width: int,
         byte_size: int,
+        prefix: str,
+        enable_reset: bool
     ) -> None:
         """Class to store and validate a configuration for the cache.
 
@@ -201,6 +203,8 @@ class CacheConfig:
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater than the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
+            prefix (str): A prefix to use for the module name.
+            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         assert_data_width_valid(data_width, byte_size)
         assert_data_width_valid(be_data_width, byte_size)
@@ -231,6 +235,8 @@ class CacheConfig:
         self.BE_DATA_WIDTH = be_data_width
         self.BE_ADDRESS_WIDTH = be_address_width
         self.BYTE_SIZE = byte_size
+        self.PREFIX = prefix
+        self.ENABLE_RESET = enable_reset
 
 
 class MemoryConfig:
@@ -243,6 +249,7 @@ class MemoryConfig:
         byte_size: int,
         min_address: int,
         max_address: int,
+        enable_reset: bool
     ) -> None:
         """Class to store and validate a configuration for the functional memory.
 
@@ -254,6 +261,7 @@ class MemoryConfig:
             byte_size (int): Number of bits per byte.
             min_address (int): The smallest address (inclusive). Requests to smaller addresses will be ignored.
             max_address (int): The greatest address (inclusive). Requests to greater addresses will be ignored.
+            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         assert_greater_equal(read_latency, 2, "read_latency")
         assert_greater_equal(write_latency, 2, "write_latency")
@@ -267,3 +275,4 @@ class MemoryConfig:
         self.BYTE_SIZE = byte_size
         self.MIN_ADDRESS = min_address
         self.MAX_ADDRESS = max_address
+        self.ENABLE_RESET = enable_reset

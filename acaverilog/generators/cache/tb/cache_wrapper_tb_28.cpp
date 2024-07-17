@@ -151,6 +151,7 @@ int sc_main(int argc, char** argv) {
         tick(1);
         reset_n_i.write(1);
         tick(1);
+        assert(port_ready_o.read());
 
         address_i.write(0);
         address_valid_i.write(1);

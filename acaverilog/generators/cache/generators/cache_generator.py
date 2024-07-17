@@ -50,13 +50,11 @@ class CacheGenerator:
     def __init__(
         self,
         config: CacheConfig,
-        prefix: str,
     ) -> None:
         """Cache Generator.
 
         Args:
             config (CacheConfig): Cache configuration.
-            prefix (str): A prefix to use for the module name.
         """
         self.DATA_WIDTH = config.DATA_WIDTH
         self.ADDRESS_WIDTH = config.ADDRESS_WIDTH
@@ -71,7 +69,8 @@ class CacheGenerator:
         self.BE_DATA_WIDTH = config.BE_DATA_WIDTH
         self.BE_ADDRESS_WIDTH = config.BE_ADDRESS_WIDTH
         self.BYTE_SIZE = config.BYTE_SIZE
-        self.PREFIX = prefix
+        self.PREFIX = config.PREFIX
+        self.ENABLE_RESET = config.ENABLE_RESET
 
         # Internal Constants
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
@@ -513,6 +512,7 @@ class CacheGenerator:
                     num_sets=self.NUM_SETS,
                     policy=self.REPLACEMENT_POLICY,
                     prefix=self.PREFIX,
+                    enable_reset=self.ENABLE_RESET
                 ).generate_module(),
                 f"{self.PREFIX}replacement_policy",
                 arg_ports=(
@@ -529,8 +529,8 @@ class CacheGenerator:
                 ),
             )
 
-        m.Always(Negedge(reset_n_i), Posedge(clk_i))(
-            If(Not(reset_n_i))(
+        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                 ## reset
                 # frontend input buffers
                 fe_flush_i_reg(0),

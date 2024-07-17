@@ -29,6 +29,7 @@ class CacheWrapperGenerator:
         self,
         num_ports: int,
         arbiter_policy: str,
+        enable_reset: bool,
         memory_config: MemoryConfig,
         *cache_configs: CacheConfig,
     ) -> None:
@@ -48,6 +49,7 @@ class CacheWrapperGenerator:
         self.ARBITER_POLICY = arbiter_policy
         self.NUM_CACHES = len(cache_configs)
         self.BYTE_SIZE = memory_config.BYTE_SIZE
+        self.ENABLE_RESET = enable_reset
         if self.NUM_CACHES > 0:
             self.FE_DATA_WIDTH = cache_configs[0].DATA_WIDTH
             self.FE_ADDRESS_WIDTH = cache_configs[0].ADDRESS_WIDTH
@@ -65,7 +67,6 @@ class CacheWrapperGenerator:
             caches.append(
                 CacheGenerator(
                     config=self.CACHE_CONFIGS[i],
-                    prefix=f"l{i+1}_",
                 ).generate_module()
             )
 
@@ -179,6 +180,7 @@ class CacheWrapperGenerator:
                 address_width=self.FE_ADDRESS_WIDTH,
                 data_width=self.FE_DATA_WIDTH,
                 policy=self.ARBITER_POLICY,
+                enable_reset=self.ENABLE_RESET
             ).generate_module()
 
             arbiter_port_mapping = [
@@ -311,7 +313,7 @@ class CacheWrapperGenerator:
 
 if __name__ == "__main__":
     # argv:
-    # (file name), number for output file suffix, num ports, arbiter policy, byte size
+    # (file name), number for output file suffix, num ports, arbiter policy, byte size, enable reset
     # [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
     # [main memory data width, main memory address width, read latency, write latency, min address, max address]
     args = copy.copy(sys.argv[1:]) # make a copy just to be sure
@@ -319,6 +321,7 @@ if __name__ == "__main__":
     NUM_PORTS = int(args.pop(0))
     ARBITER_POLICY = args.pop(0)
     BYTE_SIZE = int(args.pop(0))
+    ENABLE_RESET = bool(int(args.pop(0)))
     raw_memory_config = args.pop().split()
     raw_cache_configs = [config.split() for config in args]
 
@@ -355,7 +358,9 @@ if __name__ == "__main__":
                 block_size=BLOCK_SIZE[i],
                 be_data_width=DATA_WIDTH[i + 1],
                 be_address_width=ADDRESS_WIDTH[i + 1],
-                byte_size=BYTE_SIZE
+                byte_size=BYTE_SIZE,
+                enable_reset=ENABLE_RESET,
+                prefix=f"l{i+1}_"
             )
         )
 
@@ -366,12 +371,14 @@ if __name__ == "__main__":
         write_latency=MEMORY_WRITE_LATENCY,
         byte_size=BYTE_SIZE,
         min_address=MEMORY_MIN_ADDRESS,
-        max_address=MEMORY_MAX_ADDRESS
+        max_address=MEMORY_MAX_ADDRESS,
+        enable_reset=ENABLE_RESET
     )
 
     cache_wrapper_generator = CacheWrapperGenerator(
         NUM_PORTS,
         ARBITER_POLICY,
+        ENABLE_RESET,
         memory_config,
         *cache_configs,
     )

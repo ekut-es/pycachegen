@@ -10,12 +10,13 @@ from veriloggen import (
     OrList,
     Not,
     Repeat,
+    And
 )
 
 
 class ReplacementPolicyGenerator:
 
-    def __init__(self, num_ways: int, num_sets: int, policy: str, prefix: str) -> None:
+    def __init__(self, num_ways: int, num_sets: int, policy: str, prefix: str, enable_reset: bool) -> None:
         """Replacement policy generator.
 
         Args:
@@ -23,12 +24,14 @@ class ReplacementPolicyGenerator:
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
             policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
             prefix (str): Prefix to be used for this module's name
+            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         # This module will only be generated if num_ways > 1
         self.NUM_WAYS = num_ways
         self.NUM_SETS = num_sets
         self.POLICY = policy
         self.PREFIX = prefix
+        self.ENABLE_RESET = enable_reset
         # derived
         self.NUM_WAYS_W = int(log2(self.NUM_WAYS))
         self.NUM_SETS_W = int(log2(self.NUM_SETS))
@@ -55,8 +58,8 @@ class ReplacementPolicyGenerator:
             m.Assign(next_replacement_o[i](next_replacement_o_reg[i]))
 
         if self.POLICY == "fifo":
-            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-                If(reset_n_i == 0)(
+            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                     [next_replacement_o_reg[i](0) for i in range(self.NUM_SETS)]
                 ).Elif(replace_i)(
                     next_replacement_o_reg[set_index_i](
@@ -66,8 +69,8 @@ class ReplacementPolicyGenerator:
             )
         elif self.POLICY == "plru_mru":
             mru_bits = m.Reg("mru_bits", self.NUM_WAYS, self.NUM_SETS)
-            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-                If(reset_n_i == 0)(
+            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                     [
                         (mru_bits[i](0), next_replacement_o_reg[i](0))
                         for i in range(self.NUM_SETS)
@@ -95,8 +98,8 @@ class ReplacementPolicyGenerator:
             tree_bits = m.Reg("plru_bits", self.NUM_WAYS - 1, self.NUM_SETS)
             tmp_repl = m.Reg("tmp_repl", self.NUM_WAYS_W + 1)
 
-            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-                If(reset_n_i == 0)(
+            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                     [
                         (
                             tree_bits[i](0),
