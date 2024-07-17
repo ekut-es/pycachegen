@@ -20,7 +20,8 @@ Keep in mind that when changing the python generator files, CMake has to be call
 The cache can also be synthesized and used on an FPGA. The vivado project files are inside `/vivado`. There's currently two projects:
 
 - `cache` simply connects the cache's in and outputs to the registers of an AXI lite slave. You can edit the block design and use any cache wrapper verilog file you want, as long as the L1 cache has only one port (the other ports simply are not connected to anything) and as long as the address and data width of the L1 cache are not bigger than 32 bits, because thats how wide the AXI4 lite registers are. In software, you can then write to the registers of the AXI lite slave and the values will be passed onto the cache. The mappings of the registers to the cache ports are documented inside the AXI slave verilog file.
-- Then there's also the `bram_cache` project. It allows writing a trace to a BRAM that will then be processed by the cache. After executing the trace, the total execution time will be written to another BRAM.
+- Then there's also the `bram_cache` project. It allows writing a trace to a BRAM that will then be processed by the cache. After executing the trace, the total execution time will be written to another BRAM. Note: If you get a critical warning about the bus interface property `AWUSER_WIDTH` not matching during synthesis (`[BD 41-237]`), don't worry, it doesn't matter.
+
 
 Inside `/vitis` directories with programs for the Vivado designs:
 - `cache` contains programs for the normal `cache` design without the tracing BRAMs. There are multiple programs because they are designed for different cache configurations (they match some of the testbench configurations - at least if you disable the reset).
