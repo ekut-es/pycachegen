@@ -4,7 +4,8 @@
 	module cache_wrapper_1_v1_1 #
 	(
 		// Users to add parameters here
-
+        parameter integer CACHE_ADDRESS_WIDTH = 8,
+        parameter integer CACHE_DATA_WIDTH = 16,
 		// User parameters ends
 		// Do not modify the parameters beyond this line
 
@@ -45,6 +46,8 @@
 	);
 // Instantiation of Axi Bus Interface S00_AXI
 	cache_wrapper_1_v1_1_S00_AXI # ( 
+	    .CACHE_DATA_WIDTH(CACHE_DATA_WIDTH),
+	    .CACHE_ADDRESS_WIDTH(CACHE_ADDRESS_WIDTH),
 		.C_S_AXI_DATA_WIDTH(C_S00_AXI_DATA_WIDTH),
 		.C_S_AXI_ADDR_WIDTH(C_S00_AXI_ADDR_WIDTH)
 	) cache_wrapper_1_v1_1_S00_AXI_inst (
