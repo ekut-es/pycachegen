@@ -434,7 +434,7 @@
 	// slv_reg3: amount of data in the trace
 	// Outputs
 	// slv_reg5: rdata
-	// slv_reg6: hit, rdata_valid, w_done, p_ready
+	// slv_reg6: flush_done, hit, rdata_valid, w_done, p_ready
 	// slv_reg7: trace done
 	
 	// Trace structure: one instruction/request per word in the format of {write_enable, (padding), write data, address}
@@ -458,6 +458,7 @@
     wire cache_write_done;
     wire cache_port_ready;
 	wire cache_hit;
+	wire flush_done;
     
     // State of the trace
     reg[C_S_AXI_DATA_WIDTH-1 : 0] trace_index; // the index (not the address) of the current instruction
@@ -493,7 +494,7 @@
             slv_reg7 <= 0;
         end else begin
             // write cache outputs to the slave registers so we can at least see something
-            slv_reg5 <= {28'b0, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
+            slv_reg5 <= {27'b0, flush_done, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
             slv_reg6 <= {{CACHE_DATA_WIDTH{1'b0}}, cache_read_data};
             if (trace_state == 0) begin
                 // not currently processing the trace
@@ -576,6 +577,7 @@
         .reset_n_i(S_AXI_ARESETN),
         .flush_i(cache_flush),
         .hit_o(cache_hit),
+        .flush_done_o(flush_done),
         .address_0_i(cache_address),
         .address_valid_0_i(cache_address_valid),
         .write_data_0_i(cache_write_data),
