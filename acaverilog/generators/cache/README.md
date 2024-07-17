@@ -4,6 +4,10 @@ Inside the `generators/` directory there are python files that can generate veri
 
 The cache wrapper wraps the cache and the functional memory in one module. It can create linear cache architectures (so no two caches on the same level). It can also create an arbiter so that you can have multiple access ports. Creating caches is optional - the cache wrapper can also simply create a memory, optionally with an arbiter.
 
+To actually generate Verilog files, you can either call the cache wrapper generator from the command line with matching arguments (see the bottom of the python script), or you can write your own python code to create a cache wrapper. The former case is used for generating testbenches and will save the verilog files in `../src` since it expects you to be in the `build` directory. For the latter case you need to create memory and cache configuration objects from the classes stored in `cache_config_validation.py` and use these to instantiate a cache wrapper generator. You can then call the `generate_module()` method and generate the verilog code as shown in the python script.
+
+If you want to synthesize the code, you should disable the reset everywhere - otherwise vivado won't be able to infer BRAM.
+
 # Testbenches
 To run the testbenches, create a `/build` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one.
 
@@ -15,11 +19,11 @@ Keep in mind that when changing the python generator files, CMake has to be call
 
 The cache can also be synthesized and used on an FPGA. The vivado project files are inside `/vivado`. There's currently two projects:
 
-- `cache` simply connects the cache's in and outputs to the registers of an AXI lite slave. You can edit the block design and use any cache wrapper verilog file you want, as long as the L1 cache has only one port (the other ports simply are not connected to anything) and uses data width 16 and address width 8. The widths can be changed pretty easily in the AXI slave's source file, so this is not a huge restriction. If however the widths are bigger than 32 bits, you'll need to find out how to make the registers bigger. In software, you can then write to the registers of the AXI lite slave and the values will be passed onto the cache. The mappings of the registers to the cache ports are documented inside the AXI slave verilog file.
+- `cache` simply connects the cache's in and outputs to the registers of an AXI lite slave. You can edit the block design and use any cache wrapper verilog file you want, as long as the L1 cache has only one port (the other ports simply are not connected to anything) and as long as the address and data width of the L1 cache are not bigger than 32 bits, because thats how wide the AXI4 lite registers are. In software, you can then write to the registers of the AXI lite slave and the values will be passed onto the cache. The mappings of the registers to the cache ports are documented inside the AXI slave verilog file.
 - Then there's also the `bram_cache` project. It allows writing a trace to a BRAM that will then be processed by the cache. After executing the trace, the total execution time will be written to another BRAM.
 
 Inside `/vitis` directories with programs for the Vivado designs:
-- `cache` contains programs for the normal `cache` design without the tracing BRAMs. There are multiple programs because they are designed for different cache configurations (they match some of the testbench configurations).
+- `cache` contains programs for the normal `cache` design without the tracing BRAMs. There are multiple programs because they are designed for different cache configurations (they match some of the testbench configurations - at least if you disable the reset).
 - `bram_cache` is made for the `bram_cache` design and allows you to write a trace into an array manually. It is designed for using small traces and verifying that they got executed correctly. It already contains one such trace.
 - `trace_file_bram_cache` is also made for the `bram_cache` design, but it is used for executing big traces from binary files. The binaries hold an arbitrary amount of instructions. Instructions have the following format:
 
@@ -46,4 +50,5 @@ To synthesize the setup you need,
 1. open the design in Vivado
 2. In the block design, right click the cache wrapper AXI slave and select "Edit in IP packager"
 3. In the sources list, right click the cache wrapper source file and select "Replace File...". Select the cache wrapper verilog file you need, then repackage the IP.
-4. synthesize, implement, generate bitstream and export the hardware including the bitstream.
+4. Right click the cache wrapper AXI slave and select "Customize Block". Then enter the data and address width for the L1 cache.
+5. synthesize, implement, generate bitstream and export the hardware including the bitstream.
