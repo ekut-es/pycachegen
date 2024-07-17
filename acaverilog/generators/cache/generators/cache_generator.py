@@ -43,6 +43,7 @@ class States(Enum):
     STALL = 8
     FLUSH_COMPUTE_NEXT = 9
     FLUSH_PREPARE_WRITE_BACK = 10
+    FLUSH_BACKEND = 11
 
 
 class CacheGenerator:
@@ -191,7 +192,7 @@ class CacheGenerator:
         # Front End Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
-        flush_i = m.Input("flush_i")
+        fe_flush_i = m.Input("fe_flush_i")
         fe_address_i = m.Input("fe_address_i", self.ADDRESS_WIDTH)
         fe_address_valid_i = m.Input("fe_address_valid_i")
         fe_write_data_i = m.Input("fe_write_data_i", self.DATA_WIDTH)
@@ -205,12 +206,14 @@ class CacheGenerator:
         fe_write_done_o = m.Output("fe_write_done_o")
         fe_port_ready_o = m.Output("fe_port_ready_o")
         fe_hit_o = m.Output("fe_hit_o")
+        fe_flush_done_o = m.Output("fe_flush_done_o")
 
         # Back End Inputs
         be_read_data_i = m.Input("be_read_data_i", self.BE_DATA_WIDTH)
         be_read_data_valid_i = m.Input("be_read_data_valid_i")
         be_write_done_i = m.Input("be_write_done_i")
         be_port_ready_i = m.Input("be_port_ready_i")
+        be_flush_done_i = m.Input("be_flush_done_i")
 
         # Back End Outputs
         be_address_o = m.Output("be_address_o", self.BE_ADDRESS_WIDTH)
@@ -219,9 +222,10 @@ class CacheGenerator:
         be_write_data_valid_o = m.Output("be_write_data_valid_o")
         be_read_write_select_o = m.Output("be_read_write_select_o")
         be_write_strobe_o = m.Output("be_write_strobe_o", self.BE_BYTES_PER_WORD)
+        be_flush_o = m.Output("be_flush_o")
 
         # Front End Input Buffers
-        flush_i_reg = m.Reg("flush_i_reg")
+        fe_flush_i_reg = m.Reg("fe_flush_i_reg")
         fe_address_i_reg = m.Reg("fe_address_i_reg", self.ADDRESS_WIDTH)
         fe_write_data_i_reg = m.Reg("fe_write_data_i_reg", self.DATA_WIDTH)
         fe_read_write_select_i_reg = m.Reg("fe_read_write_select_i_reg")
@@ -233,6 +237,7 @@ class CacheGenerator:
         )
         fe_read_data_valid_o_reg = m.Reg("fe_read_data_valid_o_reg")
         fe_write_done_o_reg = m.Reg("fe_write_done_o_reg")
+        fe_flush_done_o_reg = m.Reg("fe_flush_done_o_reg")
 
         # Back End Output Buffers
         be_address_o_reg = m.Reg(
@@ -245,6 +250,7 @@ class CacheGenerator:
         be_write_data_valid_o_reg = m.Reg("be_write_data_valid_o_reg")
         be_read_write_select_o_reg = m.Reg("be_read_write_select_o_reg")
         be_write_strobe_o_reg = m.Reg("be_write_strobe_o_reg", self.BYTES_PER_WORD)
+        be_flush_o_reg = m.Reg("be_flush_o_reg")
 
         # Frontend Output Buffer Assignments
         for i in range(self.BYTES_PER_WORD):
@@ -255,6 +261,7 @@ class CacheGenerator:
             )
         m.Assign(fe_read_data_valid_o(fe_read_data_valid_o_reg))
         m.Assign(fe_write_done_o(fe_write_done_o_reg))
+        m.Assign(fe_flush_done_o(fe_flush_done_o_reg))
 
         # Backend Output Buffer Assignments
         m.Assign(be_write_data_valid_o(be_write_data_valid_o_reg))
@@ -262,6 +269,7 @@ class CacheGenerator:
         # The output address register has our own address length, so we need to cut it down
         m.Assign(be_address_o(be_address_o_reg[-self.BE_ADDRESS_WIDTH :]))
         m.Assign(be_address_valid_o(be_address_valid_o_reg))
+        m.Assign(be_flush_o(be_flush_o_reg))
         # The output data also has our own data width, so we need to
         # shift the output data and the write strobe signal
         for i in range(self.BE_BYTES_PER_WORD):
@@ -525,7 +533,7 @@ class CacheGenerator:
             If(Not(reset_n_i))(
                 ## reset
                 # frontend input buffers
-                flush_i_reg(0),
+                fe_flush_i_reg(0),
                 fe_address_i_reg(0),
                 fe_write_data_i_reg(0),
                 fe_read_write_select_i_reg(0),
@@ -603,7 +611,7 @@ class CacheGenerator:
             ).Else(
                 If(state_reg == States.READY.value)(
                     # Cache is ready for a new request
-                    If(AndList(self.WRITE_BACK, OrList(flush_i, flush_i_reg)))(
+                    If(AndList(self.WRITE_BACK, OrList(fe_flush_i, fe_flush_i_reg)))(
                         state_reg(States.FLUSH_COMPUTE_NEXT.value),
                     ).Elif(
                         OrList(
@@ -628,6 +636,8 @@ class CacheGenerator:
                         fe_write_strobe_i_reg(fe_write_strobe_i),
                         # increment latency counter
                         latency_counter.inc(),
+                        # reset flush status
+                        fe_flush_done_o_reg(0),
                     ),
                 )
                 .Elif(state_reg == States.HIT_LOOKUP.value)(
@@ -1092,7 +1102,7 @@ class CacheGenerator:
                         fe_write_done_o_reg(fe_read_write_select_i_reg),
                         hit_valid(0),
                         latency_counter(0),
-                        If(flush_i_reg)(
+                        If(fe_flush_i_reg)(
                             state_reg(States.FLUSH_COMPUTE_NEXT.value)
                         ).Else(state_reg(States.READY.value)),
                     ).Else(
@@ -1100,25 +1110,34 @@ class CacheGenerator:
                         latency_counter.inc(),
                     ),
                 )
-                .Else(
-                    If(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
-                        If(flush_encoder_input == 0)(
-                            # No more dirty sets in this block, return or go to next block
+                .Elif(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
+                    fe_flush_done_o_reg(0),  # reset flush done status
+                    (
+                        [  # flush backend
+                            state_reg(States.FLUSH_BACKEND.value),
+                            be_flush_o_reg(1),
+                        ]
+                        if not self.WRITE_BACK
+                        else If(flush_encoder_input == 0)(
+                            # No more dirty sets in this block
                             If(
                                 flush_current_block_index == self.NUM_WAYS - 1,
                             )(
-                                flush_current_block_index(0),
-                                state_reg(States.READY.value),
-                                flush_i_reg(0),
-                                latency_counter(
-                                    0
-                                ),  # latency counter was incremented all the time by write back state, reset it
-                            ).Else(flush_current_block_index.inc())
+                                # flush backend
+                                state_reg(States.FLUSH_BACKEND.value),
+                                be_flush_o_reg(1),
+                            ).Else(
+                                # continue with the next block
+                                flush_current_block_index.inc()
+                            )
                         ).Else(
                             # There is a dirty set that we need to write back
                             state_reg(States.FLUSH_PREPARE_WRITE_BACK.value),
-                        ),
-                    ).Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
+                        )
+                    ),
+                )
+                .Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
+                    [
                         write_back_address_index(flush_next_set_index),
                         write_back_tag(
                             tag_memory[flush_current_block_index][flush_next_set_index]
@@ -1130,9 +1149,21 @@ class CacheGenerator:
                         dirty_memory[flush_current_block_index][flush_next_set_index](
                             0
                         ),
-                    )
+                    ]
                     if self.WRITE_BACK
                     else []
+                )
+                .Elif(state_reg == States.FLUSH_BACKEND.value)(
+                    be_flush_o_reg(0),  # reset flush signal
+                    If(And(be_flush_done_i, Not(be_flush_o_reg)))(
+                        flush_current_block_index(0) if self.WRITE_BACK else [],
+                        state_reg(States.READY.value),
+                        fe_flush_i_reg(0),
+                        latency_counter(
+                            0
+                        ),  # latency counter was incremented all the time by write back state, reset it
+                        fe_flush_done_o_reg(1),
+                    ),
                 ),
                 # Accept flush requests even while the cache is busy
                 # but not while the cache is flushing
@@ -1140,8 +1171,9 @@ class CacheGenerator:
                     AndList(
                         state_reg != States.FLUSH_COMPUTE_NEXT.value,
                         state_reg != States.FLUSH_PREPARE_WRITE_BACK.value,
+                        state_reg != States.FLUSH_BACKEND.value,
                     )
-                )(flush_i_reg(Or(flush_i_reg, flush_i))),
+                )(fe_flush_i_reg(Or(fe_flush_i_reg, fe_flush_i))),
             )
         )
         return m

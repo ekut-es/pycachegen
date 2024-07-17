@@ -28,6 +28,7 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> reset_n_i;
     sc_signal<bool> flush_i;
     sc_signal<bool> hit_o;
+    sc_signal<bool> flush_done_o;
 
     sc_signal<uint32_t> address_0_i;
     sc_signal<bool> address_valid_0_i;
@@ -58,6 +59,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->reset_n_i(reset_n_i);
     cache_wrapper->flush_i(flush_i);
     cache_wrapper->hit_o(hit_o);
+    cache_wrapper->flush_done_o(flush_done_o);
 
     cache_wrapper->address_0_i(address_0_i);
     cache_wrapper->address_valid_0_i(address_valid_0_i);

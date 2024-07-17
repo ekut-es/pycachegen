@@ -49,6 +49,7 @@ int sc_main(int argc, char** argv) {
     sc_signal<bool> write_done_o;
     sc_signal<bool> port_ready_o;
     sc_signal<bool> hit_o;
+    sc_signal<bool> flush_done_o;
 
     const std::unique_ptr<Vcache_wrapper_26> cache_wrapper{
         new Vcache_wrapper_26{"cache_wrapper"}};
@@ -57,6 +58,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->reset_n_i(reset_n_i);
     cache_wrapper->flush_i(flush_i);
     cache_wrapper->hit_o(hit_o);
+    cache_wrapper->flush_done_o(flush_done_o);
 
     cache_wrapper->address_0_i(address_i);
     cache_wrapper->address_valid_0_i(address_valid_i);

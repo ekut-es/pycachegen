@@ -75,10 +75,9 @@ class CacheWrapperGenerator:
         # Common Inputs
         clk_i = m.Input("clk_i")
         reset_n_i = m.Input("reset_n_i")
-        flush_i = m.Input(
-            "flush_i"
-        )  # FIXME Flush needs to be propagated through all caches
-        # Output the cache hit status of the l1 cache
+        # Ports that do not need to be arbitrated and are only for the l1 cache
+        flush_i = m.Input("flush_i")
+        flush_done_o = m.Output("flush_done_o")
         hit_o = m.Output("hit_o")
 
         ## Create Ports for the very front end (potentially the interface to the arbiter)
@@ -104,6 +103,7 @@ class CacheWrapperGenerator:
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
 
+
         ## Create the interfaces between the caches and between the last cache and the memory
         # hit signal is purely for testing atm
         request_hit = []
@@ -112,6 +112,7 @@ class CacheWrapperGenerator:
         be_read_data_valid = []
         be_write_done = []
         be_port_ready = []
+        be_flush_done = []
         # Cache Backend -> Next level memory
         be_address = []
         be_address_valid = []
@@ -119,6 +120,7 @@ class CacheWrapperGenerator:
         be_write_data_valid = []
         be_read_write_select = []
         be_write_strobe = []
+        be_flush = []
 
         for i in range(self.NUM_CACHES):
             request_hit.append(m.Wire(f"request_hit_{i}"))
@@ -128,6 +130,7 @@ class CacheWrapperGenerator:
             be_read_data_valid.append(m.Wire(f"be_read_data_valid_{i}"))
             be_write_done.append(m.Wire(f"be_write_done_{i}"))
             be_port_ready.append(m.Wire(f"be_port_ready_{i}"))
+            be_flush_done.append(m.Wire(f"be_flush_done_{i}"))
             be_address.append(
                 m.Wire(f"be_address_{i}", self.CACHE_CONFIGS[i].BE_ADDRESS_WIDTH)
             )
@@ -143,6 +146,7 @@ class CacheWrapperGenerator:
                     self.CACHE_CONFIGS[i].BE_DATA_WIDTH // self.BYTE_SIZE,
                 )
             )
+            be_flush.append(m.Wire(f"be_flush_{i}"))
 
         # Assign the hit status of the l1 cache if there is one
         if self.NUM_CACHES > 0:
@@ -223,12 +227,18 @@ class CacheWrapperGenerator:
         be_read_data_valid.insert(0, l1_read_data_valid)
         be_write_done.insert(0, l1_write_done)
         be_port_ready.insert(0, l1_port_ready)
+        be_flush_done.insert(0, flush_done_o)
         be_address.insert(0, l1_address)
         be_address_valid.insert(0, l1_address_valid)
         be_write_data.insert(0, l1_write_data)
         be_write_data_valid.insert(0, l1_write_data_valid)
         be_read_write_select.insert(0, l1_read_write_select)
         be_write_strobe.insert(0, l1_write_strobe)
+        be_flush.insert(0, flush_i)
+
+
+        # Assign 1 to the last flush done because the memory doesn't need a flush
+        m.Assign(be_flush_done[-1](1))
 
         ## Connect all caches
         for i in range(self.NUM_CACHES):
@@ -240,10 +250,8 @@ class CacheWrapperGenerator:
                     # Common
                     ("clk_i", clk_i),
                     ("reset_n_i", reset_n_i),
-                    ("flush_i", flush_i),
-                    # Hit signal
-                    ("fe_hit_o", request_hit[i]),
                     # Cache In
+                    ("fe_flush_i", be_flush[i]),
                     ("fe_address_i", be_address[i]),
                     ("fe_address_valid_i", be_address_valid[i]),
                     ("fe_write_data_i", be_write_data[i]),
@@ -251,16 +259,20 @@ class CacheWrapperGenerator:
                     ("fe_read_write_select_i", be_read_write_select[i]),
                     ("fe_write_strobe_i", be_write_strobe[i]),
                     # Cache Out
+                    ("fe_flush_done_o", be_flush_done[i]),
                     ("fe_read_data_o", be_read_data[i]),
                     ("fe_read_data_valid_o", be_read_data_valid[i]),
                     ("fe_write_done_o", be_write_done[i]),
                     ("fe_port_ready_o", be_port_ready[i]),
+                    ("fe_hit_o", request_hit[i]),
                     # Cache Backend <- Memory
+                    ("be_flush_done_i", be_flush_done[i + 1]),
                     ("be_read_data_i", be_read_data[i + 1]),
                     ("be_read_data_valid_i", be_read_data_valid[i + 1]),
                     ("be_write_done_i", be_write_done[i + 1]),
                     ("be_port_ready_i", be_port_ready[i + 1]),
                     # Cache Backend -> Memory
+                    ("be_flush_o", be_flush[i + 1]),
                     ("be_address_o", be_address[i + 1]),
                     ("be_address_valid_o", be_address_valid[i + 1]),
                     ("be_write_data_o", be_write_data[i + 1]),
