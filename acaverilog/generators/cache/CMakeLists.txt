@@ -50,6 +50,7 @@ set(CACHE_WRAPPER_ARG_LIST
     "26 1 priority 8 \"16 8 1 2 fifo 0 0 0 1 1\" \"16 8 10 15 0 255\""
     "27 1 priority 13 \"13 4 2 2 plru_tree 0 0 0 1 2\" \"26 3 10 15 0 7\""
     "28 1 priority 8 \"16 8 10 15 42 48\""
+    "29 1 priority 8 \"8 3 1 2 plru_tree 0 0 0 1 1\" \"8 3 1 2 plru_tree 0 0 1 0 1\" \"8 3 1 2 plru_tree 0 0 0 1 1\" \"8 3 3 5 0 7\""
 )
 list(LENGTH CACHE_WRAPPER_ARG_LIST NUM_TESTBENCHES)
 

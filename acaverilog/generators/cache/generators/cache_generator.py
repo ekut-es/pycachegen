@@ -542,6 +542,7 @@ class CacheGenerator:
                 [fe_read_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
                 fe_read_data_valid_o_reg(0),
                 fe_write_done_o_reg(0),
+                fe_flush_done_o_reg(0),
                 # backend outputs
                 be_address_o_reg(0),
                 be_address_valid_o_reg(0),
@@ -549,6 +550,7 @@ class CacheGenerator:
                 be_write_data_valid_o_reg(0),
                 be_read_write_select_o_reg(0),
                 be_write_strobe_o_reg(0),
+                be_flush_o_reg(0),
                 # internal registers
                 state_reg(States.READY.value),
                 latency_counter(0),
@@ -611,7 +613,7 @@ class CacheGenerator:
             ).Else(
                 If(state_reg == States.READY.value)(
                     # Cache is ready for a new request
-                    If(AndList(self.WRITE_BACK, OrList(fe_flush_i, fe_flush_i_reg)))(
+                    If(OrList(fe_flush_i, fe_flush_i_reg))(
                         state_reg(States.FLUSH_COMPUTE_NEXT.value),
                     ).Elif(
                         OrList(
@@ -863,9 +865,9 @@ class CacheGenerator:
                         be_read_write_select_o_reg(1),
                         [
                             be_write_data_o_reg[byte_idx](
-                                data_memory[write_back_block_index][address_index][
-                                    write_back_word_offset
-                                ][byte_idx]
+                                data_memory[write_back_block_index][
+                                    write_back_address_index
+                                ][write_back_word_offset][byte_idx]
                             )
                             for byte_idx in range(self.BYTES_PER_WORD)
                         ],
