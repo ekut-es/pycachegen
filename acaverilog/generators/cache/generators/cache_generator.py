@@ -396,7 +396,7 @@ class CacheGenerator:
                     )
                 )
 
-            m.Always(be_read_data_i, be_address_o_reg, be_read_data_word_offset)(
+            m.Always(be_read_data_i, be_address_o_reg, be_read_data_total_word_offset)(
                 # iterate over the be read data in steps of our own data width and check if
                 # when it is the word that we want to read
                 Case(be_read_data_total_word_offset)(
