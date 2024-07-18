@@ -4,7 +4,7 @@
     "xci_name": "design_1_axi_slave_bram_cache_0_1",
     "cell_name": "axi_slave_bram_cache_0",
     "component_reference": "user.org:user:axi_slave_bram_cache:1.1",
-    "ip_revision": "38",
+    "ip_revision": "39",
     "gen_directory": "../../../../../../bram_cache.gen/sources_1/bd/design_1/ip/design_1_axi_slave_bram_cache_0_1",
     "parameters": {
       "component_parameters": {
@@ -47,7 +47,7 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Integrator" } ],
-        "IPREVISION": [ { "value": "38" } ],
+        "IPREVISION": [ { "value": "39" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../../../bram_cache.gen/sources_1/bd/design_1/ip/design_1_axi_slave_bram_cache_0_1" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],

@@ -37,32 +37,32 @@ int main()
 	volatile Xuint32* cache_address = cache_baseaddr_p + 1;
 	volatile Xuint32* cache_write_data = cache_baseaddr_p + 2;
 	volatile Xuint32* cache_trace_length = cache_baseaddr_p + 3;
-	volatile Xuint32* cache_fdone_hit_rdval_wdone_pready = cache_baseaddr_p + 5;
+	volatile Xuint32* cache_hit_rdval_wdone_pready = cache_baseaddr_p + 5;
 	volatile Xuint32* cache_read_data = cache_baseaddr_p + 6;
 	volatile Xuint32* cache_trace_done = cache_baseaddr_p + 7;
 
-//	unsigned char trace_data[] = test_trace_32_16_bin;
-//	unsigned int trace_len = test_trace_32_16_bin_len;
 	unsigned int trace_bytes_per_word = (trace_data_width / 8);
+	unsigned int trace_instruction_count = test_trace_32_16_bin_len / trace_bytes_per_word;
 
     init_platform();
 
     xil_printf("Writing the trace to the BRAM...\n\r");
-	for(int i = 0; i < test_trace_32_16_bin_len; i += trace_bytes_per_word){
+	for(int i = 0; i < trace_instruction_count; i++){
 		unsigned int word = 0;
 		for(int j = 0; j < trace_bytes_per_word; j++){
-			word |= (test_trace_32_16_bin[i+j] << (trace_data_width - (j + 1) * 8));
+			word |= (test_trace_32_16_bin[trace_bytes_per_word * i + j] << (trace_data_width - (j + 1) * 8));
 		}
     	*(trace_bram_baseaddr_p + i) = word;
 	}
 
+	// just as a quick sanity check
     xil_printf("Reading the trace start from the BRAM...\n\r");
     for (int i = 0; i < 10; i++) {
-    	xil_printf("Trace at address 0x%x: 0x%x\n\r", i, *(trace_bram_baseaddr_p + i));
+    	xil_printf("Trace at address 0x%d: 0x%x\n\r", i, *(trace_bram_baseaddr_p + i));
     }
 
     xil_printf("Starting trace processing.\n\r");
-    *cache_trace_length = test_trace_32_16_bin_len;
+    *cache_trace_length = trace_instruction_count; // length variable contains number of bytes, not 32 bit words
 
     while(1){
     	if(*cache_trace_done == 1) {
@@ -73,6 +73,7 @@ int main()
     int execution_time = *stats_bram_baseaddr_p;
     xil_printf("Trace processed. Total execution time: %d cycles.\n\r", execution_time);
 
+	// just as a quick sanity check
     xil_printf("Reading from cache...\n\r");
     for (int i = 0; i < 10; i++){
     	*cache_address = i;
@@ -82,7 +83,7 @@ int main()
     	xil_printf("Reading from address 0x%x... ", i);
 
     	while(1){
-    		if((*cache_fdone_hit_rdval_wdone_pready & 0b00101) == 0b00101) {
+    		if((*cache_hit_rdval_wdone_pready & 0b0101) == 0b0101) {
     			xil_printf("0x%x\n\r", *cache_read_data);
     			break;
     		}
