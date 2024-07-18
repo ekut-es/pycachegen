@@ -22,7 +22,7 @@
 #include "xil_printf.h"
 #include "xparameters.h"
 #include "xbasic_types.h"
-#include "test_trace_32_16.h"
+#include "mem_trace.h"
 
 const int trace_data_width = 32;
 
@@ -42,7 +42,7 @@ int main()
 	volatile Xuint32* cache_trace_done = cache_baseaddr_p + 7;
 
 	unsigned int trace_bytes_per_word = (trace_data_width / 8);
-	unsigned int trace_instruction_count = test_trace_32_16_bin_len / trace_bytes_per_word;
+	unsigned int trace_instruction_count = mem_trace_bin_len / trace_bytes_per_word;
 
     init_platform();
 
@@ -50,7 +50,7 @@ int main()
 	for(int i = 0; i < trace_instruction_count; i++){
 		unsigned int word = 0;
 		for(int j = 0; j < trace_bytes_per_word; j++){
-			word |= (test_trace_32_16_bin[trace_bytes_per_word * i + j] << (trace_data_width - (j + 1) * 8));
+			word |= (mem_trace_bin[trace_bytes_per_word * i + j] << (trace_data_width - (j + 1) * 8));
 		}
     	*(trace_bram_baseaddr_p + i) = word;
 	}
