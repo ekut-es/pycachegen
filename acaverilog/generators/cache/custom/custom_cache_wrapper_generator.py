@@ -10,31 +10,31 @@ from acaverilog.generators.cache.cache_config_validation import (
 if __name__ == "__main__":
     # Put all your cache configurations here
     cache_configs = [
-        CacheConfig(
-            data_width=16,
-            address_width=15,
-            num_ways=2,
-            num_sets=4,
-            replacement_policy="plru_tree",
-            hit_latency=0,
-            miss_latency=0,
-            write_through=False,
-            write_allocate=True,
-            block_size=4,
-            be_data_width=64,
-            be_address_width=13,
-            byte_size=8,
-            prefix="l1_",
-            enable_reset=False,
-        )
+        # CacheConfig(
+        #     data_width=16,
+        #     address_width=15,
+        #     num_ways=2,
+        #     num_sets=4,
+        #     replacement_policy="plru_tree",
+        #     hit_latency=0,
+        #     miss_latency=0,
+        #     write_through=False,
+        #     write_allocate=True,
+        #     block_size=4,
+        #     be_data_width=64,
+        #     be_address_width=13,
+        #     byte_size=8,
+        #     prefix="l1_",
+        #     enable_reset=False,
+        # )
     ]
 
     # Configure your main memory
     memory_config = MemoryConfig(
-        data_width=64,
-        address_width=13,
-        read_latency=30,
-        write_latency=45,
+        data_width=16,
+        address_width=15,
+        read_latency=5,
+        write_latency=10,
         byte_size=8,
         min_address=0,
         max_address=(2**13 - 1),

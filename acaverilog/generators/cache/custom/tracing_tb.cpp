@@ -93,14 +93,15 @@ int sc_main(int argc, char** argv) {
         read_write_select_i.write((word >> (word_buffer_width - 1)));
         sc_start(1, SC_NS);
         address_valid_i.write(0);
+        sc_start(1, SC_NS);
         while (!port_ready_o.read()) {
             sc_start(1, SC_NS);
         }
     }
-    sc_start(1, SC_NS);
-    while (!port_ready_o.read()) {
-        sc_start(1, SC_NS);
-    }
+    // sc_start(1, SC_NS);
+    // while (!port_ready_o.read()) {
+    //     sc_start(1, SC_NS);
+    // }
 
     cache_wrapper->final();
 
@@ -109,8 +110,8 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    const uint64_t simulated_time =
-        (uint64_t)sc_time_stamp().to_default_time_units() - 1;
+    const auto simulated_time =
+        sc_time_stamp().to_default_time_units();
     const auto end_time = std::chrono::system_clock::now();
     const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
