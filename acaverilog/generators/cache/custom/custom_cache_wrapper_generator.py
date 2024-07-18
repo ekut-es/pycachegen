@@ -13,7 +13,7 @@ if __name__ == "__main__":
     ARBITER_POLICY = "round_robin" # one of "fifo", "priority", "round_robin"
     BYTE_SIZE = 8 # bits per byte
     ENABLE_RESET = False # Disable for synthesis. Can be enabled for simulation.
-    ADDRESS_WIDTH = 15 # width of an address that would include the byte offset
+    ADDRESS_WIDTH = 16 # width of an address that would include the byte offset
     # Put all your cache configurations here
     CACHE_CONFIGS = [
         CacheConfig(
@@ -31,9 +31,9 @@ if __name__ == "__main__":
 
     # Configure your main memory
     MEMORY_CONFIG = MemoryConfig(
-        data_width=16,
-        read_latency=5,
-        write_latency=10,
+        data_width=64,
+        read_latency=60,
+        write_latency=60,
         min_address=0,
         max_address=(2**13 - 1),
     )
