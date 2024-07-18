@@ -2,15 +2,13 @@ from math import ceil, log2
 from veriloggen import Module, Posedge, Negedge, If, AndList, Not, For, Or, And
 
 from acaverilog.generators.cache.cache_config_validation import (
-    assert_data_width_valid,
-    assert_greater_equal,
-    MemoryConfig,
+    InternalMemoryConfig,
 )
 
 
 class FunctionalMemoryGenerator:
 
-    def __init__(self, config: MemoryConfig) -> None:
+    def __init__(self, config: InternalMemoryConfig) -> None:
         """Generator for a data memory that can hold data, hence it's called functional.
 
 

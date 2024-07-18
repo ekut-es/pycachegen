@@ -4,16 +4,13 @@ Inside the `generators/` directory there are python files that can generate veri
 
 The cache wrapper wraps the cache and the functional memory in one module. It can create linear cache architectures (so no two caches on the same level). It can also create an arbiter so that you can have multiple access ports. Creating caches is optional - the cache wrapper can also simply create a memory, optionally with an arbiter.
 
-To actually generate Verilog files, you can either call the cache wrapper generator from the command line with matching arguments (see the bottom of the python script), or you can write your own python code to create a cache wrapper. The former case is used for generating testbenches and will save the verilog files in `../src` since it expects you to be in the `build` directory. For the latter case you need to create memory and cache configuration objects from the classes stored in `cache_config_validation.py` and use these to instantiate a cache wrapper generator. You can then call the `generate_module()` method and generate the verilog code as shown in the python script.
+## Creating Verilog Code for the testbenches
 
-If you want to synthesize the code, you should disable the reset everywhere - otherwise vivado won't be able to infer BRAM.
+There are many testbenches for different cache wrapper configurations. Go inside the `testbenches/` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files, put them in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one. Create a `build/` directory and change into it, then call `cmake -GNinja ..` and then `ninja`. Then you can execute the individual testbenches.
 
-# Testbenches
-To run the testbenches, create a `/build` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one.
+## Creating Verilog Code for custom cache hierarchies
 
-You can then call ninja and execute the executables of the testbenches as well as inspect the traces.
-
-Keep in mind that when changing the python generator files, CMake has to be called again (not just ninja).
+To actually generate Verilog files for custom cache hierarchies, go to the `custom/` folder. There you'll find a `custom_cache_wrapper_generator.py` where you can configure a cache/memory hierarchy and generate an output file. There's also a `CMakeLists.txt` that will call the python script just mentioned, verilate the verilog code and compile it with a testbench for executing memory traces. The format of the traces and how to load it into the c/c++ program is the same as when executing a trace on a synthesized cache wrapper on an FPGA, so read the section below on how to do that.
 
 # FPGA
 

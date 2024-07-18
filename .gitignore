@@ -176,7 +176,8 @@ systemc-2.3.3
 external/
 
 # student/mueller
-acaverilog/generators/cache/src
+acaverilog/generators/cache/testbenches/src
+acaverilog/generators/cache/custom/src
 vivado/cache/cache.cache
 vivado/cache/cache.hw
 vivado/cache/cache.tmp

@@ -165,12 +165,10 @@ def assert_address_range_valid(
             + f"but the address is only {address_width} bits wide"
         )
 
-
 class CacheConfig:
     def __init__(
-        self,
+            self,
         data_width: int,
-        address_width: int,
         num_ways: int,
         num_sets: int,
         replacement_policy: str,
@@ -179,17 +177,11 @@ class CacheConfig:
         write_through: bool,
         write_allocate: bool,
         block_size: int,
-        be_data_width: int,
-        be_address_width: int,
-        byte_size: int,
-        prefix: str,
-        enable_reset: bool
     ) -> None:
-        """Class to store and validate a configuration for the cache.
+        """Class for end users to create configurations for caches.
 
         Args:
             data_width (int): Width of one data word in bits.
-            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
@@ -200,79 +192,122 @@ class CacheConfig:
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
+        """
+        self.DATA_WIDTH = data_width
+        self.NUM_WAYS = num_ways
+        self.NUM_SETS = num_sets
+        self.REPLACEMENT_POLICY = replacement_policy
+        self.HIT_LATENCY = hit_latency
+        self.MISS_LATENCY = miss_latency
+        self.WRITE_THROUGH = write_through
+        self.WRITE_ALLOCATE = write_allocate
+        self.BLOCK_SIZE = block_size
+
+class InternalCacheConfig:
+    def __init__(
+        self,
+        cache_config: CacheConfig,
+        address_width: int,
+        be_data_width: int,
+        be_address_width: int,
+        byte_size: int,
+        prefix: str,
+        enable_reset: bool
+    ) -> None:
+        """Class for validating cache configs in a cache hierarchy and for passing on all needed
+        arguments to a cache.
+
+        Args:
+            
+            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater than the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
             prefix (str): A prefix to use for the module name.
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
-        assert_data_width_valid(data_width, byte_size)
-        assert_data_width_valid(be_data_width, byte_size)
-        assert_is_power_of_two(num_ways, "num_ways")
-        assert_is_power_of_two(num_sets, "num_sets")
-        assert_is_power_of_two(block_size, "block_size")
-        assert_replacement_policy_is_valid(replacement_policy, REPLACEMENT_POLICIES)
+        assert_data_width_valid(cache_config.DATA_WIDTH, byte_size)
+        assert_data_width_valid(be_data_width, byte_size) # technically this is checked in the BE config too
+        assert_is_power_of_two(cache_config.NUM_WAYS, "num_ways")
+        assert_is_power_of_two(cache_config.NUM_SETS, "num_sets")
+        assert_is_power_of_two(cache_config.BLOCK_SIZE, "block_size")
+        assert_replacement_policy_is_valid(cache_config.REPLACEMENT_POLICY, REPLACEMENT_POLICIES)
         assert_same_address_space(
-            dw1=data_width, aw1=address_width, dw2=be_data_width, aw2=be_address_width
+            dw1=cache_config.DATA_WIDTH, aw1=address_width, dw2=be_data_width, aw2=be_address_width
         )
         assert_address_config_valid(
             address_width=address_width,
-            num_sets=num_sets,
-            num_ways=num_ways,
-            block_size=block_size,
+            num_sets=cache_config.NUM_SETS,
+            num_ways=cache_config.NUM_WAYS,
+            block_size=cache_config.BLOCK_SIZE,
         )
-        assert_be_data_width_valid(data_width, be_data_width)
-        self.DATA_WIDTH = data_width
+        assert_be_data_width_valid(cache_config.DATA_WIDTH, be_data_width)        
+        self.DATA_WIDTH = cache_config.DATA_WIDTH
         self.ADDRESS_WIDTH = address_width
-        self.NUM_WAYS = num_ways
-        self.NUM_SETS = num_sets
-        self.REPLACEMENT_POLICY = replacement_policy
-        self.HIT_LATENCY = hit_latency
-        self.MISS_LATENCY = miss_latency
-        self.WRITE_BACK = not write_through
-        self.WRITE_ALLOCATE = write_allocate
-        self.BLOCK_SIZE = block_size
+        self.NUM_WAYS = cache_config.NUM_WAYS
+        self.NUM_SETS = cache_config.NUM_SETS
+        self.REPLACEMENT_POLICY = cache_config.REPLACEMENT_POLICY
+        self.HIT_LATENCY = cache_config.HIT_LATENCY
+        self.MISS_LATENCY = cache_config.MISS_LATENCY
+        self.WRITE_BACK = not cache_config.WRITE_THROUGH
+        self.WRITE_ALLOCATE = cache_config.WRITE_ALLOCATE
+        self.BLOCK_SIZE = cache_config.BLOCK_SIZE
         self.BE_DATA_WIDTH = be_data_width
         self.BE_ADDRESS_WIDTH = be_address_width
         self.BYTE_SIZE = byte_size
         self.PREFIX = prefix
         self.ENABLE_RESET = enable_reset
 
-
 class MemoryConfig:
     def __init__(
         self,
         data_width: int,
-        address_width: int,
         read_latency: int,
         write_latency: int,
-        byte_size: int,
         min_address: int,
         max_address: int,
-        enable_reset: bool
     ) -> None:
-        """Class to store and validate a configuration for the functional memory.
+        """Class for end users to create configurations for memories.
 
         Args:
             data_width (int): Width of one data word in bits.
-            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            byte_size (int): Number of bits per byte.
             min_address (int): The smallest address (inclusive). Requests to smaller addresses will be ignored.
             max_address (int): The greatest address (inclusive). Requests to greater addresses will be ignored.
-            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
-        assert_greater_equal(read_latency, 2, "read_latency")
-        assert_greater_equal(write_latency, 2, "write_latency")
-        assert_data_width_valid(data_width, byte_size)
-        assert_address_range_valid(min_address, max_address, address_width)
-
         self.DATA_WIDTH = data_width
-        self.ADDRESS_WIDTH = address_width
         self.READ_LATENCY = read_latency
         self.WRITE_LATENCY = write_latency
-        self.BYTE_SIZE = byte_size
         self.MIN_ADDRESS = min_address
         self.MAX_ADDRESS = max_address
+
+class InternalMemoryConfig:
+    def __init__(
+        self,
+        memory_config: MemoryConfig,
+        address_width: int,
+        byte_size: int,
+        enable_reset: bool
+    ) -> None:
+        """Class for validating memory configs in a cache hierarchy and for passing on all needed
+        arguments to a memory.
+
+        Args:
+            address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
+            byte_size (int): Number of bits per byte.
+            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
+        """
+        assert_greater_equal(memory_config.READ_LATENCY, 2, "read_latency")
+        assert_greater_equal(memory_config.WRITE_LATENCY, 2, "write_latency")
+        assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
+        assert_address_range_valid(memory_config.MIN_ADDRESS, memory_config.MAX_ADDRESS, address_width)
+
+        self.DATA_WIDTH = memory_config.DATA_WIDTH
+        self.ADDRESS_WIDTH = address_width
+        self.READ_LATENCY = memory_config.READ_LATENCY
+        self.WRITE_LATENCY = memory_config.WRITE_LATENCY
+        self.BYTE_SIZE = byte_size
+        self.MIN_ADDRESS = memory_config.MIN_ADDRESS
+        self.MAX_ADDRESS = memory_config.MAX_ADDRESS
         self.ENABLE_RESET = enable_reset

@@ -1,5 +1,4 @@
-import sys
-import copy
+from math import log2
 from veriloggen import (
     Module,
     Submodule,
@@ -15,7 +14,8 @@ from acaverilog.generators.cache.generators.memory_access_arbiter import (
 from acaverilog.generators.cache.cache_config_validation import (
     CacheConfig,
     MemoryConfig,
-    ConfigurationError,
+    InternalCacheConfig,
+    InternalMemoryConfig,
 )
 
 
@@ -29,33 +29,60 @@ class CacheWrapperGenerator:
         self,
         num_ports: int,
         arbiter_policy: str,
+        byte_size: int,
         enable_reset: bool,
+        address_width: int,
         memory_config: MemoryConfig,
         *cache_configs: CacheConfig,
     ) -> None:
-        if not all(
-            (
-                cache_config.BYTE_SIZE == memory_config.BYTE_SIZE
-                for cache_config in cache_configs
-            )
-        ):
-            raise ConfigurationError(
-                "The byte size must be the same for all caches and the memory."
-            )
-
-        self.MEMORY_CONFIG = memory_config
-        self.CACHE_CONFIGS = cache_configs
         self.NUM_PORTS = num_ports
         self.ARBITER_POLICY = arbiter_policy
-        self.NUM_CACHES = len(cache_configs)
-        self.BYTE_SIZE = memory_config.BYTE_SIZE
+        self.BYTE_SIZE = byte_size
         self.ENABLE_RESET = enable_reset
+        self.ADDRESS_WIDTH = address_width
+        self.NUM_CACHES = len(cache_configs)
+
+        self.CACHE_CONFIGS: list[InternalCacheConfig] = []
+        for i in range(len(cache_configs)):
+            config = cache_configs[i]
+            address_width = self.ADDRESS_WIDTH - int(
+                log2(config.DATA_WIDTH // self.BYTE_SIZE)
+            )
+            if i < len(cache_configs) - 1:
+                be_data_width = cache_configs[i + 1].DATA_WIDTH
+            else:
+                be_data_width = memory_config.DATA_WIDTH
+            be_address_width = self.ADDRESS_WIDTH - int(
+                log2(be_data_width // self.BYTE_SIZE)
+            )
+            self.CACHE_CONFIGS.append(
+                InternalCacheConfig(
+                    cache_config=config,
+                    address_width=address_width,
+                    be_data_width=be_data_width,
+                    be_address_width=be_address_width,
+                    byte_size=self.BYTE_SIZE,
+                    prefix=f"l{i+1}_",
+                    enable_reset=self.ENABLE_RESET,
+                )
+            )
+
+        memory_address_width = self.ADDRESS_WIDTH - int(
+            log2(memory_config.DATA_WIDTH // self.BYTE_SIZE)
+        )
+        self.MEMORY_CONFIG = InternalMemoryConfig(
+            memory_config=memory_config,
+            address_width=memory_address_width,
+            byte_size=self.BYTE_SIZE,
+            enable_reset=self.ENABLE_RESET,
+        )
+
         if self.NUM_CACHES > 0:
-            self.FE_DATA_WIDTH = cache_configs[0].DATA_WIDTH
-            self.FE_ADDRESS_WIDTH = cache_configs[0].ADDRESS_WIDTH
+            self.FE_DATA_WIDTH = self.CACHE_CONFIGS[0].DATA_WIDTH
+            self.FE_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
         else:
-            self.FE_DATA_WIDTH = memory_config.DATA_WIDTH
-            self.FE_ADDRESS_WIDTH = memory_config.ADDRESS_WIDTH
+            self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
+            self.FE_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
 
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")
@@ -103,7 +130,6 @@ class CacheWrapperGenerator:
             read_data_valid_o.append(m.Output(f"read_data_valid_{i}_o"))
             write_done_o.append(m.Output(f"write_done_{i}_o"))
             port_ready_o.append(m.Output(f"port_ready_{i}_o"))
-
 
         ## Create the interfaces between the caches and between the last cache and the memory
         # hit signal is purely for testing atm
@@ -180,7 +206,7 @@ class CacheWrapperGenerator:
                 address_width=self.FE_ADDRESS_WIDTH,
                 data_width=self.FE_DATA_WIDTH,
                 policy=self.ARBITER_POLICY,
-                enable_reset=self.ENABLE_RESET
+                enable_reset=self.ENABLE_RESET,
             ).generate_module()
 
             arbiter_port_mapping = [
@@ -237,7 +263,6 @@ class CacheWrapperGenerator:
         be_read_write_select.insert(0, l1_read_write_select)
         be_write_strobe.insert(0, l1_write_strobe)
         be_flush.insert(0, flush_i)
-
 
         # Assign 1 to the last flush done because the memory doesn't need a flush
         m.Assign(be_flush_done[-1](1))
@@ -309,78 +334,3 @@ class CacheWrapperGenerator:
         )
 
         return m
-
-
-if __name__ == "__main__":
-    # argv:
-    # (file name), number for output file suffix, num ports, arbiter policy, byte size, enable reset
-    # [data width, address width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
-    # [main memory data width, main memory address width, read latency, write latency, min address, max address]
-    args = copy.copy(sys.argv[1:]) # make a copy just to be sure
-    FILE_SUFFIX = args.pop(0)
-    NUM_PORTS = int(args.pop(0))
-    ARBITER_POLICY = args.pop(0)
-    BYTE_SIZE = int(args.pop(0))
-    ENABLE_RESET = bool(int(args.pop(0)))
-    raw_memory_config = args.pop().split()
-    raw_cache_configs = [config.split() for config in args]
-
-    DATA_WIDTH = [int(config[0]) for config in raw_cache_configs]
-    ADDRESS_WIDTH = [int(config[1]) for config in raw_cache_configs]
-    NUM_WAYS = [int(config[2]) for config in raw_cache_configs]
-    NUM_SETS = [int(config[3]) for config in raw_cache_configs]
-    REPLACEMENT_POLICY = [config[4] for config in raw_cache_configs]
-    HIT_LATENCY = [int(config[5]) for config in raw_cache_configs]
-    MISS_LATENCY = [int(config[6]) for config in raw_cache_configs]
-    WRITE_THROUGH = [bool(int(config[7])) for config in raw_cache_configs]
-    WRITE_ALLOCATE = [bool(int(config[8])) for config in raw_cache_configs]
-    BLOCK_SIZE = [int(config[9]) for config in raw_cache_configs]
-    DATA_WIDTH.append(int(raw_memory_config[0]))
-    ADDRESS_WIDTH.append(int(raw_memory_config[1]))
-    MEMORY_READ_LATENCY = int(raw_memory_config[2])
-    MEMORY_WRITE_LATENCY = int(raw_memory_config[3])
-    MEMORY_MIN_ADDRESS = int(raw_memory_config[4], base=0)
-    MEMORY_MAX_ADDRESS = int(raw_memory_config[5], base=0)
-
-    cache_configs = []
-    for i in range(len(raw_cache_configs)):
-        cache_configs.append(
-            CacheConfig(
-                data_width=DATA_WIDTH[i],
-                address_width=ADDRESS_WIDTH[i],
-                num_ways=NUM_WAYS[i],
-                num_sets=NUM_SETS[i],
-                replacement_policy=REPLACEMENT_POLICY[i],
-                hit_latency=HIT_LATENCY[i],
-                miss_latency=MISS_LATENCY[i],
-                write_through=WRITE_THROUGH[i],
-                write_allocate=WRITE_ALLOCATE[i],
-                block_size=BLOCK_SIZE[i],
-                be_data_width=DATA_WIDTH[i + 1],
-                be_address_width=ADDRESS_WIDTH[i + 1],
-                byte_size=BYTE_SIZE,
-                enable_reset=ENABLE_RESET,
-                prefix=f"l{i+1}_"
-            )
-        )
-
-    memory_config = MemoryConfig(
-        data_width=DATA_WIDTH[-1],
-        address_width=ADDRESS_WIDTH[-1],
-        read_latency=MEMORY_READ_LATENCY,
-        write_latency=MEMORY_WRITE_LATENCY,
-        byte_size=BYTE_SIZE,
-        min_address=MEMORY_MIN_ADDRESS,
-        max_address=MEMORY_MAX_ADDRESS,
-        enable_reset=ENABLE_RESET
-    )
-
-    cache_wrapper_generator = CacheWrapperGenerator(
-        NUM_PORTS,
-        ARBITER_POLICY,
-        ENABLE_RESET,
-        memory_config,
-        *cache_configs,
-    )
-    m = cache_wrapper_generator.generate_module()
-    m.to_verilog(f"../src/cache_wrapper_{FILE_SUFFIX}.v", for_verilator=True)

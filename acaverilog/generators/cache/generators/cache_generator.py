@@ -27,7 +27,7 @@ from acaverilog.generators.cache.generators.priority_encoder_generator import (
 )
 from acaverilog.generators.cache.cache_config_validation import (
     ConfigurationError,
-    CacheConfig,
+    InternalCacheConfig,
 )
 
 
@@ -49,7 +49,7 @@ class States(Enum):
 class CacheGenerator:
     def __init__(
         self,
-        config: CacheConfig,
+        config: InternalCacheConfig,
     ) -> None:
         """Cache Generator.
 
@@ -99,11 +99,11 @@ class CacheGenerator:
         own_latencies = (self.HIT_LATENCY, self.MISS_LATENCY)
         if min_latencies == own_latencies:
             print(
-                f"{self.PREFIX}: using the minimum latencies ({min_latencies}) (hit/miss)"
+                f"{self.PREFIX}: using the minimum latencies {min_latencies} (hit/miss)"
             )
         else:
             print(
-                f"{self.PREFIX}: latencies ({own_latencies}) differ from the minimum latencies ({min_latencies}) (hit/miss)"
+                f"{self.PREFIX}: latencies {own_latencies} differ from the minimum latencies {min_latencies} (hit/miss)"
             )
 
     def get_min_worst_case_latencies(self) -> tuple[int, int]:
