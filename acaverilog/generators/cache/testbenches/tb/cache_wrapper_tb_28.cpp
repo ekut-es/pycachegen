@@ -8,7 +8,7 @@
 
 // Testbench for testing memory address ranges
 // num_ports=1, arbiter_policy=priority, byte_size=8
-// enable_reset=true, address_width=9
+// enable_reset=false, address_width=9
 // Main Memory: data_width=16, read_latency=10, write_latency=15
 // min_address=42, max_address=48
 

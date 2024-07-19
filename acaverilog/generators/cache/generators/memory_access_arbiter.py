@@ -102,7 +102,7 @@ class MemoryAccessArbiter:
         fe_read_data = m.Reg("fe_read_data", self.DATA_WIDTH, self.NUM_PORTS)
         fe_read_data_valid = m.Reg("fe_read_data_valid", self.NUM_PORTS)
         fe_write_done = m.Reg("fe_write_done", self.NUM_PORTS)
-        fe_port_ready = m.Reg("fe_port_ready", self.NUM_PORTS)
+        fe_port_busy = m.Reg("fe_port_busy", self.NUM_PORTS) # busy instead of ready so initial value 0 is good
         for i in range(self.NUM_PORTS):
             fe_address_i.append(m.Input(f"fe_address_{i}_i", self.ADDRESS_WIDTH))
             fe_address_valid_i.append(m.Input(f"fe_address_valid_{i}_i"))
@@ -118,7 +118,7 @@ class MemoryAccessArbiter:
             m.Assign(fe_read_data_o[i](fe_read_data[i]))
             m.Assign(fe_read_data_valid_o[i](fe_read_data_valid[i]))
             m.Assign(fe_write_done_o[i](fe_write_done[i]))
-            m.Assign(fe_port_ready_o[i](fe_port_ready[i]))
+            m.Assign(fe_port_ready_o[i](fe_port_busy[i]))
 
         # internal
         request_valid = m.Wire("request_valid", self.NUM_PORTS)
@@ -183,18 +183,13 @@ class MemoryAccessArbiter:
                 be_write_data_valid(0),
                 be_read_write_select(0),
                 # frontend buffers
-                [
-                    (
-                        fe_address[i](0),
-                        fe_write_data[i](0),
-                        fe_read_write_select[i](0),
-                        fe_read_data[i](0),
-                        fe_read_data_valid[i](0),
-                        fe_write_done[i](0),
-                        fe_port_ready[i](1),
-                    )
-                    for i in range(self.NUM_PORTS)
-                ],
+                fe_address(0),
+                fe_write_data(0),
+                fe_read_write_select(0),
+                fe_read_data(0),
+                fe_read_data_valid(0),
+                fe_write_done(0),
+                fe_port_busy(0),
                 # internal
                 state_reg(States.READY.value),
                 selected_request(0),
@@ -214,8 +209,8 @@ class MemoryAccessArbiter:
             ).Else(
                 # Always buffer new requests
                 [
-                    If(And(fe_port_ready[i], request_valid[i]))(
-                        fe_port_ready[i](0),
+                    If(And(Not(fe_port_busy[i]), request_valid[i]))(
+                        fe_port_busy[i](1),
                         fe_address[i](fe_address_i[i]),
                         fe_write_data[i](fe_write_data_i[i]),
                         fe_read_write_select[i](fe_read_write_select_i[i]),
@@ -292,7 +287,7 @@ class MemoryAccessArbiter:
                         be_write_data_valid(0),
                     ).Elif(be_port_ready_i)(
                         state_reg(States.READY.value),
-                        fe_port_ready[selected_request](1),
+                        fe_port_busy[selected_request](0),
                         If(And(be_read_write_select, be_write_done_i))(
                             # write done
                             fe_write_done[selected_request](1),

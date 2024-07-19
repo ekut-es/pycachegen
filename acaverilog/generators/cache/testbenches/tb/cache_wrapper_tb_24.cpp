@@ -9,7 +9,7 @@
 // Testbench for testing that the cache wrapper can generate architectures
 // without caches.
 // num_ports=1, arbiter_policy=priority, byte_size=8
-// enable_reset=true, address_width=4
+// enable_reset=false, address_width=4
 // Main Memory: data_width=16, read_latency=10, write_latency=15
 // min_address=0, max_address=7
 

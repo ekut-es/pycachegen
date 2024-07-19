@@ -68,6 +68,7 @@ int sc_main(int argc, char** argv) {
     const auto start_time = std::chrono::system_clock::now();
 
     sc_start(0, SC_NS);
+    reset_n_i.write(1); // deactivate reset
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     cache_wrapper->trace(trace, 99);
@@ -77,6 +78,26 @@ int sc_main(int argc, char** argv) {
     } else {
         trace->open(vcd_file_path.c_str());
     }
+
+    uint32_t sim_time = 0;
+
+    auto tick = [&](int amount) {
+        sc_start(amount, SC_NS);
+        sim_time += amount;
+    };
+
+    auto read = [&](int address) {
+        address_i.write(address);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(1, SC_NS);
+        while (!port_ready_o.read()) {
+            sc_start(1, SC_NS);
+        }
+        std::cout << "Reading from address " << address << "... " << read_data_o.read() << std::endl;
+    };
 
     const int trace_bytes_per_word = (trace_data_width / 8);
 
@@ -90,24 +111,35 @@ int sc_main(int argc, char** argv) {
         for (int j = 0; j < trace_bytes_per_word; j++) {
             word |= (mem_trace_bin[i + j] << (trace_data_width - (j + 1) * 8));
         }
-        address_i.write((word << (word_buffer_width - cache_address_width)) >> (word_buffer_width - cache_address_width));
+        uint32_t address = (word << (word_buffer_width - cache_address_width)) >> (word_buffer_width - cache_address_width);
+        uint32_t write_data = (word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width);
+        uint32_t write_select = (word >> (word_buffer_width - 1));
+        address_i.write(address);
         address_valid_i.write(1);
-        write_data_i.write((word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width));
-        write_data_valid_i.write((word >> (word_buffer_width - 1)));
-        read_write_select_i.write((word >> (word_buffer_width - 1)));
+        write_data_i.write(write_data);
+        write_data_valid_i.write(write_select);
+        read_write_select_i.write(write_select);
         // wait at least one cycle
-        sc_start(1, SC_NS);
+        tick(1);
         // as soon as port_ready_o becomes true, the cache will have accepted the request we just sent
         // so wait until it becomes ready and then proceed with the next request
         while (!port_ready_o.read()) {
-            sc_start(1, SC_NS);
+            tick(1);
         }
         address_valid_i.write(0);
     }
     // wait until the last instruction was processed
-    sc_start(1, SC_NS);
+    tick(1);
     while (!port_ready_o.read()) {
-        sc_start(1, SC_NS);
+        tick(1);
+    }
+
+    const auto end_time = std::chrono::system_clock::now();
+    const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
+    // sanity check
+    for (int i = 0; i < 10; i++){
+        read(i);
     }
 
     cache_wrapper->final();
@@ -117,12 +149,8 @@ int sc_main(int argc, char** argv) {
 
     delete trace;
 
-    const auto simulated_time =
-        sc_time_stamp().to_default_time_units() - 1; // subtract 1 because we wasted one cycle right at the beginning
-    const auto end_time = std::chrono::system_clock::now();
-    const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-
     std::cout << "Trace simulation done!" << std::endl;
-    std::cout << "Trace execution took " << simulated_time << " cycles (simulation took " << elapsed_time << " ms)" << std::endl;
+    // One cycle gets wasted at the beginning, do not count that one
+    std::cout << "Trace execution took " << sim_time - 1 << " cycles (simulation took " << elapsed_time << " ms)" << std::endl;
     return 0;
 }

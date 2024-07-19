@@ -8,7 +8,7 @@
 
 // Testbench for testing multiple ports with an arbiter without caches
 // num_ports=2, arbiter_policy=priority, byte_size=8
-// enable_reset=true, address_width=9
+// enable_reset=false, address_width=9
 // Main Memory: data_width=16, read_latency=10, write_latency=15
 // min_address=0, max_address=255
 

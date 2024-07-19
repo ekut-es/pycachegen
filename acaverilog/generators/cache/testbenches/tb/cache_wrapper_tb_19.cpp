@@ -8,7 +8,7 @@
 
 // Testbench for testing multiple ports with an arbiter with round robin policy
 // num_ports=5, arbiter_policy=round_robin, byte_size=8
-// enable_reset=true, address_width=9
+// enable_reset=false, address_width=9
 // L1: data_width=16, num_ways=4, num_sets=2,
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true, block_size=1

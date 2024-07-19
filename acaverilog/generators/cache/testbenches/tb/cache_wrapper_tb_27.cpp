@@ -8,7 +8,7 @@
 
 // Testbench for testing that byte sizes other than 8 work.
 // num_ports=1, arbiter_policy=priority, byte_size=13
-// enable_reset=true, address_width=4
+// enable_reset=false, address_width=4
 // L1: data_width=13, num_ways=2, num_sets=2,
 // replacement_policy=plru_tree, hit_latency=0, miss_latency=0,
 // write_through=false, write_allocate=true, block_size=2

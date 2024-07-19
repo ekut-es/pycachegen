@@ -8,7 +8,7 @@
 
 // Testbench for testing the write-back, write allocate policy
 // num_ports=1, arbiter_policy=priority, byte_size=8
-// enable_reset=true, address_width=9
+// enable_reset=false, address_width=9
 // L1: data_width=16, num_ways=1, num_sets=2,
 // replacement_policy=fifo, hit_latency=0, miss_latency=0,
 // write_through=false, write_allocate=true, block_size=1

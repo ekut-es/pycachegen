@@ -25,6 +25,8 @@ class ReplacementPolicyGenerator:
             policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
             prefix (str): Prefix to be used for this module's name
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
+                Note that `plru_tree` requires a reset (or rather, special initial values) so reset logic will always be
+                implemented when using it.
         """
         # This module will only be generated if num_ways > 1
         self.NUM_WAYS = num_ways
@@ -98,8 +100,8 @@ class ReplacementPolicyGenerator:
             tree_bits = m.Reg("plru_bits", self.NUM_WAYS - 1, self.NUM_SETS)
             tmp_repl = m.Reg("tmp_repl", self.NUM_WAYS_W + 1)
 
-            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
-                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(Not(reset_n_i))(
                     [
                         (
                             tree_bits[i](0),
@@ -119,7 +121,7 @@ class ReplacementPolicyGenerator:
                     tmp_repl(0, blk=True),
                     [
                         (
-                            # FIXME This should work but it's not pretty, but there's a problem with verilator
+                            # NOTE This should work but it's not pretty, but there's a problem with verilator
                             # only allowing operands of an arithmetic operation to have the same width
                             # So I cant just say 2*tmp_repl+2-plru_bits[...][...]
                             If(tree_bits[set_index_i][tmp_repl[: self.NUM_WAYS_W]])(

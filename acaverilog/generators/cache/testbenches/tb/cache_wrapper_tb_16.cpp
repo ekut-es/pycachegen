@@ -8,7 +8,7 @@
 
 // Testbench for testing multiple ports with an arbiter
 // num_ports=2, arbiter_policy=priority, byte_size=8
-// enable_reset=true, address_width=9
+// enable_reset=false, address_width=9
 // L1: data_width=16, num_ways=4, num_sets=2,
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true, block_size=1
