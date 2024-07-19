@@ -27,14 +27,14 @@
         input wire[TRACE_BRAM_DATA_WIDTH-1 : 0] trace_bram_read_data,
         output reg trace_bram_enable,
         output wire trace_bram_reset,
-        output wire trace_bram_write_enable,
+        output wire[(TRACE_BRAM_DATA_WIDTH/8)-1 : 0] trace_bram_write_enable,
 		// ports for stats BRAM
         output reg[STATS_BRAM_ADDRESS_WIDTH-1 : 0] stats_bram_address,
         output reg[STATS_BRAM_DATA_WIDTH-1 : 0] stats_bram_write_data,
         input wire[STATS_BRAM_DATA_WIDTH-1 : 0] stats_bram_read_data,
         output reg stats_bram_enable,
         output wire stats_bram_reset,
-        output reg stats_bram_write_enable,
+        output reg[(STATS_BRAM_DATA_WIDTH/8)-1 : 0] stats_bram_write_enable,
 		// User ports ends
 		// Do not modify the ports beyond this line
 
@@ -524,8 +524,7 @@
                 end
                 if (trace_index < trace_length) begin
                     // send a new request to the bram
-                    // Each byte must be 8 bits and word size (TRACE_BRAM_DATA_WIDTH) must be a power of two
-                    trace_bram_address <= {trace_index[TRACE_BRAM_ADDRESS_WIDTH-$clog2(TRACE_BRAM_DATA_WIDTH / 8)-1:0], {$clog2(TRACE_BRAM_DATA_WIDTH / 8){1'b0}}};
+                    trace_bram_address <= (trace_index[TRACE_BRAM_ADDRESS_WIDTH-1:0] << $clog2(TRACE_BRAM_DATA_WIDTH/8)); // trace BRAM is byte adressed
                     trace_bram_enable <= 1'b1;
                     trace_index <= trace_index + 1;
                     trace_state <= 2;
@@ -535,6 +534,7 @@
                     trace_state <= 3;
                 end
             end else if (trace_state == 2) begin
+                trace_bram_enable <= 1'b0; // disable trace bram again
                 if (cache_port_ready != 1) begin
                     // increment latency
                     latency_counter <= latency_counter + 1;
@@ -557,7 +557,7 @@
                     stats_bram_address <= 0;
                     stats_bram_write_data <= latency_counter;
                     stats_bram_enable <= 1;
-                    stats_bram_write_enable <= 1;
+                    stats_bram_write_enable <= {STATS_BRAM_DATA_WIDTH/8{1'b1}};
                     trace_state <= 4;                    
                 end else begin
                     latency_counter <= latency_counter + 1;

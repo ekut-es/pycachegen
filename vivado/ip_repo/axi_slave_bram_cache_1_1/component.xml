@@ -442,7 +442,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>f4bd66e2</spirit:value>
+            <spirit:value>f5a6ccc5</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -458,7 +458,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>f4bd66e2</spirit:value>
+            <spirit:value>f5a6ccc5</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -600,6 +600,10 @@
         <spirit:name>trace_bram_write_enable</spirit:name>
         <spirit:wire>
           <spirit:direction>out</spirit:direction>
+          <spirit:vector>
+            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.TRACE_BRAM_DATA_WIDTH&apos;)) / 8) - 1)">3</spirit:left>
+            <spirit:right spirit:format="long">0</spirit:right>
+          </spirit:vector>
           <spirit:wireTypeDefs>
             <spirit:wireTypeDef>
               <spirit:typeName>wire</spirit:typeName>
@@ -690,6 +694,10 @@
         <spirit:name>stats_bram_write_enable</spirit:name>
         <spirit:wire>
           <spirit:direction>out</spirit:direction>
+          <spirit:vector>
+            <spirit:left spirit:format="long" spirit:resolve="dependent" spirit:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.STATS_BRAM_DATA_WIDTH&apos;)) / 8) - 1)">7</spirit:left>
+            <spirit:right spirit:format="long">0</spirit:right>
+          </spirit:vector>
           <spirit:wireTypeDefs>
             <spirit:wireTypeDef>
               <spirit:typeName>wire</spirit:typeName>
@@ -1083,14 +1091,13 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/axi_slave_bram_cache_v1_1.v</spirit:name>
+        <spirit:name>../../../acaverilog/generators/cache/custom/src/simplerwlatenciesrstfixed.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_33a0f411</spirit:userFileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../acaverilog/generators/cache/src/custom_cache_wrapper.v</spirit:name>
+        <spirit:name>hdl/axi_slave_bram_cache_v1_1.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_89a1fdbc</spirit:userFileType>
+        <spirit:userFileType>CHECKSUM_f4553785</spirit:userFileType>
       </spirit:file>
     </spirit:fileSet>
     <spirit:fileSet>
@@ -1100,11 +1107,11 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/axi_slave_bram_cache_v1_1.v</spirit:name>
+        <spirit:name>../../../acaverilog/generators/cache/custom/src/simplerwlatenciesrstfixed.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>../../../acaverilog/generators/cache/src/custom_cache_wrapper.v</spirit:name>
+        <spirit:name>hdl/axi_slave_bram_cache_v1_1.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
     </spirit:fileSet>
@@ -1258,15 +1265,15 @@
         <xilinx:taxonomy>AXI_Peripheral</xilinx:taxonomy>
       </xilinx:taxonomies>
       <xilinx:displayName>axi_slave_bram_cache_v1.1</xilinx:displayName>
-      <xilinx:coreRevision>39</xilinx:coreRevision>
-      <xilinx:coreCreationDateTime>2024-07-18T12:42:04Z</xilinx:coreCreationDateTime>
+      <xilinx:coreRevision>50</xilinx:coreRevision>
+      <xilinx:coreCreationDateTime>2024-07-19T15:27:54Z</xilinx:coreCreationDateTime>
     </xilinx:coreExtensions>
     <xilinx:packagingInfo>
       <xilinx:xilinxVersion>2023.2</xilinx:xilinxVersion>
       <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="6d548c09"/>
       <xilinx:checksum xilinx:scope="memoryMaps" xilinx:value="ed1368d5"/>
-      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="6261b723"/>
-      <xilinx:checksum xilinx:scope="ports" xilinx:value="dd8b058f"/>
+      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="0fd8a850"/>
+      <xilinx:checksum xilinx:scope="ports" xilinx:value="b2f2535f"/>
       <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="8bec6531"/>
       <xilinx:checksum xilinx:scope="parameters" xilinx:value="88be5cbf"/>
     </xilinx:packagingInfo>

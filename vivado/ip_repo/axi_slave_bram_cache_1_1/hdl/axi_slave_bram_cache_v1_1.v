@@ -28,14 +28,14 @@
         input wire[TRACE_BRAM_DATA_WIDTH-1 : 0] trace_bram_read_data,
         output wire trace_bram_enable,
         output wire trace_bram_reset,
-        output wire trace_bram_write_enable,
+        output wire[(TRACE_BRAM_DATA_WIDTH/8)-1 : 0] trace_bram_write_enable,
 		// ports for stats BRAM
         output wire[STATS_BRAM_ADDRESS_WIDTH-1 : 0] stats_bram_address,
         output wire[STATS_BRAM_DATA_WIDTH-1 : 0] stats_bram_write_data,
         input wire[STATS_BRAM_DATA_WIDTH-1 : 0] stats_bram_read_data,
         output wire stats_bram_enable,
         output wire stats_bram_reset,
-        output wire stats_bram_write_enable,
+        output wire[(STATS_BRAM_DATA_WIDTH/8)-1 : 0] stats_bram_write_enable,
 		// User ports ends
 		// Do not modify the ports beyond this line
 
