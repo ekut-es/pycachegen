@@ -174,8 +174,8 @@ class MemoryAccessArbiter:
             fifo_read_idx = m.Reg("fifo_read_idx", self.FIFO_BUFFER_LENGTH_W)
             fifo_write_idx = m.Reg("fifo_write_idx", self.FIFO_BUFFER_LENGTH_W)
 
-        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
-            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+            If(Not(reset_n_i))(
                 # backend buffers
                 be_address(0),
                 be_address_valid(0),
@@ -183,11 +183,15 @@ class MemoryAccessArbiter:
                 be_write_data_valid(0),
                 be_read_write_select(0),
                 # frontend buffers
-                fe_address(0),
-                fe_write_data(0),
-                fe_read_write_select(0),
-                fe_read_data(0),
-                fe_read_data_valid(0),
+                [
+                    (
+                        fe_address[i](0),
+                        fe_write_data[i](0),
+                        fe_read_write_select[i](0),
+                        fe_read_data[i](0),
+                        fe_read_data_valid[i](0)
+                    ) for i in range(self.NUM_PORTS)
+                ],
                 fe_write_done(0),
                 fe_port_busy(0),
                 # internal

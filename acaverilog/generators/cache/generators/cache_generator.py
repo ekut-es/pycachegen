@@ -529,8 +529,8 @@ class CacheGenerator:
                 ),
             )
 
-        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
-            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+            If(Not(reset_n_i))(
                 ## reset
                 # frontend input buffers
                 fe_flush_i_reg(0),

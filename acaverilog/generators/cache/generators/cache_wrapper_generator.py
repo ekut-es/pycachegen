@@ -20,11 +20,6 @@ from acaverilog.generators.cache.cache_config_validation import (
 
 
 class CacheWrapperGenerator:
-    """Generates a top level module containing one ore more caches and a main memory.
-    There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
-    hierarchy.
-    """
-
     def __init__(
         self,
         num_ports: int,
@@ -35,6 +30,24 @@ class CacheWrapperGenerator:
         memory_config: MemoryConfig,
         *cache_configs: CacheConfig,
     ) -> None:
+        """Generates a top level module containing an arbitrary amount of caches and a main memory.
+        There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
+        hierarchy.
+
+        Args:
+            num_ports (int): Number of access ports.
+            arbiter_policy (str): Policy for the arbiter in case there is more than one port.
+                Can be one of "fifo", "priority", "round_robin".
+            byte_size (int): Number of bits per byte.
+            enable_reset (bool): Whether to generate reset logic or not. Right now this only affects the
+                main memory module (disabling it there is necessary for generating BRAM during synthesis)
+                but no other modules because otherwise there is a simulation mismatch.
+            address_width (int): With of an address that would include the byte offset. Note that the
+                addresses going into this module should not include the byte offset.
+            memory_config (MemoryConfig): Configuration for the main memory.
+            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ...
+                Can be left empty if no caches shall be generated.
+        """
         self.NUM_PORTS = num_ports
         self.ARBITER_POLICY = arbiter_policy
         self.BYTE_SIZE = byte_size

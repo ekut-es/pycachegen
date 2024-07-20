@@ -60,8 +60,8 @@ class ReplacementPolicyGenerator:
             m.Assign(next_replacement_o[i](next_replacement_o_reg[i]))
 
         if self.POLICY == "fifo":
-            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
-                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(Not(reset_n_i))(
                     [next_replacement_o_reg[i](0) for i in range(self.NUM_SETS)]
                 ).Elif(replace_i)(
                     next_replacement_o_reg[set_index_i](
@@ -71,8 +71,8 @@ class ReplacementPolicyGenerator:
             )
         elif self.POLICY == "plru_mru":
             mru_bits = m.Reg("mru_bits", self.NUM_WAYS, self.NUM_SETS)
-            m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
-                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+            m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+                If(Not(reset_n_i))(
                     [
                         (mru_bits[i](0), next_replacement_o_reg[i](0))
                         for i in range(self.NUM_SETS)
