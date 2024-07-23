@@ -1,4 +1,4 @@
-from math import log2, floor
+from math import log2, floor, ceil
 
 REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
 
@@ -154,11 +154,11 @@ def assert_address_range_valid(
         max_address (int): The greatest address (inclusive)
         address_width (int): The width of the address in bits.
     """
-    if min_address > max_address:
+    if min_address >= max_address:
         raise ConfigurationError(
-            f"min_address ({min_address}) needs to be smaller or equal to max_address ({max_address})"
+            f"min_address ({min_address}) needs to be smaller than the max_address ({max_address})"
         )
-    bits_needed = 1 if max_address == 0 else (floor(log2(max_address)) + 1)
+    bits_needed = ceil(log2(max_address))
     if bits_needed > address_width:
         raise ConfigurationError(
             f"max_address is {max_address} and needs at least {bits_needed} address bits, "
@@ -273,8 +273,10 @@ class MemoryConfig:
             data_width (int): Width of one data word in bits.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            min_address (int): The smallest address (inclusive). Requests to smaller addresses will be ignored.
-            max_address (int): The greatest address (inclusive). Requests to greater addresses will be ignored.
+            min_address (int): The smallest address (inclusive) for which to generate memory.
+                Requests to smaller addresses will be ignored. This parameter includes a byte offset.
+            max_address (int): The greatest address (exclusive) for which to generate memory.
+                Requests to greater or equal addresses will be ignored. This parameter includes a byte offset.
         """
         self.DATA_WIDTH = data_width
         self.READ_LATENCY = read_latency
@@ -303,11 +305,13 @@ class InternalMemoryConfig:
         assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
         assert_address_range_valid(memory_config.MIN_ADDRESS, memory_config.MAX_ADDRESS, address_width)
 
+        byte_offset_width = int(log2(memory_config.DATA_WIDTH / byte_size))
+
         self.DATA_WIDTH = memory_config.DATA_WIDTH
         self.ADDRESS_WIDTH = address_width
         self.READ_LATENCY = memory_config.READ_LATENCY
         self.WRITE_LATENCY = memory_config.WRITE_LATENCY
         self.BYTE_SIZE = byte_size
-        self.MIN_ADDRESS = memory_config.MIN_ADDRESS
-        self.MAX_ADDRESS = memory_config.MAX_ADDRESS
+        self.MIN_ADDRESS = memory_config.MIN_ADDRESS >> byte_offset_width
+        self.MAX_ADDRESS = memory_config.MAX_ADDRESS >> byte_offset_width
         self.ENABLE_RESET = enable_reset

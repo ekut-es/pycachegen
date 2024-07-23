@@ -35,7 +35,7 @@ if __name__ == "__main__":
         read_latency=60,
         write_latency=60,
         min_address=0,
-        max_address=(2**13 - 1),
+        max_address=(2**ADDRESS_WIDTH),
     )
 
     ### No need to change anything below this line

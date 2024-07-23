@@ -69,7 +69,7 @@ class FunctionalMemoryGenerator:
                 m.Reg(
                     f"data_memory_{i}",
                     self.BYTE_SIZE,
-                    dims=(self.MAX_ADDRESS - self.MIN_ADDRESS + 1),
+                    dims=(self.MAX_ADDRESS - self.MIN_ADDRESS),
                 )
             )
         processing_request = m.Reg("processing_request")
@@ -106,8 +106,8 @@ class FunctionalMemoryGenerator:
                                 And(read_write_select_i == 1, write_data_valid_i == 1),
                             ),
                             (
-                                address_i <= self.MAX_ADDRESS - 1
-                                if (2**self.ADDRESS_WIDTH != self.MAX_ADDRESS + 1)
+                                address_i < self.MAX_ADDRESS
+                                if (2**self.ADDRESS_WIDTH != self.MAX_ADDRESS)
                                 else True
                             ),
                             (
