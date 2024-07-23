@@ -7,7 +7,7 @@
 #include <cmath>
 
 #include "Vcustom_cache_wrapper.h"
-#include "/local/mueller/acadl_memory_trace_generation/borsttraces/oma_gemm_trace_100x400_400x16_ws_s4_bw64_aw19.h" // Specify trace file here
+#include "mem_trace.h" // Specify trace file here
 
 // Testbench for executing traces on custom cache wrapper configurations
 
