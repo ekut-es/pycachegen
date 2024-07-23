@@ -4,19 +4,25 @@
 
 #include <chrono>
 #include <iostream>
+#include <cmath>
 
 #include "Vcustom_cache_wrapper.h"
-#include "mem_trace.h"
+#include "/local/mueller/acadl_memory_trace_generation/borsttraces/oma_gemm_trace_100x400_400x16_ws_s4_bw64_aw19.h" // Specify trace file here
 
 // Testbench for executing traces on custom cache wrapper configurations
 
 // Trace and cache configuration variables
 // adjust these based on your own setup
-const int trace_data_width = 32;
+const int trace_data_width = 32; // can be at most 64 and needs to be a multiple of 8
 const int cache_address_width = 15;
 const int cache_data_width = 16;
+const int cache_address_byte_offset_width = 1; // The number of byte offset bits that's included in the trace offset
 
 int sc_main(int argc, char** argv) {
+
+    const int trace_bytes_per_word = (trace_data_width / 8);
+    const int trace_instruction_count = mem_trace_bin_len / trace_bytes_per_word;
+
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
@@ -70,15 +76,6 @@ int sc_main(int argc, char** argv) {
     sc_start(0, SC_NS);
     reset_n_i.write(1); // deactivate reset
 
-    VerilatedVcdSc* trace = new VerilatedVcdSc();
-    cache_wrapper->trace(trace, 99);
-
-    if (vcd_file_path.empty()) {
-        trace->open("Vtracing_tb.vcd");
-    } else {
-        trace->open(vcd_file_path.c_str());
-    }
-
     uint32_t sim_time = 0;
 
     auto tick = [&](int amount) {
@@ -99,13 +96,18 @@ int sc_main(int argc, char** argv) {
         std::cout << "Reading from address " << address << "... " << read_data_o.read() << std::endl;
     };
 
-    const int trace_bytes_per_word = (trace_data_width / 8);
-
-
     // Send all instructions to the cache, one after the other
     const int word_buffer_width = 64; // mem trace is a char array so I first read one trace word into a buffer
     // the size of that buffer must be known for shifting which I need to do for extracting the address, data, and write enable
-    for (uint64_t i = 0; i < mem_trace_bin_len; i += 4) {
+    int progress = -1;
+    for (uint64_t i = 0; i < mem_trace_bin_len; i += trace_bytes_per_word) {
+        int new_progress = int((float(i) / float(mem_trace_bin_len)) * 100.0);
+        if (new_progress != progress) {
+            progress = new_progress;
+            int instructions_processed = (i/trace_bytes_per_word);
+            std::cout.flush();
+            std::cout << "Progress: " << instructions_processed << " of " << trace_instruction_count << " (" << progress << "%)\r";
+        }
         // send the next instruction
         uint64_t word = 0;
         for (int j = 0; j < trace_bytes_per_word; j++) {
@@ -114,11 +116,13 @@ int sc_main(int argc, char** argv) {
         uint32_t address = (word << (word_buffer_width - cache_address_width)) >> (word_buffer_width - cache_address_width);
         uint32_t write_data = (word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width);
         uint32_t write_select = (word >> (word_buffer_width - 1));
-        address_i.write(address);
+
+        address_i.write(address >> cache_address_byte_offset_width);
         address_valid_i.write(1);
         write_data_i.write(write_data);
         write_data_valid_i.write(write_select);
         read_write_select_i.write(write_select);
+
         // wait at least one cycle
         tick(1);
         // as soon as port_ready_o becomes true, the cache will have accepted the request we just sent
@@ -128,6 +132,7 @@ int sc_main(int argc, char** argv) {
         }
         address_valid_i.write(0);
     }
+    std::cout.flush();
     // wait until the last instruction was processed
     tick(1);
     while (!port_ready_o.read()) {
@@ -138,16 +143,12 @@ int sc_main(int argc, char** argv) {
     const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     // sanity check
-    for (int i = 0; i < 10; i++){
+    std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
+    for (int i = 0; i < 8; i++){
         read(i);
     }
 
     cache_wrapper->final();
-
-    trace->flush();
-    trace->close();
-
-    delete trace;
 
     std::cout << "Trace simulation done!" << std::endl;
     // One cycle gets wasted at the beginning, do not count that one
