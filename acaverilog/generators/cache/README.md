@@ -6,7 +6,7 @@ The cache wrapper wraps the cache and the functional memory in one module. It ca
 
 ## Creating Verilog Code for the testbenches
 
-There are many testbenches for different cache wrapper configurations. Go inside the `testbenches/` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files, put them in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one. Create a `build/` directory and change into it, then call `cmake -GNinja ..` and then `ninja`. Then you can execute the individual testbenches.
+There are many testbenches for different cache wrapper configurations. Go inside the `testbenches/` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files, put them in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one. Create a `build/` directory and change into it, then call `cmake -GNinja ..` and then `ninja`. Then you can execute the individual testbenches, or you can can call the bash script `../run_testbenches.sh` to execute all testbenches.
 
 ## Creating Verilog Code for custom cache hierarchies
 
