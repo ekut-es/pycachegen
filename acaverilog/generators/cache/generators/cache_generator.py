@@ -415,19 +415,37 @@ class CacheGenerator:
             )
 
         # Memories
-        tag_memory = m.Reg(
-            f"tag_memory", self.TAG_WIDTH, dims=(self.NUM_WAYS, self.NUM_SETS)
-        )
-        valid_memory = m.Reg("valid_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
-        data_memory = m.Reg(
-            f"data_memory",
-            self.BYTE_SIZE,
-            dims=(self.NUM_WAYS, self.NUM_SETS, self.BLOCK_SIZE, self.BYTES_PER_WORD),
-        )
+        tag_memory = []
+        valid_memory = []
+        data_memory = []
+        for way in range(self.NUM_WAYS):
+            tag_memory.append(
+                m.Reg(f"tag_memory_way_{way}", self.TAG_WIDTH, dims=(self.NUM_SETS))
+            )
+            valid_memory.append(
+                m.Reg(f"valid_memory_way_{way}", 1, dims=(self.NUM_SETS))
+            )
+            data_memory.append([])
+            for byte in range(self.BYTES_PER_WORD):
+                data_memory[-1].append(
+                    m.Reg(
+                        f"data_memory_way_{way}_byte_{byte}",
+                        self.BYTE_SIZE,
+                        dims=(self.NUM_SETS, self.BLOCK_SIZE),
+                    )
+                )
 
         # Things that are only needed for write back
         if self.WRITE_BACK:
-            dirty_memory = m.Reg("dirty_memory", 1, dims=(self.NUM_WAYS, self.NUM_SETS))
+            dirty_memory = []
+            for way in range(self.NUM_WAYS):
+                dirty_memory.append(
+                    m.Reg(
+                        f"dirty_memory_way_{way}",
+                        1,
+                        dims=(self.NUM_SETS),
+                    )
+                )
             write_back_address_index = m.Reg(
                 "write_back_address_index", max(1, self.INDEX_WIDTH)
             )
@@ -440,20 +458,33 @@ class CacheGenerator:
             )
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
-            flush_encoder_input = m.Wire("flush_encoder_input", self.NUM_SETS)
+            flush_encoder_input = m.Reg("flush_encoder_input", self.NUM_SETS)
             flush_next_set_index = m.Wire(
                 "flush_next_set_index", max(1, ceil(log2(self.NUM_SETS)))
             )
             flush_current_block_index = m.Reg(
                 "flush_current_block_index", max(1, self.NUM_WAYS_W)
             )
+
             for i in range(self.NUM_SETS):
-                m.Assign(
-                    flush_encoder_input[i](
-                        And(
-                            valid_memory[flush_current_block_index][i],
-                            dirty_memory[flush_current_block_index][i],
-                        )
+                m.Always(
+                    *[valid_memory[way] for way in range(self.NUM_WAYS)],
+                    *[dirty_memory[way] for way in range(self.NUM_WAYS)],
+                    flush_current_block_index,
+                )(
+                    Case(flush_current_block_index)(
+                        *[
+                            When(way)(
+                                flush_encoder_input[i](
+                                    And(
+                                        valid_memory[way][i],
+                                        dirty_memory[way][i],
+                                    ),
+                                    blk=True,
+                                )
+                            )
+                            for way in range(self.NUM_WAYS)
+                        ]
                     )
                 )
 
@@ -512,7 +543,7 @@ class CacheGenerator:
                     num_sets=self.NUM_SETS,
                     policy=self.REPLACEMENT_POLICY,
                     prefix=self.PREFIX,
-                    enable_reset=self.ENABLE_RESET
+                    enable_reset=self.ENABLE_RESET,
                 ).generate_module(),
                 f"{self.PREFIX}replacement_policy",
                 arg_ports=(
@@ -529,87 +560,93 @@ class CacheGenerator:
                 ),
             )
 
-        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
-            If(Not(reset_n_i))(
-                ## reset
-                # frontend input buffers
-                fe_flush_i_reg(0),
-                fe_address_i_reg(0),
-                fe_write_data_i_reg(0),
-                fe_read_write_select_i_reg(0),
-                fe_write_strobe_i_reg(0),
-                # frontend output buffers
-                [fe_read_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
-                fe_read_data_valid_o_reg(0),
-                fe_write_done_o_reg(0),
-                fe_flush_done_o_reg(0),
-                # backend outputs
-                be_address_o_reg(0),
-                be_address_valid_o_reg(0),
-                [be_write_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
-                be_write_data_valid_o_reg(0),
-                be_read_write_select_o_reg(0),
-                be_write_strobe_o_reg(0),
-                be_flush_o_reg(0),
-                # internal registers
-                state_reg(States.READY.value),
-                latency_counter(0),
-                hit_valid(0),
-                hit_vector(0),
-                send_mem_request_next_state(0),
-                read_block_word_offset(0),
-                # internal memories
+        m.Always(
+            *([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else []))
+        )(
+            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                 [
+                    ## reset
+                    # frontend input buffers
+                    fe_flush_i_reg(0),
+                    fe_address_i_reg(0),
+                    fe_write_data_i_reg(0),
+                    fe_read_write_select_i_reg(0),
+                    fe_write_strobe_i_reg(0),
+                    # frontend output buffers
+                    [fe_read_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
+                    fe_read_data_valid_o_reg(0),
+                    fe_write_done_o_reg(0),
+                    fe_flush_done_o_reg(0),
+                    # backend outputs
+                    be_address_o_reg(0),
+                    be_address_valid_o_reg(0),
+                    [be_write_data_o_reg[i](0) for i in range(self.BYTES_PER_WORD)],
+                    be_write_data_valid_o_reg(0),
+                    be_read_write_select_o_reg(0),
+                    be_write_strobe_o_reg(0),
+                    be_flush_o_reg(0),
+                    # internal registers
+                    state_reg(States.READY.value),
+                    latency_counter(0),
+                    hit_valid(0),
+                    hit_vector(0),
+                    send_mem_request_next_state(0),
+                    read_block_word_offset(0),
+                    # internal memories
                     [
                         [
-                            tag_memory[block_idx][set_idx](0),
-                            valid_memory[block_idx][set_idx](0),
+                            [
+                                tag_memory[way_idx][set_idx](0),
+                                valid_memory[way_idx][set_idx](0),
+                                [
+                                    [
+                                        data_memory[way_idx][byte_idx][set_idx][
+                                            word_idx
+                                        ](0)
+                                        for byte_idx in range(self.BYTES_PER_WORD)
+                                    ]
+                                    for word_idx in range(self.BLOCK_SIZE)
+                                ],
+                            ]
+                            for set_idx in range(self.NUM_SETS)
+                        ]
+                        for way_idx in range(self.NUM_WAYS)
+                    ],
+                    # write back things
+                    (
+                        [
+                            write_back_address_index(0),
+                            write_back_block_index(0),
+                            write_back_next_state(0),
+                            write_back_tag(0),
+                            write_back_word_offset(0),
+                            flush_current_block_index(0),
                             [
                                 [
-                                    data_memory[block_idx][set_idx][word_idx][byte_idx](
-                                        0
-                                    )
-                                    for byte_idx in range(self.BYTES_PER_WORD)
+                                    dirty_memory[way_idx][set_idx](0)
+                                    for set_idx in range(self.NUM_SETS)
                                 ]
-                                for word_idx in range(self.BLOCK_SIZE)
+                                for way_idx in range(self.NUM_WAYS)
                             ],
                         ]
-                        for set_idx in range(self.NUM_SETS)
-                    ]
-                    for block_idx in range(self.NUM_WAYS)
-                ],
-                # write back things
-                (
-                    [
-                        write_back_address_index(0),
-                        write_back_block_index(0),
-                        write_back_next_state(0),
-                        write_back_tag(0),
-                        write_back_word_offset(0),
-                        flush_current_block_index(0),
+                        if self.WRITE_BACK
+                        else []
+                    ),
+                    # things for set associative caches
+                    (
                         [
-                            [
-                                dirty_memory[block_idx][set_idx](0)
-                                for set_idx in range(self.NUM_SETS)
-                            ]
-                            for block_idx in range(self.NUM_WAYS)
-                        ],
-                    ]
-                    if self.WRITE_BACK
-                    else []
-                ),
-                # things for set associative caches
-                (
-                    [
-                        next_block_replacement(0),
-                        repl_pol_access(0),
-                        repl_pol_replace(0),
-                        repl_pol_block_index(0),
-                    ]
-                    if self.NUM_WAYS > 1
-                    else []
-                ),
-                be_read_data_word_offset(0) if self.READ_BLOCK_WC > 1 else [],
+                            next_block_replacement(0),
+                            repl_pol_access(0),
+                            repl_pol_replace(0),
+                            repl_pol_block_index(0),
+                        ]
+                        if self.NUM_WAYS > 1
+                        else []
+                    ),
+                    be_read_data_word_offset(0) if self.READ_BLOCK_WC > 1 else [],
+                ]
+                if self.ENABLE_RESET
+                else []
             ).Else(
                 If(state_reg == States.READY.value)(
                     # Cache is ready for a new request
@@ -677,21 +714,31 @@ class CacheGenerator:
                             # write
                             [
                                 If(fe_write_strobe_i_reg[byte_idx])(
-                                    data_memory[hit_index][address_index][
-                                        address_word_offset
-                                    ][byte_idx](
-                                        fe_write_data_i_reg[
-                                            self.BYTE_SIZE
-                                            * byte_idx : self.BYTE_SIZE
-                                            * (byte_idx + 1)
-                                        ]
-                                    )
+                                    [
+                                        If(hit_index == way)(
+                                            data_memory[way][byte_idx][address_index][
+                                                address_word_offset
+                                            ](
+                                                fe_write_data_i_reg[
+                                                    self.BYTE_SIZE
+                                                    * byte_idx : self.BYTE_SIZE
+                                                    * (byte_idx + 1)
+                                                ]
+                                            )
+                                        )
+                                        for way in range(self.NUM_WAYS)
+                                    ]
                                 )
                                 for byte_idx in range(self.BYTES_PER_WORD)
                             ],
                             (
                                 [
-                                    dirty_memory[hit_index][address_index](1),
+                                    [
+                                        If(hit_index == way)(
+                                            dirty_memory[way][address_index](1),
+                                        )
+                                        for way in range(self.NUM_WAYS)
+                                    ],
                                     state_reg(States.STALL.value),
                                 ]
                                 if self.WRITE_BACK
@@ -718,11 +765,16 @@ class CacheGenerator:
                         ).Else(
                             # read
                             [
-                                fe_read_data_o_reg[byte_idx](
-                                    data_memory[hit_index][address_index][
-                                        address_word_offset
-                                    ][byte_idx]
-                                )
+                                [
+                                    If(hit_index == way)(
+                                        fe_read_data_o_reg[byte_idx](
+                                            data_memory[way][byte_idx][address_index][
+                                                address_word_offset
+                                            ]
+                                        )
+                                    )
+                                    for way in range(self.NUM_WAYS)
+                                ]
                                 for byte_idx in range(self.BYTES_PER_WORD)
                             ],
                             state_reg(States.STALL.value),
@@ -748,18 +800,21 @@ class CacheGenerator:
                         ).Else(
                             # We have to replace a block
                             # Update valid and dirty bits and the tag
-                            valid_memory[next_block_replacement][address_index](1),
-                            tag_memory[next_block_replacement][address_index](
-                                address_tag
-                            ),
-                            (
-                                # mark dirty if write, else remove dirty bit
-                                dirty_memory[next_block_replacement][address_index](
-                                    fe_read_write_select_i_reg
+                            [
+                                If(next_block_replacement == way)(
+                                    valid_memory[way][address_index](1),
+                                    tag_memory[way][address_index](address_tag),
+                                    # mark dirty if write, else remove dirty bit
+                                    (
+                                        dirty_memory[way][address_index](
+                                            fe_read_write_select_i_reg
+                                        )
+                                        if self.WRITE_BACK
+                                        else []
+                                    ),
                                 )
-                                if self.WRITE_BACK
-                                else []
-                            ),
+                                for way in range(self.NUM_WAYS)
+                            ],
                             # Update the replacement policy state
                             (
                                 [
@@ -772,7 +827,15 @@ class CacheGenerator:
                             ),
                             If(
                                 And(
-                                    dirty_memory[next_block_replacement][address_index],
+                                    OrList(
+                                        *[
+                                            And(
+                                                way == next_block_replacement,
+                                                dirty_memory[way][address_index],
+                                            )
+                                            for way in range(self.NUM_WAYS)
+                                        ]
+                                    ),
                                     Or(
                                         Not(fe_read_write_select_i_reg),
                                         self.WRITE_ALLOCATE,
@@ -788,11 +851,14 @@ class CacheGenerator:
                                     state_reg(States.WRITE_BACK_BLOCK.value),
                                     write_back_address_index(address_index),
                                     write_back_block_index(next_block_replacement),
-                                    write_back_tag(
-                                        tag_memory[next_block_replacement][
-                                            address_index
-                                        ]
-                                    ),
+                                    [
+                                        If(way == next_block_replacement)(
+                                            write_back_tag(
+                                                tag_memory[way][address_index]
+                                            )
+                                        )
+                                        for way in range(self.NUM_WAYS)
+                                    ],
                                     If(
                                         OrList(
                                             Not(fe_read_write_select_i_reg),
@@ -864,11 +930,16 @@ class CacheGenerator:
                         be_write_strobe_o_reg(2**self.BYTES_PER_WORD - 1),
                         be_read_write_select_o_reg(1),
                         [
-                            be_write_data_o_reg[byte_idx](
-                                data_memory[write_back_block_index][
-                                    write_back_address_index
-                                ][write_back_word_offset][byte_idx]
-                            )
+                            [
+                                If(write_back_block_index == way)(
+                                    be_write_data_o_reg[byte_idx](
+                                        data_memory[way][byte_idx][
+                                            write_back_address_index
+                                        ][write_back_word_offset]
+                                    )
+                                )
+                                for way in range(self.NUM_WAYS)
+                            ]
                             for byte_idx in range(self.BYTES_PER_WORD)
                         ],
                         be_write_data_valid_o_reg(1),
@@ -933,26 +1004,31 @@ class CacheGenerator:
                             # if we read stuff we always want to write back the whole word since the fe write request will be applied afterwards
                             # so we do not need to worry about any write strobe things
                             [
-                                data_memory[next_block_replacement][address_index][
-                                    # figure out the correct block offset
-                                    (
-                                        be_address_o_reg[: self.WORD_OFFSET_W]
-                                        + (
-                                            0
-                                            if self.ADDRESS_WIDTH
-                                            == self.BE_ADDRESS_WIDTH
-                                            else be_read_data_word_offset
+                                [
+                                    If(next_block_replacement == way)(
+                                        data_memory[way][byte_idx][address_index][
+                                            # figure out the correct block offset
+                                            (
+                                                be_address_o_reg[: self.WORD_OFFSET_W]
+                                                + (
+                                                    0
+                                                    if self.ADDRESS_WIDTH
+                                                    == self.BE_ADDRESS_WIDTH
+                                                    else be_read_data_word_offset
+                                                )
+                                                if self.BLOCK_SIZE > 1
+                                                else 0
+                                            )
+                                        ](
+                                            resized_be_read_data[
+                                                self.BYTE_SIZE
+                                                * byte_idx : self.BYTE_SIZE
+                                                * (byte_idx + 1)
+                                            ]
                                         )
-                                        if self.BLOCK_SIZE > 1
-                                        else 0
                                     )
-                                ][byte_idx](
-                                    resized_be_read_data[
-                                        self.BYTE_SIZE
-                                        * byte_idx : self.BYTE_SIZE
-                                        * (byte_idx + 1)
-                                    ]
-                                )
+                                    for way in range(self.NUM_WAYS)
+                                ]
                                 for byte_idx in range(self.BYTES_PER_WORD)
                             ],
                         ),
@@ -1026,13 +1102,20 @@ class CacheGenerator:
                         # fe write request, write to the cache
                         [
                             If(fe_write_strobe_i_reg[i])(
-                                data_memory[next_block_replacement][address_index][
-                                    address_word_offset
-                                ][i](
-                                    fe_write_data_i_reg[
-                                        self.BYTE_SIZE * i : self.BYTE_SIZE * (i + 1)
-                                    ]
-                                )
+                                [
+                                    If(next_block_replacement == way)(
+                                        data_memory[way][i][address_index][
+                                            address_word_offset
+                                        ](
+                                            fe_write_data_i_reg[
+                                                self.BYTE_SIZE
+                                                * i : self.BYTE_SIZE
+                                                * (i + 1)
+                                            ]
+                                        )
+                                    )
+                                    for way in range(self.NUM_WAYS)
+                                ]
                             )
                             for i in range(self.BYTES_PER_WORD)
                         ],
@@ -1064,11 +1147,16 @@ class CacheGenerator:
                     ).Else(
                         # fe read request, hand the data out
                         [
-                            fe_read_data_o_reg[byte_idx](
-                                data_memory[next_block_replacement][address_index][
-                                    address_word_offset
-                                ][byte_idx]
-                            )
+                            [
+                                If(next_block_replacement == way)(
+                                    fe_read_data_o_reg[byte_idx](
+                                        data_memory[way][byte_idx][address_index][
+                                            address_word_offset
+                                        ]
+                                    )
+                                )
+                                for way in range(self.NUM_WAYS)
+                            ]
                             for byte_idx in range(self.BYTES_PER_WORD)
                         ],
                         state_reg(States.STALL.value),
@@ -1141,16 +1229,17 @@ class CacheGenerator:
                 .Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
                     [
                         write_back_address_index(flush_next_set_index),
-                        write_back_tag(
-                            tag_memory[flush_current_block_index][flush_next_set_index]
-                        ),
+                        [
+                            If(way == flush_current_block_index)(
+                                write_back_tag(tag_memory[way][flush_next_set_index]),
+                                # clear dirty bit
+                                dirty_memory[way][flush_next_set_index](0),
+                            )
+                            for way in range(self.NUM_WAYS)
+                        ],
                         write_back_block_index(flush_current_block_index),
                         write_back_next_state(States.FLUSH_COMPUTE_NEXT.value),
                         state_reg(States.WRITE_BACK_BLOCK.value),
-                        # clear dirty bit
-                        dirty_memory[flush_current_block_index][flush_next_set_index](
-                            0
-                        ),
                     ]
                     if self.WRITE_BACK
                     else []
