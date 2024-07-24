@@ -303,9 +303,10 @@ class InternalMemoryConfig:
         assert_greater_equal(memory_config.READ_LATENCY, 2, "read_latency")
         assert_greater_equal(memory_config.WRITE_LATENCY, 2, "write_latency")
         assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
-        assert_address_range_valid(memory_config.MIN_ADDRESS, memory_config.MAX_ADDRESS, address_width)
 
         byte_offset_width = int(log2(memory_config.DATA_WIDTH / byte_size))
+
+        assert_address_range_valid(memory_config.MIN_ADDRESS, memory_config.MAX_ADDRESS, address_width + byte_offset_width)
 
         self.DATA_WIDTH = memory_config.DATA_WIDTH
         self.ADDRESS_WIDTH = address_width

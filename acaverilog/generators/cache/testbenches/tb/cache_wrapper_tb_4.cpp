@@ -13,7 +13,7 @@
 // replacement_policy=plru_tree, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false, block_size=1
 // Main Memory: data_width=16, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=0, max_address=512
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -63,6 +63,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->port_ready_0_o(port_ready_o);
 
     const int MAX_SIMULATION_TIME = 1000;
+    int exit_code = 0;
 
     auto tick = [&](int amount) {
         if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
@@ -82,6 +83,7 @@ int sc_main(int argc, char** argv) {
                       << " FAILED; expected " << std::to_string(expected)
                       << " got " << std::to_string(read_data_o.read())
                       << "; continuing" << std::endl;
+            exit_code = 1;
         }
     };
 
@@ -90,6 +92,7 @@ int sc_main(int argc, char** argv) {
             std::cerr << "Error: Expected hit to be "
                       << std::to_string(expected) << " but got "
                       << std::to_string(hit_o.read()) << std::endl;
+            exit_code = 1;
         }
     };
 
@@ -173,6 +176,7 @@ int sc_main(int argc, char** argv) {
         tick(10);
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
+        exit_code = 1;
     }
 
     cache_wrapper->final();
@@ -183,5 +187,5 @@ int sc_main(int argc, char** argv) {
     delete trace;
 
     std::cout << "Vcache_wrapper_4 done!" << std::endl;
-    return 0;
+    return exit_code;
 }

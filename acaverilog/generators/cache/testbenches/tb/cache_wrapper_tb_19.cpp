@@ -13,7 +13,7 @@
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true, block_size=1
 // Main Memory: data_width=16, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=0, max_address=512
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -155,18 +155,11 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_4_o(write_done_4_o);
     cache_wrapper->port_ready_4_o(port_ready_4_o);
 
-    const int MAX_SIMULATION_TIME = 1000;
-
-    auto tick = [&](int amount) {
-        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
-            throw std::runtime_error("Exceeded maximum simulation time");
-        }
-        sc_start(amount, SC_NS);
-    };
+    int exit_code = 0;
 
     std::cout << "Vcache_wrapper_19 start!" << std::endl;
 
-    tick(0);
+    sc_start(0, SC_NS);
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     cache_wrapper->trace(trace, 99);
@@ -177,9 +170,9 @@ int sc_main(int argc, char** argv) {
         trace->open(vcd_file_path.c_str());
     }
 
-    tick(1);
+    sc_start(1, SC_NS);
     reset_n_i.write(1);
-    tick(1);
+    sc_start(1, SC_NS);
 
     address_0_i.write(2);
     address_valid_0_i.write(1);
@@ -187,18 +180,19 @@ int sc_main(int argc, char** argv) {
     write_data_valid_0_i.write(1);
     read_write_select_0_i.write(1);
 
-    tick(1); // wait one cycle for the next positive clock edge
+    sc_start(1, SC_NS); // wait one cycle for the next positive clock edge
     address_valid_0_i.write(0);
     address_valid_1_i.write(0);
-    tick(2); // wait two cycles for the arbiter to buffer the request and output it
+    sc_start(2, SC_NS); // wait two cycles for the arbiter to buffer the request and output it
 
-    tick(miss_latency); // write request from 0 should be done now
+    sc_start(miss_latency, SC_NS); // write request from 0 should be done now
 
-    tick(1); // result of write request should now be accessible on the fe port
+    sc_start(1, SC_NS); // result of write request should now be accessible on the fe port
             // and the request from port 1 should be sent
     
     if(!write_done_0_o.read()) {
         std::cerr << "Write failed" << std::endl;
+        exit_code = 1;
     } else {
         std::cout << "Write successful" << std::endl;
     }
@@ -214,7 +208,7 @@ int sc_main(int argc, char** argv) {
     write_data_valid_1_i.write(1);
     read_write_select_1_i.write(1);
 
-    tick(1); // wait for the next positive clock edge
+    sc_start(1, SC_NS); // wait for the next positive clock edge
 
     address_valid_0_i.write(0);
     address_valid_1_i.write(0);
@@ -226,40 +220,43 @@ int sc_main(int argc, char** argv) {
     write_data_valid_3_i.write(1);
     read_write_select_3_i.write(1);
 
-    tick(2); // wait two more cycles so the request can be outputted and accepted by the cache
+    sc_start(2, SC_NS); // wait two more cycles so the request can be outputted and accepted by the cache
 
     address_valid_3_i.write(0);
 
-    tick(hit_latency); // request from 1 should be processed now
+    sc_start(hit_latency, SC_NS); // request from 1 should be processed now
 
-    tick(1); // wait one more cycle so we can read the result and request from port 3 should be sent now
+    sc_start(1, SC_NS); // wait one more cycle so we can read the result and request from port 3 should be sent now
 
     if(!write_done_1_o.read()) {
         std::cerr << "Write failed" << std::endl;
+        exit_code = 1;
     } else {
         std::cout << "Write successful" << std::endl;
     }
 
-    tick(1); // cache should now have registered the request
+    sc_start(1, SC_NS); // cache should now have registered the request
 
-    tick(hit_latency); // cache should now be done with request from 3
+    sc_start(hit_latency, SC_NS); // cache should now be done with request from 3
 
-    tick(1); // wait one more cycle so we can see the result
+    sc_start(1, SC_NS); // wait one more cycle so we can see the result
 
     if(!write_done_3_o.read()) {
         std::cerr << "Write failed" << std::endl;
+        exit_code = 1;
     } else {
         std::cout << "Write successful" << std::endl;
     }
 
-    tick(1); // cache should now have registered the request
+    sc_start(1, SC_NS); // cache should now have registered the request
 
-    tick(hit_latency); // cache should now be done with request from 0
+    sc_start(hit_latency, SC_NS); // cache should now be done with request from 0
 
-    tick(1); // wait one more cycle so we can see the result
+    sc_start(1, SC_NS); // wait one more cycle so we can see the result
 
     if(read_data_0_o.read() != 16 || !read_data_valid_0_o.read()) {
         std::cerr << "Read failed" << std::endl;
+        exit_code = 1;
     } else {
         std::cout << "Read successful" << std::endl;
     }
@@ -272,5 +269,5 @@ int sc_main(int argc, char** argv) {
     delete trace;
 
     std::cout << "Vcache_wrapper_19 done!" << std::endl;
-    return 0;
+    return exit_code;
 }

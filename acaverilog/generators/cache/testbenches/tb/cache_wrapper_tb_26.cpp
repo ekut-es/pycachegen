@@ -13,7 +13,7 @@
 // replacement_policy=fifo, hit_latency=0, miss_latency=0,
 // write_through=false, write_allocate=true, block_size=1
 // Main Memory: data_width=16, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=0, max_address=512
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -71,18 +71,11 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_0_o(write_done_o);
     cache_wrapper->port_ready_0_o(port_ready_o);
 
-    const int MAX_SIMULATION_TIME = 1000;
-
-    auto tick = [&](int amount) {
-        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
-            throw std::runtime_error("Exceeded maximum simulation time");
-        }
-        sc_start(amount, SC_NS);
-    };
+    int exit_code = 0;
 
     std::cout << "Vcache_wrapper_26 start!" << std::endl;
 
-    tick(0);
+    sc_start(0, SC_NS);
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     cache_wrapper->trace(trace, 99);
@@ -95,36 +88,36 @@ int sc_main(int argc, char** argv) {
 
     try {
         // do stuff
-        tick(1);
+        sc_start(1, SC_NS);
         reset_n_i.write(1);
-        tick(1);
+        sc_start(1, SC_NS);
 
         address_i.write(2);
         address_valid_i.write(1);
         write_data_i.write(0x12);
         write_data_valid_i.write(1);
         read_write_select_i.write(1);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);
-        tick(miss_ndirty_write_latency + 1);
+        sc_start(miss_ndirty_write_latency + 1, SC_NS);
         assert(write_done_o.read());
 
         address_i.write(2);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);   
-        tick(hit_latency + 1);
+        sc_start(hit_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x12);
 
         address_i.write(3);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);   
-        tick(miss_ndirty_read_latency + mem_read_latency + 1);
+        sc_start(miss_ndirty_read_latency + mem_read_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x0);
 
         address_i.write(3);
@@ -132,18 +125,18 @@ int sc_main(int argc, char** argv) {
         write_data_i.write(0x13);
         write_data_valid_i.write(1);
         read_write_select_i.write(1);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);
-        tick(hit_latency + 1);
+        sc_start(hit_latency + 1, SC_NS);
         assert(write_done_o.read());
 
         address_i.write(4);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);   
-        tick(miss_dirty_read_latency + mem_write_latency + mem_read_latency + 1);
+        sc_start(miss_dirty_read_latency + mem_write_latency + mem_read_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x0);
 
         address_i.write(5);
@@ -151,14 +144,15 @@ int sc_main(int argc, char** argv) {
         write_data_i.write(0x15);
         write_data_valid_i.write(1);
         read_write_select_i.write(1);
-        tick(1);
+        sc_start(1, SC_NS);
         address_valid_i.write(0);
-        tick(miss_dirty_write_latency + mem_write_latency + 1);
+        sc_start(miss_dirty_write_latency + mem_write_latency + 1, SC_NS);
         assert(write_done_o.read());
 
-        tick(10);
+        sc_start(10, SC_NS);
     } catch (std::runtime_error& e) {
         std::cerr << e.what() << std::endl;
+        exit_code = 1;
     }
 
     cache_wrapper->final();
@@ -169,5 +163,5 @@ int sc_main(int argc, char** argv) {
     delete trace;
 
     std::cout << "Vcache_wrapper_26 done!" << std::endl;
-    return 0;
+    return exit_code;
 }

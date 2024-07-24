@@ -13,7 +13,7 @@
 // replacement_policy=plru_tree, hit_latency=6, miss_latency=8,
 // write_through=true, write_allocate=false, block_size=1
 // Main Memory: data_width=16, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=0, max_address=512
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -67,6 +67,8 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_0_o(write_done_o);
     cache_wrapper->port_ready_0_o(port_ready_o);
 
+    int exit_code = 0;
+
     std::cout << "Vcache_wrapper_5 start!" << std::endl;
 
     sc_start(0, SC_NS);
@@ -80,61 +82,66 @@ int sc_main(int argc, char** argv) {
         trace->open(vcd_file_path.c_str());
     }
 
-    sc_start(1, SC_NS);
-    reset_n_i.write(1);
-    sc_start(1, SC_NS);
+    try {
+        sc_start(1, SC_NS);
+        reset_n_i.write(1);
+        sc_start(1, SC_NS);
 
-    // read miss
-    address_i.write(2);
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-    sc_start(miss_latency + read_latency, SC_NS);
-    assert(port_ready_o.read() == 1);
+        // read miss
+        address_i.write(2);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(miss_latency + read_latency, SC_NS);
+        assert(port_ready_o.read() == 1);
 
-    // read miss
-    address_i.write(3);
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-    sc_start(miss_latency + read_latency, SC_NS);
-    assert(port_ready_o.read() == 1); 
-    
-    // write hit
-    address_i.write(2);
-    address_valid_i.write(1);
-    read_write_select_i.write(1);
-    write_data_i.write(55);
-    write_data_valid_i.write(1);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-    sc_start(hit_latency + write_latency, SC_NS);
-    assert(port_ready_o.read() == 1); 
+        // read miss
+        address_i.write(3);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(miss_latency + read_latency, SC_NS);
+        assert(port_ready_o.read() == 1);
 
-    // read hit (-> no mem access)
-    address_i.write(2);
-    address_valid_i.write(1);
-    read_write_select_i.write(0);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-    sc_start(hit_latency, SC_NS);
-    assert(port_ready_o.read() == 1); 
-    assert(read_data_valid_o.read() == 1);
-    assert(read_data_o.read() == 55);
+        // write hit
+        address_i.write(2);
+        address_valid_i.write(1);
+        read_write_select_i.write(1);
+        write_data_i.write(55);
+        write_data_valid_i.write(1);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(hit_latency + write_latency, SC_NS);
+        assert(port_ready_o.read() == 1);
 
-    // write miss
-    address_i.write(4);
-    address_valid_i.write(1);
-    read_write_select_i.write(1);
-    write_data_valid_i.write(1);
-    sc_start(1, SC_NS);
-    address_valid_i.write(0);
-    sc_start(miss_latency + write_latency, SC_NS);
-    assert(port_ready_o.read() == 1);    
+        // read hit (-> no mem access)
+        address_i.write(2);
+        address_valid_i.write(1);
+        read_write_select_i.write(0);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(hit_latency, SC_NS);
+        assert(port_ready_o.read() == 1);
+        assert(read_data_valid_o.read() == 1);
+        assert(read_data_o.read() == 55);
 
-    sc_start(10, SC_NS);
+        // write miss
+        address_i.write(4);
+        address_valid_i.write(1);
+        read_write_select_i.write(1);
+        write_data_valid_i.write(1);
+        sc_start(1, SC_NS);
+        address_valid_i.write(0);
+        sc_start(miss_latency + write_latency, SC_NS);
+        assert(port_ready_o.read() == 1);
+
+        sc_start(10, SC_NS);
+    } catch (std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
+        exit_code = 1;
+    }
     cache_wrapper->final();
 
     trace->flush();
@@ -143,5 +150,5 @@ int sc_main(int argc, char** argv) {
     delete trace;
 
     std::cout << "Vcache_wrapper_5 done!" << std::endl;
-    return 0;
+    return exit_code;
 }

@@ -13,7 +13,7 @@
 // replacement_policy=plru_mru, hit_latency=4, miss_latency=11,
 // write_through=false, write_allocate=true, block_size=1
 // Main Memory: data_width=16, read_latency=10, write_latency=15
-// min_address=0, max_address=255
+// min_address=0, max_address=512
 
 int sc_main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
@@ -133,18 +133,11 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_3_o(write_done_3_o);
     cache_wrapper->port_ready_3_o(port_ready_3_o);
 
-    const int MAX_SIMULATION_TIME = 1000;
-
-    auto tick = [&](int amount) {
-        if (sc_time_stamp().to_default_time_units() > MAX_SIMULATION_TIME) {
-            throw std::runtime_error("Exceeded maximum simulation time");
-        }
-        sc_start(amount, SC_NS);
-    };
+    int exit_code = 0;
 
     std::cout << "Vcache_wrapper_18 start!" << std::endl;
 
-    tick(0);
+    sc_start(0, SC_NS);
 
     VerilatedVcdSc* trace = new VerilatedVcdSc();
     cache_wrapper->trace(trace, 99);
@@ -155,108 +148,125 @@ int sc_main(int argc, char** argv) {
         trace->open(vcd_file_path.c_str());
     }
 
-    tick(1);
-    reset_n_i.write(1);
-    tick(1);
+    try {
+        sc_start(1, SC_NS);
+        reset_n_i.write(1);
+        sc_start(1, SC_NS);
 
-    address_0_i.write(2);
-    address_valid_0_i.write(1);
-    write_data_0_i.write(14);
-    write_data_valid_0_i.write(1);
-    read_write_select_0_i.write(1);
+        address_0_i.write(2);
+        address_valid_0_i.write(1);
+        write_data_0_i.write(14);
+        write_data_valid_0_i.write(1);
+        read_write_select_0_i.write(1);
 
-    address_1_i.write(2);
-    address_valid_1_i.write(1);
-    read_write_select_1_i.write(0);
+        address_1_i.write(2);
+        address_valid_1_i.write(1);
+        read_write_select_1_i.write(0);
 
-    tick(1); // wait one cycle for the next positive clock edge
-    address_valid_0_i.write(0);
-    address_valid_1_i.write(0);
-    tick(3); // wait two cycles for the arbiter to buffer the request, insert it into the fifo and then output it
+        sc_start(1, SC_NS);  // wait one cycle for the next positive clock edge
+        address_valid_0_i.write(0);
+        address_valid_1_i.write(0);
+        sc_start(
+            3, SC_NS);  // wait two cycles for the arbiter to buffer the
+                        // request, insert it into the fifo and then output it
 
-    address_2_i.write(3);
-    address_valid_2_i.write(1);
-    write_data_2_i.write(22);
-    write_data_valid_2_i.write(1);
-    read_write_select_2_i.write(1);
+        address_2_i.write(3);
+        address_valid_2_i.write(1);
+        write_data_2_i.write(22);
+        write_data_valid_2_i.write(1);
+        read_write_select_2_i.write(1);
 
-    tick(1);
+        sc_start(1, SC_NS);
 
-    address_valid_2_i.write(0);
+        address_valid_2_i.write(0);
 
-    address_3_i.write(3);
-    address_valid_3_i.write(1);
-    read_write_select_3_i.write(0);
+        address_3_i.write(3);
+        address_valid_3_i.write(1);
+        read_write_select_3_i.write(0);
 
-    tick(1);
-    address_valid_3_i.write(0);
+        sc_start(1, SC_NS);
+        address_valid_3_i.write(0);
 
-    tick(miss_latency - 2); // write request from 0 should be done now
+        sc_start(miss_latency - 2,
+                 SC_NS);  // write request from 0 should be done now
 
-    tick(1); // result of write request should now be accessible on the fe port
-            // and the request from port 1 should be sent
-    
-    if(!write_done_0_o.read()) {
-        std::cerr << "Write failed" << std::endl;
-    } else {
-        std::cout << "Write successful" << std::endl;
+        sc_start(
+            1,
+            SC_NS);  // result of write request should now be accessible on the
+                     // fe port and the request from port 1 should be sent
+
+        if (!write_done_0_o.read()) {
+            std::cerr << "Write failed" << std::endl;
+            exit_code = 1;
+        } else {
+            std::cout << "Write successful" << std::endl;
+        }
+
+        // send another request from port 0 which should be queued behind those
+        // from 2 and 3
+        address_0_i.write(3);
+        address_valid_0_i.write(1);
+        write_data_0_i.write(2);
+        write_data_valid_0_i.write(1);
+        read_write_select_0_i.write(1);
+
+        sc_start(1, SC_NS);  // after another cycle the cache should have
+                             // registered the request
+
+        address_valid_0_i.write(0);  // invalidate request from 0
+
+        sc_start(hit_latency, SC_NS);  // read request should be done now
+
+        sc_start(
+            1, SC_NS);  // wait for the result to be handed out on the fe port
+
+        if (read_data_1_o.read() != 14 || !read_data_valid_1_o.read()) {
+            std::cerr << "Read failed" << std::endl;
+            exit_code = 1;
+        } else {
+            std::cout << "Read successful" << std::endl;
+        }
+
+        sc_start(1, SC_NS);  // wait for cache to register request from port 2
+
+        sc_start(miss_latency, SC_NS);  // request should now be processed
+
+        sc_start(1, SC_NS);  // wait another cycle for the result
+
+        if (!write_done_2_o.read()) {
+            std::cerr << "Write failed" << std::endl;
+            exit_code = 1;
+        } else {
+            std::cout << "Write successful" << std::endl;
+        }
+
+        sc_start(1, SC_NS);  // wait for cache to register request from port 3
+
+        sc_start(hit_latency, SC_NS);  // request should now be processed
+
+        sc_start(1, SC_NS);  // wait another cycle for the result
+
+        if (read_data_3_o.read() != 22 || !read_data_valid_3_o.read()) {
+            std::cerr << "Read failed" << std::endl;
+            exit_code = 1;
+        } else {
+            std::cout << "Read successful" << std::endl;
+        }
+
+        assert(write_done_0_o ==
+               0);  // write done from first request should not be set anymore
+
+        sc_start(1, SC_NS);  // wait for cache to register request from port 0
+
+        sc_start(hit_latency, SC_NS);  // request should now be processed
+
+        sc_start(1, SC_NS);  // wait another cycle for the result
+
+        sc_start(10, SC_NS);
+    } catch (std::runtime_error& e) {
+        std::cerr << e.what() << std::endl;
+        exit_code = 1;
     }
-
-    // send another request from port 0 which should be queued behind  those from 2 and 3
-    address_0_i.write(3);
-    address_valid_0_i.write(1);
-    write_data_0_i.write(2);
-    write_data_valid_0_i.write(1);
-    read_write_select_0_i.write(1);
-
-    tick(1); // after another cycle the cache should have registered the request
-
-    address_valid_0_i.write(0); // invalidate request from 0
-
-    tick(hit_latency); // read request should be done now
-
-    tick(1); // wait for the result to be handed out on the fe port
-
-    if(read_data_1_o.read() != 14 || !read_data_valid_1_o.read()) {
-        std::cerr << "Read failed" << std::endl;
-    } else {
-        std::cout << "Read successful" << std::endl;
-    }
-
-    tick(1); // wait for cache to register request from port 2
-
-    tick(miss_latency); // request should now be processed
-
-    tick(1); // wait another cycle for the result
-    
-    if(!write_done_2_o.read()) {
-        std::cerr << "Write failed" << std::endl;
-    } else {
-        std::cout << "Write successful" << std::endl;
-    }
-
-    tick(1); // wait for cache to register request from port 3
-
-    tick(hit_latency); // request should now be processed
-
-    tick(1); // wait another cycle for the result
-
-    if(read_data_3_o.read() != 22 || !read_data_valid_3_o.read()) {
-        std::cerr << "Read failed" << std::endl;
-    } else {
-        std::cout << "Read successful" << std::endl;
-    }
-
-    assert(write_done_0_o == 0); // write done from first request should not be set anymore
-
-    tick(1); // wait for cache to register request from port 0
-
-    tick(hit_latency); // request should now be processed
-
-    tick(1); // wait another cycle for the result
-
-    tick(10);
-
     cache_wrapper->final();
 
     trace->flush();
@@ -265,5 +275,5 @@ int sc_main(int argc, char** argv) {
     delete trace;
 
     std::cout << "Vcache_wrapper_18 done!" << std::endl;
-    return 0;
+    return exit_code;
 }
