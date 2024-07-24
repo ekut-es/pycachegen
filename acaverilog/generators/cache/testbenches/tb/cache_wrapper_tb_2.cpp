@@ -159,31 +159,31 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        read(4, 0, false);
-        read(4, 0, true);
         read(8, 0, false);
         read(8, 0, true);
-        read(4, 0, true);
+        read(16, 0, false);
+        read(16, 0, true);
+        read(8, 0, true);
 
-        read(5, 0, false);
-        read(6, 0, false);
+        read(10, 0, false);
+        read(12, 0, false);
 
-        write(4, 111, true);
-        write(8, 222, true);
+        write(8, 111, true);
+        write(16, 222, true);
 
-        write(12, 333, false);
+        write(24, 333, false);
 
-        read(4, 111, true);
-        read(8, 222, true);
-        read(4, 111, true);
+        read(8, 111, true);
+        read(16, 222, true);
+        read(8, 111, true);
 
-        read(12, 333, false);
-        read(12, 333, true);
-        read(8, 222, true);
-        read(4, 111, false);
+        read(24, 333, false);
+        read(24, 333, true);
+        read(16, 222, true);
+        read(8, 111, false);
 
-        read(5, 0, true);
-        read(6, 0, true);
+        read(10, 0, true);
+        read(12, 0, true);
 
         tick(10);
     } catch (std::runtime_error& e) {

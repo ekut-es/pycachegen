@@ -166,21 +166,21 @@ int sc_main(int argc, char** argv) {
         assert(port_ready_o.read());
         tick(1);
         assert(port_ready_o.read());
-        address_i.write(41);
+        address_i.write(82);
         tick(1);
         assert(port_ready_o.read());
         tick(1);
         assert(port_ready_o.read());
         tick(1);
         assert(port_ready_o.read());
-        address_i.write(49);
+        address_i.write(98);
         tick(1);
         assert(port_ready_o.read());
         tick(1);
         assert(port_ready_o.read());
         tick(1);
         assert(port_ready_o.read());
-        address_i.write(255);
+        address_i.write(510);
         tick(1);
         assert(port_ready_o.read());
         tick(1);
@@ -188,13 +188,13 @@ int sc_main(int argc, char** argv) {
         tick(1);
         assert(port_ready_o.read());
 
-        read(42, 0, 0);
-        read(43, 0, 0);
-        read(47, 0, 0);
-        read(48, 0, 0);
+        read(84, 0, 0);
+        read(86, 0, 0);
+        read(94, 0, 0);
+        read(98, 0, 0);
 
-        write(45, 0x145, 0);
-        read(45, 0x145, 0);
+        write(90, 0x145, 0);
+        read(90, 0x145, 0);
 
         tick(10);
     } catch (std::runtime_error& e) {

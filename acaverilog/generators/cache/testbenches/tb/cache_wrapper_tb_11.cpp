@@ -159,17 +159,17 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(4, 0x40, false);
-        write(5, 0x50, false);
-        write(6, 0x60, false);
+        write(8, 0x40, false);
+        write(10, 0x50, false);
+        write(12, 0x60, false);
 
         flush();
 
-        read(4, 0x40, true);
-        read(5, 0x50, true);
-        read(6, 0x60, true);
+        read(8, 0x40, true);
+        read(10, 0x50, true);
+        read(12, 0x60, true);
 
-        write(8, 0x80, false); // manually check that this doesn't cause a write-back
+        write(16, 0x80, false); // manually check that this doesn't cause a write-back
 
         tick(10);
     } catch (std::runtime_error& e) {

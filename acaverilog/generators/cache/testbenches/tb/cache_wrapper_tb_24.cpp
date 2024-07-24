@@ -158,12 +158,12 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         read(0, 0, 0);
-        read(1, 0, 0);
         read(2, 0, 0);
-        read(3, 0, 0);
+        read(4, 0, 0);
+        read(6, 0, 0);
         
-        write(4, 333, 0);
-        read(4, 333, 0);
+        write(8, 333, 0);
+        read(8, 333, 0);
         read(0, 0, 0);
 
         tick(10);

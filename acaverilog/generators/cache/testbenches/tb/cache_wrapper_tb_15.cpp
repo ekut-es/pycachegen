@@ -159,22 +159,22 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         write(0, 10, false);
-        write(2, 12, false);
-        write(4, 14, false);
-        write(6, 16, false);
+        write(4, 12, false);
+        write(8, 14, false);
+        write(12, 16, false);
 
         read(0, 10, true);
 
-        write(8, 18, false);
+        write(16, 18, false);
 
-        read(2, 12, false);
+        read(4, 12, false);
 
-        read(4, 14, false);
+        read(8, 14, false);
 
-        read(4, 14, true);
-        read(8, 18, true);
-        read(2, 12, true);
-        read(6, 16, true);
+        read(8, 14, true);
+        read(16, 18, true);
+        read(4, 12, true);
+        read(12, 16, true);
 
         tick(10);
     } catch (std::runtime_error& e) {

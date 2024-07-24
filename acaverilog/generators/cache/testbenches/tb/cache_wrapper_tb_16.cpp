@@ -108,13 +108,13 @@ int sc_main(int argc, char** argv) {
     reset_n_i.write(1);
     sc_start(1, SC_NS);
 
-    address_0_i.write(2);
+    address_0_i.write(4);
     address_valid_0_i.write(1);
     write_data_0_i.write(14);
     write_data_valid_0_i.write(1);
     read_write_select_0_i.write(1);
 
-    address_1_i.write(2);
+    address_1_i.write(4);
     address_valid_1_i.write(1);
     read_write_select_1_i.write(0);
 
@@ -148,7 +148,7 @@ int sc_main(int argc, char** argv) {
         std::cout << "Read successful" << std::endl;
     }
 
-    address_1_i.write(3);    
+    address_1_i.write(6);    
     address_valid_1_i.write(1);
     write_data_valid_1_i.write(0);
     read_write_select_1_i.write(0);
@@ -156,7 +156,7 @@ int sc_main(int argc, char** argv) {
     sc_start(1, SC_NS); // arbiter should now register the request from port 1
     address_valid_1_i.write(0);
 
-    address_0_i.write(3);
+    address_0_i.write(6);
     address_valid_0_i.write(1);
     write_data_0_i.write(111);
     write_data_valid_0_i.write(1);

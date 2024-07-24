@@ -36,17 +36,12 @@ class CacheWrapperGenerator:
 
         Args:
             num_ports (int): Number of access ports.
-            arbiter_policy (str): Policy for the arbiter in case there is more than one port.
-                Can be one of "fifo", "priority", "round_robin".
+            arbiter_policy (str): Policy for the arbiter in case there is more than one port. Can be one of "fifo", "priority", "round_robin".
             byte_size (int): Number of bits per byte.
-            enable_reset (bool): Whether to generate reset logic or not. Right now this only affects the
-                main memory module (disabling it there is necessary for generating BRAM during synthesis)
-                but no other modules because otherwise there is a simulation mismatch.
-            address_width (int): With of an address that would include the byte offset. Note that the
-                addresses going into this module should not include the byte offset.
+            enable_reset (bool): Whether to generate reset logic or not. Right now this only affects the main memory module (disabling it there is necessary for generating BRAM during synthesis) but no other modules because otherwise there is a simulation mismatch.
+            address_width (int): Address width including the byte offset bits.
             memory_config (MemoryConfig): Configuration for the main memory.
-            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ...
-                Can be left empty if no caches shall be generated.
+            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
         """
         self.NUM_PORTS = num_ports
         self.ARBITER_POLICY = arbiter_policy
@@ -54,11 +49,12 @@ class CacheWrapperGenerator:
         self.ENABLE_RESET = enable_reset
         self.ADDRESS_WIDTH = address_width
         self.NUM_CACHES = len(cache_configs)
+        self.FE_ADDRESS_WIDTH = address_width
 
         self.CACHE_CONFIGS: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
-            address_width = self.ADDRESS_WIDTH - int(
+            cache_address_width = self.ADDRESS_WIDTH - int(
                 log2(config.DATA_WIDTH // self.BYTE_SIZE)
             )
             if i < len(cache_configs) - 1:
@@ -71,7 +67,7 @@ class CacheWrapperGenerator:
             self.CACHE_CONFIGS.append(
                 InternalCacheConfig(
                     cache_config=config,
-                    address_width=address_width,
+                    address_width=cache_address_width,
                     be_data_width=be_data_width,
                     be_address_width=be_address_width,
                     byte_size=self.BYTE_SIZE,
@@ -91,11 +87,12 @@ class CacheWrapperGenerator:
         )
 
         if self.NUM_CACHES > 0:
+            self.L1_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
             self.FE_DATA_WIDTH = self.CACHE_CONFIGS[0].DATA_WIDTH
-            self.FE_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
         else:
+            self.L1_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
             self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
-            self.FE_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
+        self.FE_BYTE_OFFSET_WIDTH = int(log2(self.FE_DATA_WIDTH / self.BYTE_SIZE))
 
     def generate_module(self) -> Module:
         m = Module("cache_wrapper")
@@ -195,7 +192,7 @@ class CacheWrapperGenerator:
             m.Assign(hit_o(0))
 
         ## Create the interface for the ports of the L1 cache (or the memory if there are no caches)
-        l1_address = m.Wire(f"l1_address", self.FE_ADDRESS_WIDTH)
+        l1_address = m.Wire(f"l1_address", self.L1_ADDRESS_WIDTH)
         l1_address_valid = m.Wire(f"l1_address_valid")
         l1_write_data = m.Wire(f"l1_write_data", self.FE_DATA_WIDTH)
         l1_write_data_valid = m.Wire(f"l1_write_data_valid")
@@ -216,7 +213,7 @@ class CacheWrapperGenerator:
             ## Create an arbiter
             arbiter = MemoryAccessArbiter(
                 num_ports=self.NUM_PORTS,
-                address_width=self.FE_ADDRESS_WIDTH,
+                address_width=self.L1_ADDRESS_WIDTH,
                 data_width=self.FE_DATA_WIDTH,
                 policy=self.ARBITER_POLICY,
                 enable_reset=self.ENABLE_RESET,
@@ -239,7 +236,7 @@ class CacheWrapperGenerator:
             for i in range(self.NUM_PORTS):
                 arbiter_port_mapping.extend(
                     [
-                        (f"fe_address_{i}_i", address_i[i]),
+                        (f"fe_address_{i}_i", address_i[i][self.FE_BYTE_OFFSET_WIDTH:]),
                         (f"fe_address_valid_{i}_i", address_valid_i[i]),
                         (f"fe_write_data_{i}_i", write_data_i[i]),
                         (f"fe_write_data_valid_{i}_i", write_data_valid_i[i]),
@@ -253,7 +250,7 @@ class CacheWrapperGenerator:
             Submodule(m, arbiter, "arbiter", arg_ports=arbiter_port_mapping)
         else:
             ## Directly connect the L1 interface wires to the in-/outputs
-            m.Assign(l1_address(address_i[0]))
+            m.Assign(l1_address(address_i[0][self.FE_BYTE_OFFSET_WIDTH:]))
             m.Assign(l1_address_valid(address_valid_i[0]))
             m.Assign(l1_write_data(write_data_i[0]))
             m.Assign(l1_write_data_valid(write_data_valid_i[0]))

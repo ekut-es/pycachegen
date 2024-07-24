@@ -160,19 +160,19 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         read(0, 0, false);
-        read(1, 0, false);
         read(2, 0, false);
-        read(3, 0, false);
+        read(4, 0, false);
+        read(6, 0, false);
 
         read(0, 0, true);
-        read(1, 0, true);
         read(2, 0, true);
-        read(3, 0, true);
+        read(4, 0, true);
+        read(6, 0, true);
 
-        write(4, 333, false);
+        write(8, 333, false);
         read(0, 0, true);
-        read(4, 333, false);
-        read(4, 333, true);
+        read(8, 333, false);
+        read(8, 333, true);
         read(0, 0, false);
         read(0, 0, true);
 

@@ -159,19 +159,19 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(1, 11, false);
-        write(2, 12, false);
-        write(3, 13, false);
-        write(4, 14, false);
+        write(2, 11, false);
+        write(4, 12, false);
+        write(6, 13, false);
+        write(8, 14, false);
         
-        read(1, 11, true);
-        read(2, 12, true);
-        read(3, 13, true);
-        read(4, 14, true);
+        read(2, 11, true);
+        read(4, 12, true);
+        read(6, 13, true);
+        read(8, 14, true);
 
-        write(5, 15, false);
+        write(10, 15, false);
 
-        read(1, 11, false);
+        read(2, 11, false);
 
         tick(10);
     } catch (std::runtime_error& e) {

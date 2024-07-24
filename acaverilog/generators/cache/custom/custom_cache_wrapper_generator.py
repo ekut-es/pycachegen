@@ -13,7 +13,7 @@ if __name__ == "__main__":
     ARBITER_POLICY = "round_robin" # one of "fifo", "priority", "round_robin"
     BYTE_SIZE = 8 # bits per byte
     ENABLE_RESET = False # Disable for synthesis. Can be enabled for simulation.
-    ADDRESS_WIDTH = 16 # width of an address that would include the byte offset
+    ADDRESS_WIDTH = 16 # Addresses must include the byte offset bits
     # Put all your cache configurations here
     CACHE_CONFIGS = [
         CacheConfig(

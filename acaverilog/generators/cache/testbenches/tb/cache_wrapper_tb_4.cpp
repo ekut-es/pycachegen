@@ -160,18 +160,18 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         read(0, 0, false);
-        read(2, 0, false);
-        read(0, 0, true);
         read(4, 0, false);
-        read(6, 0, false);
+        read(0, 0, true);
+        read(8, 0, false);
+        read(12, 0, false);
+        read(8, 0, true);
+        read(16, 0, false);
+        read(8, 0, true);
+        read(4, 0, true);
+        read(16, 0, true);
+        read(0, 0, false);
         read(4, 0, true);
         read(8, 0, false);
-        read(4, 0, true);
-        read(2, 0, true);
-        read(8, 0, true);
-        read(0, 0, false);
-        read(2, 0, true);
-        read(4, 0, false);
 
         tick(10);
     } catch (std::runtime_error& e) {

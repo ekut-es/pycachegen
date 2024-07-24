@@ -16,7 +16,6 @@
 const int trace_data_width = 32; // can be at most 64 and needs to be a multiple of 8
 const int cache_address_width = 15;
 const int cache_data_width = 16;
-const int cache_address_byte_offset_width = 1; // The number of byte offset bits that's included in the trace offset
 
 int sc_main(int argc, char** argv) {
 
@@ -117,7 +116,7 @@ int sc_main(int argc, char** argv) {
         uint32_t write_data = (word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width);
         uint32_t write_select = (word >> (word_buffer_width - 1));
 
-        address_i.write(address >> cache_address_byte_offset_width);
+        address_i.write(address);
         address_valid_i.write(1);
         write_data_i.write(write_data);
         write_data_valid_i.write(write_select);
@@ -145,7 +144,7 @@ int sc_main(int argc, char** argv) {
     // sanity check
     std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
     for (int i = 0; i < 8; i++){
-        read(i);
+        read(i*trace_bytes_per_word);
     }
 
     cache_wrapper->final();

@@ -160,29 +160,29 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         // Write block A
-        write(8, 18, false);
-        write(9, 19, true);
-        write(10, 110, true);
-        write(11, 111, true);
+        write(16, 18, false);
+        write(18, 19, true);
+        write(20, 110, true);
+        write(22, 111, true);
 
         // Read block B
-        read(18, 0, false);
-        read(16, 0, true);
+        read(36, 0, false);
+        read(32, 0, true);
 
         // Write block B
-        write(16, 116, true);
-        write(17, 117, true);
-        write(18, 118, true);
-        write(19, 119, true);
+        write(32, 116, true);
+        write(34, 117, true);
+        write(36, 118, true);
+        write(38, 119, true);
 
         // Write block C
-        write(24, 124, false);
+        write(48, 124, false);
 
         // Read block A
-        read(10, 110, false);
+        read(20, 110, false);
 
         // Read block C
-        read(25, 0, true);
+        read(50, 0, true);
 
         tick(10);
     } catch (std::runtime_error& e) {

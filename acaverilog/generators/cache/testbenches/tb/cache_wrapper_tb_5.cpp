@@ -88,7 +88,7 @@ int sc_main(int argc, char** argv) {
         sc_start(1, SC_NS);
 
         // read miss
-        address_i.write(2);
+        address_i.write(4);
         address_valid_i.write(1);
         read_write_select_i.write(0);
         sc_start(1, SC_NS);
@@ -97,7 +97,7 @@ int sc_main(int argc, char** argv) {
         assert(port_ready_o.read() == 1);
 
         // read miss
-        address_i.write(3);
+        address_i.write(6);
         address_valid_i.write(1);
         read_write_select_i.write(0);
         sc_start(1, SC_NS);
@@ -106,7 +106,7 @@ int sc_main(int argc, char** argv) {
         assert(port_ready_o.read() == 1);
 
         // write hit
-        address_i.write(2);
+        address_i.write(4);
         address_valid_i.write(1);
         read_write_select_i.write(1);
         write_data_i.write(55);
@@ -117,7 +117,7 @@ int sc_main(int argc, char** argv) {
         assert(port_ready_o.read() == 1);
 
         // read hit (-> no mem access)
-        address_i.write(2);
+        address_i.write(4);
         address_valid_i.write(1);
         read_write_select_i.write(0);
         sc_start(1, SC_NS);
@@ -128,7 +128,7 @@ int sc_main(int argc, char** argv) {
         assert(read_data_o.read() == 55);
 
         // write miss
-        address_i.write(4);
+        address_i.write(8);
         address_valid_i.write(1);
         read_write_select_i.write(1);
         write_data_valid_i.write(1);

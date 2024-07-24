@@ -104,14 +104,14 @@ int sc_main(int argc, char** argv) {
     sc_start(1, SC_NS);
 
     // write from port 0
-    address_0_i.write(2);
+    address_0_i.write(4);
     address_valid_0_i.write(1);
     write_data_0_i.write(14);
     write_data_valid_0_i.write(1);
     read_write_select_0_i.write(1);
 
     // read from port 1
-    address_1_i.write(2);
+    address_1_i.write(4);
     address_valid_1_i.write(1);
     read_write_select_1_i.write(0);
 

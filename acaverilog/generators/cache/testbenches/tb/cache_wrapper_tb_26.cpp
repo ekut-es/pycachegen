@@ -92,7 +92,7 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         sc_start(1, SC_NS);
 
-        address_i.write(2);
+        address_i.write(4);
         address_valid_i.write(1);
         write_data_i.write(0x12);
         write_data_valid_i.write(1);
@@ -102,7 +102,7 @@ int sc_main(int argc, char** argv) {
         sc_start(miss_ndirty_write_latency + 1, SC_NS);
         assert(write_done_o.read());
 
-        address_i.write(2);
+        address_i.write(4);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
@@ -111,7 +111,7 @@ int sc_main(int argc, char** argv) {
         sc_start(hit_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x12);
 
-        address_i.write(3);
+        address_i.write(6);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
@@ -120,7 +120,7 @@ int sc_main(int argc, char** argv) {
         sc_start(miss_ndirty_read_latency + mem_read_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x0);
 
-        address_i.write(3);
+        address_i.write(6);
         address_valid_i.write(1);
         write_data_i.write(0x13);
         write_data_valid_i.write(1);
@@ -130,7 +130,7 @@ int sc_main(int argc, char** argv) {
         sc_start(hit_latency + 1, SC_NS);
         assert(write_done_o.read());
 
-        address_i.write(4);
+        address_i.write(8);
         address_valid_i.write(1);
         write_data_valid_i.write(0);
         read_write_select_i.write(0);
@@ -139,7 +139,7 @@ int sc_main(int argc, char** argv) {
         sc_start(miss_dirty_read_latency + mem_write_latency + mem_read_latency + 1, SC_NS);
         assert(read_data_valid_o.read() == 1 && read_data_o.read() == 0x0);
 
-        address_i.write(5);
+        address_i.write(10);
         address_valid_i.write(1);
         write_data_i.write(0x15);
         write_data_valid_i.write(1);

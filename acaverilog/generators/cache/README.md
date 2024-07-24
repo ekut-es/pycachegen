@@ -50,5 +50,5 @@ To synthesize the setup you need,
 1. open the design in Vivado
 2. In the block design, right click the cache wrapper AXI slave and select "Edit in IP packager"
 3. In the sources list, right click the cache wrapper source file and select "Replace File...". Select the cache wrapper verilog file you need, then repackage the IP.
-4. Right click the cache wrapper AXI slave and select "Customize Block". Then enter the data and address width for the L1 cache.
+4. Right click the cache wrapper AXI slave and select "Customize Block". Then enter your data and address width.
 5. synthesize, implement, generate bitstream and export the hardware including the bitstream.

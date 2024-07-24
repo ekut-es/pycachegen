@@ -54,16 +54,16 @@ def assert_same_address_space(dw1: int, aw1: int, dw2: int, aw2: int) -> None:
 
     Args:
         dw1 (int): data width 1
-        aw1 (int): address width 1
+        aw1 (int): address width 1 (not inlcuding byte offset bits)
         dw2 (int): data width 2
-        aw2 (int): address width 2
+        aw2 (int): address width 2 (not inlcuding byte offset bits)
 
     Raises:
         ConfigurationError: Error that gets thrown if the two configurations do not cover the same address space
     """
     if (own := dw1 * 2**aw1) != (other := dw2 * 2**aw2):
         raise ConfigurationError(
-            f"Own address space spans {own} bits while backend address space spans {other} bits"
+            f"First address space spans {own} bits while second address space spans {other} bits"
         )
 
 
@@ -78,7 +78,7 @@ def assert_data_width_valid(data_width: int, byte_size: int) -> None:
     """
     if data_width % byte_size != 0 or not is_power_of_two(data_width // byte_size):
         raise ConfigurationError(
-            "Data width must have the form (byte_size * 2**n) with n >= 0"
+            f"Data width must have the form (byte_size * 2**n) with n >= 0 (data width {data_width}, byte size {byte_size})"
         )
 
 
@@ -89,7 +89,7 @@ def assert_address_config_valid(
     to the address width.
 
     Args:
-        address_width (int): width of the word addressing address
+        address_width (int): width of the word addressing address (without the bits for a byte offset)
         num_sets (int): number of sets
         num_ways (int): number of ways
         block_size (int): words per block
@@ -124,7 +124,7 @@ def assert_be_data_width_valid(data_width, be_data_width) -> None:
     """
     if data_width > be_data_width:
         raise ConfigurationError(
-            "The data width cannot be greater than the backend data width"
+            f"The data width ({data_width}) cannot be greater than the backend data width ({be_data_width})"
         )
 
 
@@ -150,9 +150,9 @@ def assert_address_range_valid(
     set by the address width.
 
     Args:
-        min_address (int): The smallest address (inclusive)
-        max_address (int): The greatest address (inclusive)
-        address_width (int): The width of the address in bits.
+        min_address (int): The smallest address (inclusive) including byte offset bits.
+        max_address (int): The greatest address (exclusive) including byte offset bits.
+        address_width (int): The width of the address in bits, including byte offset bits.
     """
     if min_address >= max_address:
         raise ConfigurationError(
@@ -185,10 +185,8 @@ class CacheConfig:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
-            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Can be 0
-                so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
-            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Can be 0
-                so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
+            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Can be 0 so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
+            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Can be 0 so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
@@ -220,7 +218,7 @@ class InternalCacheConfig:
         Args:
             
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
-            be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater than the cache's own data_width.
+            be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
             prefix (str): A prefix to use for the module name.
@@ -273,10 +271,8 @@ class MemoryConfig:
             data_width (int): Width of one data word in bits.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            min_address (int): The smallest address (inclusive) for which to generate memory.
-                Requests to smaller addresses will be ignored. This parameter includes a byte offset.
-            max_address (int): The greatest address (exclusive) for which to generate memory.
-                Requests to greater or equal addresses will be ignored. This parameter includes a byte offset.
+            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. This parameter includes a byte offset.
+            max_address (int): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. This parameter includes a byte offset.
         """
         self.DATA_WIDTH = data_width
         self.READ_LATENCY = read_latency

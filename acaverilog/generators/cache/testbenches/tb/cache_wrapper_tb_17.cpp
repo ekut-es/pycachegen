@@ -162,18 +162,18 @@ int sc_main(int argc, char** argv) {
         tick(1);
 
         write(0, 100, false);
-        write(1, 101, false);
+        write(2, 101, false);
 
         read(0, 100, true);
-        read(1, 101, true);
+        read(2, 101, true);
 
-        write(2, 102, false);
-        write(3, 103, false);
+        write(4, 102, false);
+        write(6, 103, false);
 
         read(0, 100, false);
-        read(1, 101, false);
+        read(2, 101, false);
 
-        read(4, 0, false);
+        read(8, 0, false);
 
         read(0, 100, false);
 
