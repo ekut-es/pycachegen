@@ -4,7 +4,7 @@
 
 #include <chrono>
 #include <iostream>
-#include <cmath>
+#include <math.h>
 
 #include "Vcustom_cache_wrapper.h"
 #include "mem_trace.h" // Specify trace file here
@@ -21,6 +21,7 @@ int sc_main(int argc, char** argv) {
 
     const int trace_bytes_per_word = (trace_data_width / 8);
     const int trace_instruction_count = mem_trace_bin_len / trace_bytes_per_word;
+    const int trace_address_byte_offset_width = int(log2(trace_bytes_per_word));
 
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
@@ -144,7 +145,7 @@ int sc_main(int argc, char** argv) {
     // sanity check
     std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
     for (int i = 0; i < 8; i++){
-        read(i*trace_bytes_per_word);
+        read(i*trace_address_byte_offset_width);
     }
 
     cache_wrapper->final();
