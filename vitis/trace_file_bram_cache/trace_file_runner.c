@@ -76,11 +76,11 @@ int main()
 	// just as a quick sanity check
     xil_printf("Reading from cache...\n\r");
     for (int i = 0; i < 10; i++){
-    	*cache_address = i;
+    	*cache_address = 2*i;
     	*cache_flush_sel_wval_addrval = 0b0001;
     	*cache_flush_sel_wval_addrval = 0b0000;
 
-    	xil_printf("Reading from address 0x%x... ", i);
+    	xil_printf("Reading from address 0x%x... ", 2*i);
 
     	while(1){
     		if((*cache_hit_rdval_wdone_pready & 0b0101) == 0b0101) {

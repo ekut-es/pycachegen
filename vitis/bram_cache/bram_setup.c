@@ -55,18 +55,18 @@ int main()
 
 	int mem_trace[] = {
 			write(0, 0x1111), // miss
-			write(1, 0x2222), // miss
-			write(2, 0xdead), // miss
-			write(3, 0xbeef), // miss
+			write(2, 0x2222), // miss
+			write(4, 0xdead), // miss
+			write(6, 0xbeef), // miss
 			read(0), // miss
 			write(0, 0x1001), // hit
 			read(0), // hit
-			read(1), // miss
 			read(2), // miss
-			read(3), // miss
-			read(3), // hit
-			write(4, 0x4444), // miss
 			read(4), // miss
+			read(6), // miss
+			read(6), // hit
+			write(8, 0x4444), // miss
+			read(8), // miss
 			read(0) // miss
 	};
 	int expected_execution_time = 11 * 8 + 3 * 6 + 6 * 16 + 6 * 11;
@@ -98,11 +98,11 @@ int main()
 
     xil_printf("Reading from cache...\n\r");
     for (int i = 0; i < trace_length; i++){
-    	*cache_address = i;
+    	*cache_address = 2*i;
     	*cache_flush_sel_wval_addrval = 0b0001;
     	*cache_flush_sel_wval_addrval = 0b0000;
 
-    	xil_printf("Reading from address 0x%x... ", i);
+    	xil_printf("Reading from address 0x%x... ", 2*i);
 
     	for(int j = 0; j < cache_read_timeout; j++){
     		if((*cache_fdone_hit_rdval_wdone_pready & 0b00101) == 0b00101) {

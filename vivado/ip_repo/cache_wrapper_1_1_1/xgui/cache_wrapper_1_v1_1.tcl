@@ -7,8 +7,10 @@ proc init_gui { IPINST } {
   ipgui::add_param $IPINST -name "C_S00_AXI_ADDR_WIDTH" -parent ${Page_0}
   ipgui::add_param $IPINST -name "C_S00_AXI_BASEADDR" -parent ${Page_0}
   ipgui::add_param $IPINST -name "C_S00_AXI_HIGHADDR" -parent ${Page_0}
-  ipgui::add_param $IPINST -name "CACHE_ADDRESS_WIDTH" -parent ${Page_0}
-  ipgui::add_param $IPINST -name "CACHE_DATA_WIDTH" -parent ${Page_0}
+  set CACHE_ADDRESS_WIDTH [ipgui::add_param $IPINST -name "CACHE_ADDRESS_WIDTH" -parent ${Page_0}]
+  set_property tooltip {Width of the addresses going into the cache wrapper. Byte offset bits need to be included in the address.} ${CACHE_ADDRESS_WIDTH}
+  set CACHE_DATA_WIDTH [ipgui::add_param $IPINST -name "CACHE_DATA_WIDTH" -parent ${Page_0}]
+  set_property tooltip {Width of the data words going into the cache wrapper.} ${CACHE_DATA_WIDTH}
 
 
 }

@@ -44,7 +44,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("WRITE\n\r");
-    *axi_slave_address = 1;
+    *axi_slave_address = 2;
     *axi_slave_write_data = 101;
     *axi_slave_flush_sel_wval_addrval = 0b0111;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
@@ -60,7 +60,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("READ\n\r");
-    *axi_slave_address = 1;
+    *axi_slave_address = 2;
     *axi_slave_flush_sel_wval_addrval = 0b0001;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
     xil_printf("STALL\n\r");
@@ -68,7 +68,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("WRITE\n\r");
-    *axi_slave_address = 2;
+    *axi_slave_address = 4;
     *axi_slave_write_data = 102;
     *axi_slave_flush_sel_wval_addrval = 0b0111;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
@@ -76,7 +76,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("WRITE\n\r");
-    *axi_slave_address = 3;
+    *axi_slave_address = 6;
     *axi_slave_write_data = 103;
     *axi_slave_flush_sel_wval_addrval = 0b0111;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
@@ -92,7 +92,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("READ\n\r");
-    *axi_slave_address = 1;
+    *axi_slave_address = 2;
     *axi_slave_flush_sel_wval_addrval = 0b0001;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
     xil_printf("STALL\n\r");
@@ -100,7 +100,7 @@ int main()
     xil_printf("f_done/hit/rd_valid/w_done/p_ready: 0x%x\n\r", *axi_slave_fdone_hit_rdval_wdone_pready);
 
     xil_printf("READ\n\r");
-    *axi_slave_address = 4;
+    *axi_slave_address = 8;
     *axi_slave_flush_sel_wval_addrval = 0b0001;
     *axi_slave_flush_sel_wval_addrval = 0b0000;
     xil_printf("STALL\n\r");
