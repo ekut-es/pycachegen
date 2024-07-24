@@ -27,7 +27,11 @@ file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
 # Call python script to generate verilog code, then verilate it
 execute_process(
     COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/custom_cache_wrapper_generator.py ${CMAKE_CURRENT_SOURCE_DIR}/src/custom_cache_wrapper.v"
+    RESULT_VARIABLE return_code
 )
+if(return_code AND NOT return_code EQUAL 0)
+    message(FATAL_ERROR "Cache wrapper generation FAILED")
+endif()
 add_executable(Vtracing_tb tracing_tb.cpp)
 set_property(
     TARGET Vtracing_tb

@@ -70,7 +70,11 @@ foreach(i RANGE 1 ${NUM_TESTBENCHES})
     list(GET CACHE_WRAPPER_ARG_LIST ${current_idx_dec} current_args)
     execute_process(
         COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/tb_cache_wrapper_generator.py ${CMAKE_CURRENT_SOURCE_DIR}/src ${current_args}"
+        RESULT_VARIABLE return_code
     )
+    if(return_code AND NOT return_code EQUAL 0)
+        message(FATAL_ERROR "Cache wrapper generation FAILED")
+    endif()
     add_executable(Vcache_wrapper_tb_${current_idx} tb/cache_wrapper_tb_${current_idx}.cpp)
     set_property(
         TARGET Vcache_wrapper_tb_${current_idx}
