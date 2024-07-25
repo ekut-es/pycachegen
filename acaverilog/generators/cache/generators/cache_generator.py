@@ -22,9 +22,6 @@ from acaverilog.generators.cache.generators.one_hot_to_bin_generator import (
 from acaverilog.generators.cache.generators.replacement_policy_generator import (
     ReplacementPolicyGenerator,
 )
-from acaverilog.generators.cache.generators.priority_encoder_generator import (
-    PriorityEncoderGenerator,
-)
 from acaverilog.generators.cache.cache_config_validation import (
     ConfigurationError,
     InternalCacheConfig,
@@ -41,9 +38,8 @@ class States(Enum):
     SEND_MEM_REQUEST = 6
     SEND_MEM_REQUEST_WAIT = 7
     STALL = 8
-    FLUSH_COMPUTE_NEXT = 9
-    FLUSH_PREPARE_WRITE_BACK = 10
-    FLUSH_BACKEND = 11
+    FLUSH_CACHE = 9
+    FLUSH_BACKEND = 10
 
 
 class CacheGenerator:
@@ -458,49 +454,8 @@ class CacheGenerator:
             )
             write_back_next_state = m.Reg("write_back_next_state", self.STATE_REG_WIDTH)
             # Flush functionality
-            flush_encoder_input = m.Reg("flush_encoder_input", self.NUM_SETS)
-            flush_next_set_index = m.Wire(
-                "flush_next_set_index", max(1, ceil(log2(self.NUM_SETS)))
-            )
-            flush_current_block_index = m.Reg(
-                "flush_current_block_index", max(1, self.NUM_WAYS_W)
-            )
-
-            for i in range(self.NUM_SETS):
-                m.Always(
-                    *[valid_memory[way] for way in range(self.NUM_WAYS)],
-                    *[dirty_memory[way] for way in range(self.NUM_WAYS)],
-                    flush_current_block_index,
-                )(
-                    Case(flush_current_block_index)(
-                        *[
-                            When(way)(
-                                flush_encoder_input[i](
-                                    And(
-                                        valid_memory[way][i],
-                                        dirty_memory[way][i],
-                                    ),
-                                    blk=True,
-                                )
-                            )
-                            for way in range(self.NUM_WAYS)
-                        ]
-                    )
-                )
-
-            Submodule(
-                m,
-                PriorityEncoderGenerator(
-                    width_unencoded=self.NUM_SETS,
-                    prefix=self.PREFIX,
-                    prioritize_msb=False,
-                ).generate_module(),
-                f"{self.PREFIX}flush_priority_encoder",
-                arg_ports=(
-                    ("unencoded_i", flush_encoder_input),
-                    ("encoded_o", flush_next_set_index),
-                ),
-            )
+            flush_set_index = m.Reg("flush_set_index", max(1, self.INDEX_WIDTH))
+            flush_block_index = m.Reg("flush_block_index", max(1, self.NUM_WAYS_W))
 
         # Things that are only needed for direct mapped cache
         if self.NUM_WAYS == 1:
@@ -620,7 +575,7 @@ class CacheGenerator:
                             write_back_next_state(0),
                             write_back_tag(0),
                             write_back_word_offset(0),
-                            flush_current_block_index(0),
+                            flush_block_index(0),
                             [
                                 [
                                     dirty_memory[way_idx][set_idx](0)
@@ -651,7 +606,7 @@ class CacheGenerator:
                 If(state_reg == States.READY.value)(
                     # Cache is ready for a new request
                     If(OrList(fe_flush_i, fe_flush_i_reg))(
-                        state_reg(States.FLUSH_COMPUTE_NEXT.value),
+                        state_reg(States.FLUSH_CACHE.value),
                     ).Elif(
                         OrList(
                             AndList(
@@ -1192,62 +1147,60 @@ class CacheGenerator:
                         fe_write_done_o_reg(fe_read_write_select_i_reg),
                         hit_valid(0),
                         latency_counter(0),
-                        If(fe_flush_i_reg)(
-                            state_reg(States.FLUSH_COMPUTE_NEXT.value)
-                        ).Else(state_reg(States.READY.value)),
+                        If(fe_flush_i_reg)(state_reg(States.FLUSH_CACHE.value)).Else(
+                            state_reg(States.READY.value)
+                        ),
                     ).Else(
                         # Stall for the remaining time (or error if this took too much time...?)
                         latency_counter.inc(),
                     ),
                 )
-                .Elif(state_reg == States.FLUSH_COMPUTE_NEXT.value)(
+                .Elif(state_reg == States.FLUSH_CACHE.value)(
                     fe_flush_done_o_reg(0),  # reset flush done status
                     (
-                        [  # flush backend
+                        [
+                            flush_set_index.inc(),
+                            If(flush_set_index == self.NUM_SETS - 1)(
+                                flush_block_index.inc(),
+                                If(flush_block_index == self.NUM_WAYS - 1)(
+                                    # Done flushing this cache, flush the backend
+                                    state_reg(States.FLUSH_BACKEND.value),
+                                    be_flush_o_reg(1),
+                                ),
+                            ),
+                            Case(flush_block_index)(
+                                *[
+                                    When(way)(
+                                        If(
+                                            And(
+                                                dirty_memory[way][flush_set_index],
+                                                valid_memory[way][flush_set_index],
+                                            )
+                                        )(
+                                            write_back_tag(
+                                                tag_memory[way][flush_set_index]
+                                            ),
+                                            write_back_address_index(flush_set_index),
+                                            dirty_memory[way][flush_set_index](0),
+                                            write_back_next_state(States.FLUSH_CACHE.value),
+                                            state_reg(States.WRITE_BACK_BLOCK.value),
+                                        )
+                                    )
+                                    for way in range(self.NUM_WAYS)
+                                ]
+                            ),
+                        ]
+                        if self.WRITE_BACK
+                        else [
+                            # flush the backend
                             state_reg(States.FLUSH_BACKEND.value),
                             be_flush_o_reg(1),
                         ]
-                        if not self.WRITE_BACK
-                        else If(flush_encoder_input == 0)(
-                            # No more dirty sets in this block
-                            If(
-                                flush_current_block_index == self.NUM_WAYS - 1,
-                            )(
-                                # flush backend
-                                state_reg(States.FLUSH_BACKEND.value),
-                                be_flush_o_reg(1),
-                            ).Else(
-                                # continue with the next block
-                                flush_current_block_index.inc()
-                            )
-                        ).Else(
-                            # There is a dirty set that we need to write back
-                            state_reg(States.FLUSH_PREPARE_WRITE_BACK.value),
-                        )
                     ),
-                )
-                .Elif(state_reg == States.FLUSH_PREPARE_WRITE_BACK.value)(
-                    [
-                        write_back_address_index(flush_next_set_index),
-                        [
-                            If(way == flush_current_block_index)(
-                                write_back_tag(tag_memory[way][flush_next_set_index]),
-                                # clear dirty bit
-                                dirty_memory[way][flush_next_set_index](0),
-                            )
-                            for way in range(self.NUM_WAYS)
-                        ],
-                        write_back_block_index(flush_current_block_index),
-                        write_back_next_state(States.FLUSH_COMPUTE_NEXT.value),
-                        state_reg(States.WRITE_BACK_BLOCK.value),
-                    ]
-                    if self.WRITE_BACK
-                    else []
                 )
                 .Elif(state_reg == States.FLUSH_BACKEND.value)(
                     be_flush_o_reg(0),  # reset flush signal
                     If(And(be_flush_done_i, Not(be_flush_o_reg)))(
-                        flush_current_block_index(0) if self.WRITE_BACK else [],
                         state_reg(States.READY.value),
                         fe_flush_i_reg(0),
                         latency_counter(
@@ -1260,8 +1213,7 @@ class CacheGenerator:
                 # but not while the cache is flushing
                 If(
                     AndList(
-                        state_reg != States.FLUSH_COMPUTE_NEXT.value,
-                        state_reg != States.FLUSH_PREPARE_WRITE_BACK.value,
+                        state_reg != States.FLUSH_CACHE.value,
                         state_reg != States.FLUSH_BACKEND.value,
                     )
                 )(fe_flush_i_reg(Or(fe_flush_i_reg, fe_flush_i))),
