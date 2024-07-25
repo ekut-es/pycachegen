@@ -174,7 +174,7 @@ class MemoryAccessArbiter:
             fifo_read_idx = m.Reg("fifo_read_idx", self.FIFO_BUFFER_LENGTH_W)
             fifo_write_idx = m.Reg("fifo_write_idx", self.FIFO_BUFFER_LENGTH_W)
 
-        m.Always(Posedge(clk_i), Negedge(reset_n_i))(
+        m.Always(Posedge(clk_i))(
             If(Not(reset_n_i))(
                 # backend buffers
                 be_address(0),

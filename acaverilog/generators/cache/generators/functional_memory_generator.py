@@ -83,7 +83,7 @@ class FunctionalMemoryGenerator:
         m.Assign(write_done_o(write_done))
         m.Assign(port_ready_o(Not(processing_request)))
 
-        m.Always(*([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else [])))(
+        m.Always(Posedge(clk_i))(
             # nothing in progress
             If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                 # no data_memory reset because that would create a huge number of lines

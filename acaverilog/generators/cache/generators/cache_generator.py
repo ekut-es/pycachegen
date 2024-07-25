@@ -427,7 +427,7 @@ class CacheGenerator:
                     m.Reg(
                         f"data_memory_way_{way}_byte_{byte}",
                         self.BYTE_SIZE,
-                        dims=(self.NUM_SETS, self.BLOCK_SIZE),
+                        dims=(self.NUM_SETS * self.BLOCK_SIZE),
                     )
                 )
 
@@ -456,6 +456,45 @@ class CacheGenerator:
             # Flush functionality
             flush_set_index = m.Reg("flush_set_index", max(1, self.INDEX_WIDTH))
             flush_block_index = m.Reg("flush_block_index", max(1, self.NUM_WAYS_W))
+
+        # The data memory cannot have more than two dimensions, so we need to do the addessing
+        # manually. Here are all the wires to hold the addresses that we may want to access, which
+        # are just concatenations of other signals. But we need these assignments because
+        # Veriloggen does not seem to have a concatenation operator...
+        dmem_msb_addr_fe = m.Wire(
+            "dmem_msb_addr_fe", max(1, self.INDEX_WIDTH + self.WORD_OFFSET_W)
+        )
+        dmem_msb_addr_be = m.Wire(
+            "dmem_msb_addr_be", max(1, self.INDEX_WIDTH + self.WORD_OFFSET_W)
+        )
+        if self.BLOCK_SIZE > 1:
+            m.Assign(dmem_msb_addr_fe[: self.WORD_OFFSET_W](address_word_offset))
+            m.Assign(dmem_msb_addr_be[: self.WORD_OFFSET_W](
+                    # figure out the correct block offset
+                    be_address_o_reg[: self.WORD_OFFSET_W]
+                    + (
+                        0
+                        if self.ADDRESS_WIDTH == self.BE_ADDRESS_WIDTH
+                        else be_read_data_word_offset
+                    )
+                )
+            )
+        if self.NUM_SETS > 1:
+            m.Assign(dmem_msb_addr_fe[self.WORD_OFFSET_W :](address_index))
+            m.Assign(dmem_msb_addr_be[self.WORD_OFFSET_W :](address_index))
+        if self.BLOCK_SIZE == 1 and self.NUM_SETS == 1:
+            m.Assign(dmem_msb_addr_fe(0))
+            m.Assign(dmem_msb_addr_be(0))
+        if self.WRITE_BACK:
+            dmem_msb_addr_wb = m.Wire(
+                "dmem_msb_addr_wb", max(1, self.INDEX_WIDTH + self.WORD_OFFSET_W)
+            )
+            if self.BLOCK_SIZE > 1:
+                m.Assign(dmem_msb_addr_wb[: self.WORD_OFFSET_W](write_back_word_offset))
+            if self.NUM_SETS > 1:
+                m.Assign(dmem_msb_addr_wb[self.WORD_OFFSET_W :](write_back_address_index))
+            if self.BLOCK_SIZE == 1 and self.NUM_SETS == 1:
+                m.Assign(dmem_msb_addr_wb(0))
 
         # Things that are only needed for direct mapped cache
         if self.NUM_WAYS == 1:
@@ -515,10 +554,8 @@ class CacheGenerator:
                 ),
             )
 
-        m.Always(
-            *([Posedge(clk_i)] + ([Negedge(reset_n_i)] if self.ENABLE_RESET else []))
-        )(
-            If(And(self.ENABLE_RESET, Not(reset_n_i)))(
+        m.Always(Posedge(clk_i))(
+            If(Not(reset_n_i))(
                 [
                     ## reset
                     # frontend input buffers
@@ -555,8 +592,8 @@ class CacheGenerator:
                                 valid_memory[way_idx][set_idx](0),
                                 [
                                     [
-                                        data_memory[way_idx][byte_idx][set_idx][
-                                            word_idx
+                                        data_memory[way_idx][byte_idx][
+                                            set_idx * word_idx
                                         ](0)
                                         for byte_idx in range(self.BYTES_PER_WORD)
                                     ]
@@ -671,8 +708,8 @@ class CacheGenerator:
                                 If(fe_write_strobe_i_reg[byte_idx])(
                                     [
                                         If(hit_index == way)(
-                                            data_memory[way][byte_idx][address_index][
-                                                address_word_offset
+                                            data_memory[way][byte_idx][
+                                                dmem_msb_addr_fe
                                             ](
                                                 fe_write_data_i_reg[
                                                     self.BYTE_SIZE
@@ -723,9 +760,7 @@ class CacheGenerator:
                                 [
                                     If(hit_index == way)(
                                         fe_read_data_o_reg[byte_idx](
-                                            data_memory[way][byte_idx][address_index][
-                                                address_word_offset
-                                            ]
+                                            data_memory[way][byte_idx][dmem_msb_addr_fe]
                                         )
                                     )
                                     for way in range(self.NUM_WAYS)
@@ -888,9 +923,7 @@ class CacheGenerator:
                             [
                                 If(write_back_block_index == way)(
                                     be_write_data_o_reg[byte_idx](
-                                        data_memory[way][byte_idx][
-                                            write_back_address_index
-                                        ][write_back_word_offset]
+                                        data_memory[way][byte_idx][dmem_msb_addr_wb]
                                     )
                                 )
                                 for way in range(self.NUM_WAYS)
@@ -961,20 +994,7 @@ class CacheGenerator:
                             [
                                 [
                                     If(next_block_replacement == way)(
-                                        data_memory[way][byte_idx][address_index][
-                                            # figure out the correct block offset
-                                            (
-                                                be_address_o_reg[: self.WORD_OFFSET_W]
-                                                + (
-                                                    0
-                                                    if self.ADDRESS_WIDTH
-                                                    == self.BE_ADDRESS_WIDTH
-                                                    else be_read_data_word_offset
-                                                )
-                                                if self.BLOCK_SIZE > 1
-                                                else 0
-                                            )
-                                        ](
+                                        data_memory[way][byte_idx][dmem_msb_addr_be](
                                             resized_be_read_data[
                                                 self.BYTE_SIZE
                                                 * byte_idx : self.BYTE_SIZE
@@ -1059,9 +1079,7 @@ class CacheGenerator:
                             If(fe_write_strobe_i_reg[i])(
                                 [
                                     If(next_block_replacement == way)(
-                                        data_memory[way][i][address_index][
-                                            address_word_offset
-                                        ](
+                                        data_memory[way][i][dmem_msb_addr_fe](
                                             fe_write_data_i_reg[
                                                 self.BYTE_SIZE
                                                 * i : self.BYTE_SIZE
@@ -1105,9 +1123,7 @@ class CacheGenerator:
                             [
                                 If(next_block_replacement == way)(
                                     fe_read_data_o_reg[byte_idx](
-                                        data_memory[way][byte_idx][address_index][
-                                            address_word_offset
-                                        ]
+                                        data_memory[way][byte_idx][dmem_msb_addr_fe]
                                     )
                                 )
                                 for way in range(self.NUM_WAYS)
@@ -1182,7 +1198,9 @@ class CacheGenerator:
                                             ),
                                             write_back_address_index(flush_set_index),
                                             dirty_memory[way][flush_set_index](0),
-                                            write_back_next_state(States.FLUSH_CACHE.value),
+                                            write_back_next_state(
+                                                States.FLUSH_CACHE.value
+                                            ),
                                             state_reg(States.WRITE_BACK_BLOCK.value),
                                         )
                                     )
