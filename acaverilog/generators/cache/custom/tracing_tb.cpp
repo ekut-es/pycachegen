@@ -5,6 +5,7 @@
 #include <chrono>
 #include <iostream>
 #include <math.h>
+#include <iomanip>
 
 #include "Vcustom_cache_wrapper.h"
 #include "mem_trace.h" // Specify trace file here
@@ -16,12 +17,13 @@
 const int trace_data_width = 32; // can be at most 64 and needs to be a multiple of 8
 const int cache_address_width = 15;
 const int cache_data_width = 16;
+const int cache_address_byte_offset_width = 1;  // number of byte offset bits in an address (usually log2(cache_data_width/8)).
+                                                // only affects the reads at the end
 
 int sc_main(int argc, char** argv) {
 
     const int trace_bytes_per_word = (trace_data_width / 8);
     const int trace_instruction_count = mem_trace_bin_len / trace_bytes_per_word;
-    const int trace_address_byte_offset_width = int(log2(trace_bytes_per_word));
 
     Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
@@ -111,11 +113,12 @@ int sc_main(int argc, char** argv) {
         // send the next instruction
         uint64_t word = 0;
         for (int j = 0; j < trace_bytes_per_word; j++) {
-            word |= (mem_trace_bin[i + j] << (trace_data_width - (j + 1) * 8));
+            uint64_t next_byte = mem_trace_bin[i + j];
+            word |= (next_byte << (trace_data_width - (j + 1) * 8));
         }
         uint32_t address = (word << (word_buffer_width - cache_address_width)) >> (word_buffer_width - cache_address_width);
         uint32_t write_data = (word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width);
-        uint32_t write_select = (word >> (word_buffer_width - 1));
+        uint32_t write_select = (word << (word_buffer_width - trace_data_width) >> (word_buffer_width - 1));
 
         address_i.write(address);
         address_valid_i.write(1);
@@ -145,7 +148,7 @@ int sc_main(int argc, char** argv) {
     // sanity check
     std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
     for (int i = 0; i < 8; i++){
-        read(i*trace_address_byte_offset_width);
+        read(i << cache_address_byte_offset_width);
     }
 
     cache_wrapper->final();
