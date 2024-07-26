@@ -1,6 +1,0 @@
-[submodule "external/systemc"]
-	path = external/systemc
-	url = https://github.com/accellera-official/systemc.git
-[submodule "external/verilator"]
-	path = external/verilator
-	url = https://github.com/verilator/verilator.git
