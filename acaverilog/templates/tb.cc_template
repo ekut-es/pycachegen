@@ -1,0 +1,110 @@
+#include <memory>
+#include <vector>
+#include <systemc.h>
+#include <verilated.h>
+#include <verilated_vcd_sc.h>
+
+#define USE_CASSERT {{ '1' if use_cassert else '0' }}
+#include "assertv.h"
+
+#include "V{{ base_file_name }}.h"
+
+int sc_main(int argc, char** argv) {
+    Verilated::commandArgs(argc, argv);
+    Verilated::traceEverOn(true);
+
+    // get vcd file path from command line arguments
+    std::string vcd_file_path;
+
+    if(argc == 2) {
+        vcd_file_path = std::string(argv[1]);
+    }
+
+    // signals
+    {%- if kwarg_clk != "" %}
+    sc_clock clk_i{"clk", 1, SC_NS, 0.5, 0, SC_NS, true};
+    {%- endif %}
+    {%- if kwarg_reset != "" %}
+    sc_signal<bool> reset_n_i;
+    {%- endif %}
+
+    // CAUTION!
+    // when input/output wire of verilog module has less than 32 bits
+    // sc_signal<uint32_t> is inferred instead of sc_signal<sc_bv<X>>
+
+    // inputs
+    {%- for input, type in kwarg_inputs.items() %}
+    sc_signal<{{ type }}> {{ input }};
+    {%- endfor %}
+
+    // outputs
+    {%- for output, type in kwarg_outputs.items() %}
+    sc_signal<{{ type }}> {{ output }};
+    {%- endfor %}
+
+    const std::unique_ptr<V{{ base_file_name }}> {{ kwarg_snake_case_object_name }}{new V{{ base_file_name }}{"{{ base_file_name }}"} };
+
+    {%- if kwarg_clk %}
+    {{ kwarg_snake_case_object_name  }}->{{ kwarg_clk }}(clk_i);
+    {%- endif %}
+    {%- if kwarg_reset %}
+    {{ kwarg_snake_case_object_name  }}->{{ kwarg_reset }}(reset_n_i);
+    {%- endif %}
+
+    {%- for input, type in kwarg_inputs.items() %}
+    {{ kwarg_snake_case_object_name  }}->{{ input }}({{ input }});
+    {%- endfor %}
+
+    {%- for output, type in kwarg_outputs.items() %}
+    {{ kwarg_snake_case_object_name  }}->{{ output }}({{ output }});
+    {%- endfor %}
+
+    // start simulation and trace
+    std::cout << "{{ base_file_name }} start!" << std::endl;
+
+    sc_start(0, SC_NS);
+
+    VerilatedVcdSc* trace = new VerilatedVcdSc();
+    {{ kwarg_snake_case_object_name }}->trace(trace, 99);
+
+    if(vcd_file_path.empty()) {
+        trace->open("{{ default_vcd_dir_path }}/{{ base_file_name }}.vcd");
+    } else {
+        trace->open(vcd_file_path.c_str());
+    }
+
+    {%- if kwarg_reset != "" %}
+    // reset
+    sc_start(1, SC_NS);
+    reset_n_i.write(0);
+    sc_start(1, SC_NS);
+    reset_n_i.write(1);
+    sc_start(1, SC_NS);
+    {%- endif %}
+
+    {%- if kwarg_tests != "" %}
+    // tests
+    {{ kwarg_tests }}
+    {%- endif %}
+
+    {%- if default_runtime_ns > 0 %}
+    // default runtime
+    sc_start({{ default_runtime_ns }}, SC_NS);
+    {%- endif %}
+
+    {%- if kwarg_reset != "" %}
+    // end simulation with reset
+    reset_n_i.write(0);
+    sc_start(2, SC_NS);
+    {%- endif %}
+
+    {{ kwarg_snake_case_object_name }}->final();
+
+    trace->flush();
+    trace->close();
+
+    delete trace;
+
+    std::cout << "{{ base_file_name }} done!" << std::endl;
+    return 0;
+}
