@@ -8,12 +8,11 @@ from pycachegen import (
 
 if __name__ == "__main__":
     # argv:
-    # path to output directory, number for output file suffix, num ports, arbiter policy, byte size, enable reset, address_width
+    # output file path, num ports, arbiter policy, byte size, enable reset, address_width
     # [data width, num ways, num sets, replacement policy, hit latency, miss latency, write through, write allocate, block size]...
     # [main memory data width, read latency, write latency, min address, max address]
     args = copy.copy(sys.argv[1:])  # make a copy just to be sure
-    OUT_DIR = args.pop(0)
-    FILE_SUFFIX = args.pop(0)
+    OUTPUT_PATH = args.pop(0)
     NUM_PORTS = int(args.pop(0))
     ARBITER_POLICY = args.pop(0)
     BYTE_SIZE = int(args.pop(0))
@@ -55,4 +54,4 @@ if __name__ == "__main__":
         *cache_configs,
     )
     m = cache_wrapper_generator.generate_module()
-    m.to_verilog(f"{OUT_DIR}/cache_wrapper_{FILE_SUFFIX}.v", for_verilator=True)
+    m.to_verilog(OUTPUT_PATH, for_verilator=True)

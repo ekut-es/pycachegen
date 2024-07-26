@@ -21,12 +21,9 @@ find_package(Threads REQUIRED)
 # Find SystemC using SystemC's CMake integration
 find_package(SystemCLanguage PATHS ${SYSTEMC_HOME})
 
-# make a src directory
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src")
-
 # Call python script to generate verilog code, then verilate it
 execute_process(
-    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/custom_cache_wrapper_generator.py ${CMAKE_CURRENT_SOURCE_DIR}/src/custom_cache_wrapper.v"
+    COMMAND bash -c "python ${CMAKE_CURRENT_SOURCE_DIR}/custom_cache_wrapper_generator.py custom_cache_wrapper.v"
     RESULT_VARIABLE return_code
 )
 if(return_code AND NOT return_code EQUAL 0)
@@ -38,6 +35,6 @@ set_property(
     PROPERTY CXX_STANDARD ${SystemC_CXX_STANDARD}
 )
 verilate(Vtracing_tb SYSTEMC COVERAGE TRACE
-SOURCES src/custom_cache_wrapper.v
+SOURCES ${CMAKE_CURRENT_BINARY_DIR}/custom_cache_wrapper.v
 )
 verilator_link_systemc(Vtracing_tb)
