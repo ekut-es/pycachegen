@@ -175,21 +175,16 @@ systemc-2.3.3
 # external
 external/
 
-# student/mueller
-acaverilog/generators/cache/testbenches/src
-acaverilog/generators/cache/custom/src
-vivado/cache/cache.cache
-vivado/cache/cache.hw
-vivado/cache/cache.tmp
-vivado/cache/cache.gen
-vivado/cache/cache.runs
-vivado/cache/cache.ip_user_files
-vivado/cache/cache.sim
-vivado/bram_cache/bram_cache.cache
-vivado/bram_cache/bram_cache.hw
-vivado/bram_cache/bram_cache.tmp
-vivado/bram_cache/bram_cache.gen
-vivado/bram_cache/bram_cache.runs
-vivado/bram_cache/bram_cache.ip_user_files
-vivado/bram_cache/bram_cache.sim
-*.xsa
+# generated verilog source files
+testbenches/src
+tracing/src
+
+# vivado files that can be generated
+vivado/*/*.cache
+vivado/*/*.hw
+vivado/*/*.tmp
+vivado/*/*.gen
+vivado/*/*.runs
+vivado/*/*.ip_user_files
+vivado/*/*.sim
+vivado/*/*.xsa
