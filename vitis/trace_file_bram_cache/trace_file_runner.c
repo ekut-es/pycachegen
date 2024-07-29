@@ -22,7 +22,7 @@
 #include "xil_printf.h"
 #include "xparameters.h"
 #include "xbasic_types.h"
-#include "mem_trace.h"
+#include "mem_trace_2.h"
 
 const int trace_data_width = 32;
 
@@ -50,7 +50,8 @@ int main()
 	for(int i = 0; i < trace_instruction_count; i++){
 		unsigned int word = 0;
 		for(int j = 0; j < trace_bytes_per_word; j++){
-			word |= (mem_trace_bin[trace_bytes_per_word * i + j] << (trace_data_width - (j + 1) * 8));
+			unsigned int next_byte = mem_trace_bin[trace_bytes_per_word * i + j];
+			word |= (next_byte << (trace_data_width - (j + 1) * 8));
 		}
     	*(trace_bram_baseaddr_p + i) = word;
 	}
@@ -58,7 +59,7 @@ int main()
 	// just as a quick sanity check
     xil_printf("Reading the trace start from the BRAM...\n\r");
     for (int i = 0; i < 10; i++) {
-    	xil_printf("Trace at address 0x%d: 0x%x\n\r", i, *(trace_bram_baseaddr_p + i));
+    	xil_printf("Trace instruction %d: 0x%x\n\r", i, *(trace_bram_baseaddr_p + i));
     }
 
     xil_printf("Starting trace processing.\n\r");
@@ -80,7 +81,7 @@ int main()
     	*cache_flush_sel_wval_addrval = 0b0001;
     	*cache_flush_sel_wval_addrval = 0b0000;
 
-    	xil_printf("Reading from address 0x%x... ", 2*i);
+    	xil_printf("Reading from address no. %d... ", i);
 
     	while(1){
     		if((*cache_hit_rdval_wdone_pready & 0b0101) == 0b0101) {

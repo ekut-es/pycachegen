@@ -24,7 +24,7 @@ module cache_wrapper
   wire be_write_done_0;
   wire be_port_ready_0;
   wire be_flush_done_0;
-  wire [13-1:0] be_address_0;
+  wire [12-1:0] be_address_0;
   wire be_address_valid_0;
   wire [64-1:0] be_write_data_0;
   wire be_write_data_valid_0;
@@ -32,7 +32,7 @@ module cache_wrapper
   wire [8-1:0] be_write_strobe_0;
   wire be_flush_0;
   assign hit_o = request_hit_0;
-  wire [15-1:0] l1_address;
+  wire [14-1:0] l1_address;
   wire l1_address_valid;
   wire [16-1:0] l1_write_data;
   wire l1_write_data_valid;
@@ -43,7 +43,7 @@ module cache_wrapper
   wire l1_port_ready;
   wire [2-1:0] l1_write_strobe;
   assign l1_write_strobe = 3;
-  assign l1_address = address_0_i;
+  assign l1_address = address_0_i[14:1];
   assign l1_address_valid = address_valid_0_i;
   assign l1_write_data = write_data_0_i;
   assign l1_write_data_valid = write_data_valid_0_i;
@@ -114,7 +114,7 @@ module l1_cache
   input clk_i,
   input reset_n_i,
   input fe_flush_i,
-  input [15-1:0] fe_address_i,
+  input [14-1:0] fe_address_i,
   input fe_address_valid_i,
   input [16-1:0] fe_write_data_i,
   input fe_write_data_valid_i,
@@ -131,7 +131,7 @@ module l1_cache
   input be_write_done_i,
   input be_port_ready_i,
   input be_flush_done_i,
-  output [13-1:0] be_address_o,
+  output [12-1:0] be_address_o,
   output be_address_valid_o,
   output [64-1:0] be_write_data_o,
   output be_write_data_valid_o,
@@ -141,7 +141,7 @@ module l1_cache
 );
 
   reg fe_flush_i_reg;
-  reg [15-1:0] fe_address_i_reg;
+  reg [14-1:0] fe_address_i_reg;
   reg [16-1:0] fe_write_data_i_reg;
   reg fe_read_write_select_i_reg;
   reg [2-1:0] fe_write_strobe_i_reg;
@@ -149,7 +149,7 @@ module l1_cache
   reg fe_read_data_valid_o_reg;
   reg fe_write_done_o_reg;
   reg fe_flush_done_o_reg;
-  reg [15-1:0] be_address_o_reg;
+  reg [14-1:0] be_address_o_reg;
   reg be_address_valid_o_reg;
   reg [8-1:0] be_write_data_o_reg [0:2-1];
   reg be_write_data_valid_o_reg;
@@ -163,7 +163,7 @@ module l1_cache
   assign fe_flush_done_o = fe_flush_done_o_reg;
   assign be_write_data_valid_o = be_write_data_valid_o_reg;
   assign be_read_write_select_o = be_read_write_select_o_reg;
-  assign be_address_o = be_address_o_reg[14:2];
+  assign be_address_o = be_address_o_reg[13:2];
   assign be_address_valid_o = be_address_valid_o_reg;
   assign be_flush_o = be_flush_o_reg;
   assign be_write_data_o[7:0] = (be_address_o_reg[1:0] == 0)? be_write_data_o_reg[0] : 0;
@@ -194,8 +194,8 @@ module l1_cache
   assign address_word_offset = fe_address_i_reg[1:0];
   wire [2-1:0] address_index;
   assign address_index = fe_address_i_reg[3:2];
-  wire [11-1:0] address_tag;
-  assign address_tag = fe_address_i_reg[14:4];
+  wire [10-1:0] address_tag;
+  assign address_tag = fe_address_i_reg[13:4];
   reg [16-1:0] resized_be_read_data;
   reg [2-1:0] be_read_data_word_offset;
   wire [2-1:0] be_read_data_total_word_offset;
@@ -218,30 +218,32 @@ module l1_cache
     endcase
   end
 
-  reg [11-1:0] tag_memory [0:2-1][0:4-1];
-  reg [1-1:0] valid_memory [0:2-1][0:4-1];
-  reg [8-1:0] data_memory [0:2-1][0:4-1][0:4-1][0:2-1];
-  reg [1-1:0] dirty_memory [0:2-1][0:4-1];
+  reg [10-1:0] tag_memory_way_0 [0:4-1];
+  reg [1-1:0] valid_memory_way_0 [0:4-1];
+  reg [8-1:0] data_memory_way_0_byte_0 [0:16-1];
+  reg [8-1:0] data_memory_way_0_byte_1 [0:16-1];
+  reg [10-1:0] tag_memory_way_1 [0:4-1];
+  reg [1-1:0] valid_memory_way_1 [0:4-1];
+  reg [8-1:0] data_memory_way_1_byte_0 [0:16-1];
+  reg [8-1:0] data_memory_way_1_byte_1 [0:16-1];
+  reg [1-1:0] dirty_memory_way_0 [0:4-1];
+  reg [1-1:0] dirty_memory_way_1 [0:4-1];
   reg [2-1:0] write_back_address_index;
   reg [1-1:0] write_back_block_index;
-  reg [11-1:0] write_back_tag;
+  reg [10-1:0] write_back_tag;
   reg [2-1:0] write_back_word_offset;
   reg [4-1:0] write_back_next_state;
-  wire [4-1:0] flush_encoder_input;
-  wire [2-1:0] flush_next_set_index;
-  reg [1-1:0] flush_current_block_index;
-  assign flush_encoder_input[0] = valid_memory[flush_current_block_index][0] & dirty_memory[flush_current_block_index][0];
-  assign flush_encoder_input[1] = valid_memory[flush_current_block_index][1] & dirty_memory[flush_current_block_index][1];
-  assign flush_encoder_input[2] = valid_memory[flush_current_block_index][2] & dirty_memory[flush_current_block_index][2];
-  assign flush_encoder_input[3] = valid_memory[flush_current_block_index][3] & dirty_memory[flush_current_block_index][3];
-
-  l1_priority_encoder
-  l1_flush_priority_encoder
-  (
-    .unencoded_i(flush_encoder_input),
-    .encoded_o(flush_next_set_index)
-  );
-
+  reg [2-1:0] flush_set_index;
+  reg [1-1:0] flush_block_index;
+  wire [4-1:0] dmem_msb_addr_fe;
+  wire [4-1:0] dmem_msb_addr_be;
+  assign dmem_msb_addr_fe[1:0] = address_word_offset;
+  assign dmem_msb_addr_be[1:0] = be_address_o_reg[1:0] + be_read_data_word_offset;
+  assign dmem_msb_addr_fe[3:2] = address_index;
+  assign dmem_msb_addr_be[3:2] = address_index;
+  wire [4-1:0] dmem_msb_addr_wb;
+  assign dmem_msb_addr_wb[1:0] = write_back_word_offset;
+  assign dmem_msb_addr_wb[3:2] = write_back_address_index;
   wire [1-1:0] hit_index;
   reg [1-1:0] next_block_replacement;
   reg repl_pol_access;
@@ -274,130 +276,7 @@ module l1_cache
 
 
   always @(posedge clk_i) begin
-    if(0 & !reset_n_i) begin
-      fe_flush_i_reg <= 0;
-      fe_address_i_reg <= 0;
-      fe_write_data_i_reg <= 0;
-      fe_read_write_select_i_reg <= 0;
-      fe_write_strobe_i_reg <= 0;
-      fe_read_data_o_reg[0] <= 0;
-      fe_read_data_o_reg[1] <= 0;
-      fe_read_data_valid_o_reg <= 0;
-      fe_write_done_o_reg <= 0;
-      fe_flush_done_o_reg <= 0;
-      be_address_o_reg <= 0;
-      be_address_valid_o_reg <= 0;
-      be_write_data_o_reg[0] <= 0;
-      be_write_data_o_reg[1] <= 0;
-      be_write_data_valid_o_reg <= 0;
-      be_read_write_select_o_reg <= 0;
-      be_write_strobe_o_reg <= 0;
-      be_flush_o_reg <= 0;
-      state_reg <= 0;
-      latency_counter <= 0;
-      hit_valid <= 0;
-      hit_vector <= 0;
-      send_mem_request_next_state <= 0;
-      read_block_word_offset <= 0;
-      tag_memory[0][0] <= 0;
-      valid_memory[0][0] <= 0;
-      data_memory[0][0][0][0] <= 0;
-      data_memory[0][0][0][1] <= 0;
-      data_memory[0][0][1][0] <= 0;
-      data_memory[0][0][1][1] <= 0;
-      data_memory[0][0][2][0] <= 0;
-      data_memory[0][0][2][1] <= 0;
-      data_memory[0][0][3][0] <= 0;
-      data_memory[0][0][3][1] <= 0;
-      tag_memory[0][1] <= 0;
-      valid_memory[0][1] <= 0;
-      data_memory[0][1][0][0] <= 0;
-      data_memory[0][1][0][1] <= 0;
-      data_memory[0][1][1][0] <= 0;
-      data_memory[0][1][1][1] <= 0;
-      data_memory[0][1][2][0] <= 0;
-      data_memory[0][1][2][1] <= 0;
-      data_memory[0][1][3][0] <= 0;
-      data_memory[0][1][3][1] <= 0;
-      tag_memory[0][2] <= 0;
-      valid_memory[0][2] <= 0;
-      data_memory[0][2][0][0] <= 0;
-      data_memory[0][2][0][1] <= 0;
-      data_memory[0][2][1][0] <= 0;
-      data_memory[0][2][1][1] <= 0;
-      data_memory[0][2][2][0] <= 0;
-      data_memory[0][2][2][1] <= 0;
-      data_memory[0][2][3][0] <= 0;
-      data_memory[0][2][3][1] <= 0;
-      tag_memory[0][3] <= 0;
-      valid_memory[0][3] <= 0;
-      data_memory[0][3][0][0] <= 0;
-      data_memory[0][3][0][1] <= 0;
-      data_memory[0][3][1][0] <= 0;
-      data_memory[0][3][1][1] <= 0;
-      data_memory[0][3][2][0] <= 0;
-      data_memory[0][3][2][1] <= 0;
-      data_memory[0][3][3][0] <= 0;
-      data_memory[0][3][3][1] <= 0;
-      tag_memory[1][0] <= 0;
-      valid_memory[1][0] <= 0;
-      data_memory[1][0][0][0] <= 0;
-      data_memory[1][0][0][1] <= 0;
-      data_memory[1][0][1][0] <= 0;
-      data_memory[1][0][1][1] <= 0;
-      data_memory[1][0][2][0] <= 0;
-      data_memory[1][0][2][1] <= 0;
-      data_memory[1][0][3][0] <= 0;
-      data_memory[1][0][3][1] <= 0;
-      tag_memory[1][1] <= 0;
-      valid_memory[1][1] <= 0;
-      data_memory[1][1][0][0] <= 0;
-      data_memory[1][1][0][1] <= 0;
-      data_memory[1][1][1][0] <= 0;
-      data_memory[1][1][1][1] <= 0;
-      data_memory[1][1][2][0] <= 0;
-      data_memory[1][1][2][1] <= 0;
-      data_memory[1][1][3][0] <= 0;
-      data_memory[1][1][3][1] <= 0;
-      tag_memory[1][2] <= 0;
-      valid_memory[1][2] <= 0;
-      data_memory[1][2][0][0] <= 0;
-      data_memory[1][2][0][1] <= 0;
-      data_memory[1][2][1][0] <= 0;
-      data_memory[1][2][1][1] <= 0;
-      data_memory[1][2][2][0] <= 0;
-      data_memory[1][2][2][1] <= 0;
-      data_memory[1][2][3][0] <= 0;
-      data_memory[1][2][3][1] <= 0;
-      tag_memory[1][3] <= 0;
-      valid_memory[1][3] <= 0;
-      data_memory[1][3][0][0] <= 0;
-      data_memory[1][3][0][1] <= 0;
-      data_memory[1][3][1][0] <= 0;
-      data_memory[1][3][1][1] <= 0;
-      data_memory[1][3][2][0] <= 0;
-      data_memory[1][3][2][1] <= 0;
-      data_memory[1][3][3][0] <= 0;
-      data_memory[1][3][3][1] <= 0;
-      write_back_address_index <= 0;
-      write_back_block_index <= 0;
-      write_back_next_state <= 0;
-      write_back_tag <= 0;
-      write_back_word_offset <= 0;
-      flush_current_block_index <= 0;
-      dirty_memory[0][0] <= 0;
-      dirty_memory[0][1] <= 0;
-      dirty_memory[0][2] <= 0;
-      dirty_memory[0][3] <= 0;
-      dirty_memory[1][0] <= 0;
-      dirty_memory[1][1] <= 0;
-      dirty_memory[1][2] <= 0;
-      dirty_memory[1][3] <= 0;
-      next_block_replacement <= 0;
-      repl_pol_access <= 0;
-      repl_pol_replace <= 0;
-      repl_pol_block_index_o <= 0;
-      be_read_data_word_offset <= 0;
+    if(!reset_n_i) begin
     end else begin
       if(state_reg == 0) begin
         if(fe_flush_i || fe_flush_i_reg) begin
@@ -414,8 +293,8 @@ module l1_cache
           fe_flush_done_o_reg <= 0;
         end 
       end else if(state_reg == 1) begin
-        hit_vector[0] <= (tag_memory[0][address_index] == address_tag) && (valid_memory[0][address_index] == 1);
-        hit_vector[1] <= (tag_memory[1][address_index] == address_tag) && (valid_memory[1][address_index] == 1);
+        hit_vector[0] <= (tag_memory_way_0[address_index] == address_tag) && (valid_memory_way_0[address_index] == 1);
+        hit_vector[1] <= (tag_memory_way_1[address_index] == address_tag) && (valid_memory_way_1[address_index] == 1);
         hit_valid <= 1;
         latency_counter <= latency_counter + 1;
         next_block_replacement <= next_replacements[address_index];
@@ -427,16 +306,41 @@ module l1_cache
           repl_pol_block_index_o <= hit_index;
           if(fe_read_write_select_i_reg) begin
             if(fe_write_strobe_i_reg[0]) begin
-              data_memory[hit_index][address_index][address_word_offset][0] <= fe_write_data_i_reg[7:0];
+              if(hit_index == 0) begin
+                data_memory_way_0_byte_0[dmem_msb_addr_fe] <= fe_write_data_i_reg[7:0];
+              end 
+              if(hit_index == 1) begin
+                data_memory_way_1_byte_0[dmem_msb_addr_fe] <= fe_write_data_i_reg[7:0];
+              end 
             end 
             if(fe_write_strobe_i_reg[1]) begin
-              data_memory[hit_index][address_index][address_word_offset][1] <= fe_write_data_i_reg[15:8];
+              if(hit_index == 0) begin
+                data_memory_way_0_byte_1[dmem_msb_addr_fe] <= fe_write_data_i_reg[15:8];
+              end 
+              if(hit_index == 1) begin
+                data_memory_way_1_byte_1[dmem_msb_addr_fe] <= fe_write_data_i_reg[15:8];
+              end 
             end 
-            dirty_memory[hit_index][address_index] <= 1;
+            if(hit_index == 0) begin
+              dirty_memory_way_0[address_index] <= 1;
+            end 
+            if(hit_index == 1) begin
+              dirty_memory_way_1[address_index] <= 1;
+            end 
             state_reg <= 8;
           end else begin
-            fe_read_data_o_reg[0] <= data_memory[hit_index][address_index][address_word_offset][0];
-            fe_read_data_o_reg[1] <= data_memory[hit_index][address_index][address_word_offset][1];
+            if(hit_index == 0) begin
+              fe_read_data_o_reg[0] <= data_memory_way_0_byte_0[dmem_msb_addr_fe];
+            end 
+            if(hit_index == 1) begin
+              fe_read_data_o_reg[0] <= data_memory_way_1_byte_0[dmem_msb_addr_fe];
+            end 
+            if(hit_index == 0) begin
+              fe_read_data_o_reg[1] <= data_memory_way_0_byte_1[dmem_msb_addr_fe];
+            end 
+            if(hit_index == 1) begin
+              fe_read_data_o_reg[1] <= data_memory_way_1_byte_1[dmem_msb_addr_fe];
+            end 
             state_reg <= 8;
           end
         end else if(0 & fe_read_write_select_i_reg) begin
@@ -449,17 +353,29 @@ module l1_cache
           state_reg <= 6;
           send_mem_request_next_state <= 8;
         end else begin
-          valid_memory[next_block_replacement][address_index] <= 1;
-          tag_memory[next_block_replacement][address_index] <= address_tag;
-          dirty_memory[next_block_replacement][address_index] <= fe_read_write_select_i_reg;
+          if(next_block_replacement == 0) begin
+            valid_memory_way_0[address_index] <= 1;
+            tag_memory_way_0[address_index] <= address_tag;
+            dirty_memory_way_0[address_index] <= fe_read_write_select_i_reg;
+          end 
+          if(next_block_replacement == 1) begin
+            valid_memory_way_1[address_index] <= 1;
+            tag_memory_way_1[address_index] <= address_tag;
+            dirty_memory_way_1[address_index] <= fe_read_write_select_i_reg;
+          end 
           repl_pol_access <= 1;
           repl_pol_replace <= 1;
           repl_pol_block_index_o <= next_block_replacement;
-          if(dirty_memory[next_block_replacement][address_index] & (!fe_read_write_select_i_reg | 1)) begin
+          if(((next_block_replacement == 0) & dirty_memory_way_0[address_index] || (next_block_replacement == 1) & dirty_memory_way_1[address_index]) & (!fe_read_write_select_i_reg | 1)) begin
             state_reg <= 3;
             write_back_address_index <= address_index;
             write_back_block_index <= next_block_replacement;
-            write_back_tag <= tag_memory[next_block_replacement][address_index];
+            if(next_block_replacement == 0) begin
+              write_back_tag <= tag_memory_way_0[address_index];
+            end 
+            if(next_block_replacement == 1) begin
+              write_back_tag <= tag_memory_way_1[address_index];
+            end 
             if(!fe_read_write_select_i_reg || 1 || (fe_write_strobe_i_reg != 3)) begin
               write_back_next_state <= 4;
             end else begin
@@ -478,11 +394,21 @@ module l1_cache
         be_address_o_reg[1:0] <= write_back_word_offset;
         write_back_word_offset <= write_back_word_offset + 1;
         be_address_o_reg[3:2] <= write_back_address_index;
-        be_address_o_reg[14:4] <= write_back_tag;
+        be_address_o_reg[13:4] <= write_back_tag;
         be_write_strobe_o_reg <= 3;
         be_read_write_select_o_reg <= 1;
-        be_write_data_o_reg[0] <= data_memory[write_back_block_index][write_back_address_index][write_back_word_offset][0];
-        be_write_data_o_reg[1] <= data_memory[write_back_block_index][write_back_address_index][write_back_word_offset][1];
+        if(write_back_block_index == 0) begin
+          be_write_data_o_reg[0] <= data_memory_way_0_byte_0[dmem_msb_addr_wb];
+        end 
+        if(write_back_block_index == 1) begin
+          be_write_data_o_reg[0] <= data_memory_way_1_byte_0[dmem_msb_addr_wb];
+        end 
+        if(write_back_block_index == 0) begin
+          be_write_data_o_reg[1] <= data_memory_way_0_byte_1[dmem_msb_addr_wb];
+        end 
+        if(write_back_block_index == 1) begin
+          be_write_data_o_reg[1] <= data_memory_way_1_byte_1[dmem_msb_addr_wb];
+        end 
         be_write_data_valid_o_reg <= 1;
         state_reg <= 6;
         if(write_back_word_offset == 3) begin
@@ -509,8 +435,18 @@ module l1_cache
             end else begin
               be_read_data_word_offset <= be_read_data_word_offset + 1;
             end
-            data_memory[next_block_replacement][address_index][be_address_o_reg[1:0] + be_read_data_word_offset][0] <= resized_be_read_data[7:0];
-            data_memory[next_block_replacement][address_index][be_address_o_reg[1:0] + be_read_data_word_offset][1] <= resized_be_read_data[15:8];
+            if(next_block_replacement == 0) begin
+              data_memory_way_0_byte_0[dmem_msb_addr_be] <= resized_be_read_data[7:0];
+            end 
+            if(next_block_replacement == 1) begin
+              data_memory_way_1_byte_0[dmem_msb_addr_be] <= resized_be_read_data[7:0];
+            end 
+            if(next_block_replacement == 0) begin
+              data_memory_way_0_byte_1[dmem_msb_addr_be] <= resized_be_read_data[15:8];
+            end 
+            if(next_block_replacement == 1) begin
+              data_memory_way_1_byte_1[dmem_msb_addr_be] <= resized_be_read_data[15:8];
+            end 
           end
         end 
       end else if(state_reg == 4) begin
@@ -518,7 +454,7 @@ module l1_cache
         repl_pol_access <= 0;
         repl_pol_replace <= 0;
         be_address_o_reg[1:0] <= read_block_word_offset;
-        be_address_o_reg[14:2] <= fe_address_i_reg[14:2];
+        be_address_o_reg[13:2] <= fe_address_i_reg[13:2];
         be_read_write_select_o_reg <= 0;
         if(read_block_word_offset == 0) begin
           send_mem_request_next_state <= 5;
@@ -536,15 +472,35 @@ module l1_cache
         repl_pol_replace <= 0;
         if(fe_read_write_select_i_reg) begin
           if(fe_write_strobe_i_reg[0]) begin
-            data_memory[next_block_replacement][address_index][address_word_offset][0] <= fe_write_data_i_reg[7:0];
+            if(next_block_replacement == 0) begin
+              data_memory_way_0_byte_0[dmem_msb_addr_fe] <= fe_write_data_i_reg[7:0];
+            end 
+            if(next_block_replacement == 1) begin
+              data_memory_way_1_byte_0[dmem_msb_addr_fe] <= fe_write_data_i_reg[7:0];
+            end 
           end 
           if(fe_write_strobe_i_reg[1]) begin
-            data_memory[next_block_replacement][address_index][address_word_offset][1] <= fe_write_data_i_reg[15:8];
+            if(next_block_replacement == 0) begin
+              data_memory_way_0_byte_1[dmem_msb_addr_fe] <= fe_write_data_i_reg[15:8];
+            end 
+            if(next_block_replacement == 1) begin
+              data_memory_way_1_byte_1[dmem_msb_addr_fe] <= fe_write_data_i_reg[15:8];
+            end 
           end 
           state_reg <= 8;
         end else begin
-          fe_read_data_o_reg[0] <= data_memory[next_block_replacement][address_index][address_word_offset][0];
-          fe_read_data_o_reg[1] <= data_memory[next_block_replacement][address_index][address_word_offset][1];
+          if(next_block_replacement == 0) begin
+            fe_read_data_o_reg[0] <= data_memory_way_0_byte_0[dmem_msb_addr_fe];
+          end 
+          if(next_block_replacement == 1) begin
+            fe_read_data_o_reg[0] <= data_memory_way_1_byte_0[dmem_msb_addr_fe];
+          end 
+          if(next_block_replacement == 0) begin
+            fe_read_data_o_reg[1] <= data_memory_way_0_byte_1[dmem_msb_addr_fe];
+          end 
+          if(next_block_replacement == 1) begin
+            fe_read_data_o_reg[1] <= data_memory_way_1_byte_1[dmem_msb_addr_fe];
+          end 
           state_reg <= 8;
         end
       end else if(state_reg == 8) begin
@@ -565,65 +521,47 @@ module l1_cache
         end
       end else if(state_reg == 9) begin
         fe_flush_done_o_reg <= 0;
-        if(flush_encoder_input == 0) begin
-          if(flush_current_block_index == 1) begin
-            state_reg <= 11;
+        flush_set_index <= flush_set_index + 1;
+        if(flush_set_index == 3) begin
+          flush_block_index <= flush_block_index + 1;
+          if(flush_block_index == 1) begin
+            state_reg <= 10;
             be_flush_o_reg <= 1;
-          end else begin
-            flush_current_block_index <= flush_current_block_index + 1;
+          end 
+        end 
+        case(flush_block_index)
+          0: begin
+            if(dirty_memory_way_0[flush_set_index] & valid_memory_way_0[flush_set_index]) begin
+              write_back_tag <= tag_memory_way_0[flush_set_index];
+              write_back_address_index <= flush_set_index;
+              dirty_memory_way_0[flush_set_index] <= 0;
+              write_back_next_state <= 9;
+              state_reg <= 3;
+            end 
           end
-        end else begin
-          state_reg <= 10;
-        end
+          1: begin
+            if(dirty_memory_way_1[flush_set_index] & valid_memory_way_1[flush_set_index]) begin
+              write_back_tag <= tag_memory_way_1[flush_set_index];
+              write_back_address_index <= flush_set_index;
+              dirty_memory_way_1[flush_set_index] <= 0;
+              write_back_next_state <= 9;
+              state_reg <= 3;
+            end 
+          end
+        endcase
       end else if(state_reg == 10) begin
-        write_back_address_index <= flush_next_set_index;
-        write_back_tag <= tag_memory[flush_current_block_index][flush_next_set_index];
-        write_back_block_index <= flush_current_block_index;
-        write_back_next_state <= 9;
-        state_reg <= 3;
-        dirty_memory[flush_current_block_index][flush_next_set_index] <= 0;
-      end else if(state_reg == 11) begin
         be_flush_o_reg <= 0;
         if(be_flush_done_i & !be_flush_o_reg) begin
-          flush_current_block_index <= 0;
           state_reg <= 0;
           fe_flush_i_reg <= 0;
           latency_counter <= 0;
           fe_flush_done_o_reg <= 1;
         end 
       end 
-      if((state_reg != 9) && (state_reg != 10) && (state_reg != 11)) begin
+      if((state_reg != 9) && (state_reg != 10)) begin
         fe_flush_i_reg <= fe_flush_i_reg | fe_flush_i;
       end 
     end
-  end
-
-
-endmodule
-
-
-
-module l1_priority_encoder
-(
-  input [4-1:0] unencoded_i,
-  output reg [2-1:0] encoded_o
-);
-
-
-  always @(unencoded_i) begin
-    encoded_o = 0;
-    if(unencoded_i[3]) begin
-      encoded_o = 3;
-    end 
-    if(unencoded_i[2]) begin
-      encoded_o = 2;
-    end 
-    if(unencoded_i[1]) begin
-      encoded_o = 1;
-    end 
-    if(unencoded_i[0]) begin
-      encoded_o = 0;
-    end 
   end
 
 
@@ -680,7 +618,7 @@ module l1_replacement_policy
   reg [2-1:0] tmp_repl;
 
   always @(posedge clk_i) begin
-    if(0 & !reset_n_i) begin
+    if(!reset_n_i) begin
       plru_bits[0] <= 0;
       next_replacement_o_reg[0] <= 1;
       plru_bits[1] <= 0;
@@ -713,7 +651,7 @@ module functional_memory
 (
   input clk_i,
   input reset_n_i,
-  input [13-1:0] address_i,
+  input [12-1:0] address_i,
   input address_valid_i,
   input [64-1:0] write_data_i,
   input write_data_valid_i,
@@ -725,7 +663,7 @@ module functional_memory
   output port_ready_o
 );
 
-  reg [13-1:0] address;
+  reg [12-1:0] address;
   reg [64-1:0] write_data;
   reg read_write_select;
   reg [8-1:0] write_strobe;
@@ -733,14 +671,14 @@ module functional_memory
   reg read_data_valid;
   reg write_done;
   reg [6-1:0] latency_counter;
-  reg [8-1:0] data_memory_0 [0:8192-1];
-  reg [8-1:0] data_memory_1 [0:8192-1];
-  reg [8-1:0] data_memory_2 [0:8192-1];
-  reg [8-1:0] data_memory_3 [0:8192-1];
-  reg [8-1:0] data_memory_4 [0:8192-1];
-  reg [8-1:0] data_memory_5 [0:8192-1];
-  reg [8-1:0] data_memory_6 [0:8192-1];
-  reg [8-1:0] data_memory_7 [0:8192-1];
+  reg [8-1:0] data_memory_0 [0:4096-1];
+  reg [8-1:0] data_memory_1 [0:4096-1];
+  reg [8-1:0] data_memory_2 [0:4096-1];
+  reg [8-1:0] data_memory_3 [0:4096-1];
+  reg [8-1:0] data_memory_4 [0:4096-1];
+  reg [8-1:0] data_memory_5 [0:4096-1];
+  reg [8-1:0] data_memory_6 [0:4096-1];
+  reg [8-1:0] data_memory_7 [0:4096-1];
   reg processing_request;
   assign read_data_o[7:0] = read_data[0];
   assign read_data_o[15:8] = read_data[1];
