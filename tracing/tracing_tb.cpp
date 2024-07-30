@@ -21,6 +21,8 @@ const int cache_data_width = 16;
 const int cache_address_byte_offset_width = 1;  // number of byte offset bits in an address (usually log2(cache_data_width/8)).
                                                 // only affects the reads at the end
 
+const bool create_csv = false; // whether to create CSV files showing which instructions created hits and how long their execution took
+
 int sc_main(int argc, char** argv) {
 
     const int trace_bytes_per_word = (trace_data_width / 8);
@@ -138,11 +140,13 @@ int sc_main(int argc, char** argv) {
             tick(1);
         }
         address_valid_i.write(0);
-        if (i != 0) {
-            hits[(i / trace_bytes_per_word) - 1] = hit_o.read();
-            instruction_durations[(i / trace_bytes_per_word) - 1] = sim_time - instruction_start_time;
+        if(create_csv) {
+            if (i != 0) {
+                hits[(i / trace_bytes_per_word) - 1] = hit_o.read();
+                instruction_durations[(i / trace_bytes_per_word) - 1] = sim_time - instruction_start_time;
+            }
+            instruction_start_time = sim_time;
         }
-        instruction_start_time = sim_time;
     }
     std::cout.flush();
     // wait until the last instruction was processed
@@ -150,12 +154,24 @@ int sc_main(int argc, char** argv) {
     while (!port_ready_o.read()) {
         tick(1);
     }
-    hits[trace_instruction_count - 1] = hit_o.read();
-    instruction_durations[trace_instruction_count - 1] = sim_time - instruction_start_time;
 
     const auto end_time = std::chrono::system_clock::now();
     const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
+    if(create_csv) {
+        hits[trace_instruction_count - 1] = hit_o.read();
+        instruction_durations[trace_instruction_count - 1] = sim_time - instruction_start_time;
+        std::cout << "Writing hit and instruction execution times to CSV files..." << std::endl;
+        ofstream hit_file("tracing_tb_hits.csv");
+        ofstream durations_file("tracing_tb_instruction_execution_times.csv");
+        for (int i = 0; i < trace_instruction_count; i++) {
+            hit_file << hits[i] << ",";
+            durations_file << instruction_durations[i] << ",";
+        }
+        hit_file.close();
+        durations_file.close();
+    }
+    
     // sanity check
     std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
     for (int i = 0; i < 8; i++){
@@ -165,16 +181,6 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->final();
 
     std::cout << "Trace simulation done!" << std::endl;
-    std::cout << "Writing hit and instruction execution times to CSV files..." << std::endl;
-
-    ofstream hit_file("tracing_tb_hits.csv");
-    ofstream durations_file("tracing_tb_instruction_execution_times.csv");
-    for (int i = 0; i < trace_instruction_count; i++) {
-        hit_file << hits[i] << ",";
-        durations_file << instruction_durations[i] << ",";
-    }
-    hit_file.close();
-    durations_file.close();
 
     // One cycle gets wasted at the beginning, do not count that one
     std::cout << "Trace execution took " << sim_time - 1 << " cycles (simulation took " << elapsed_time << " ms)" << std::endl;
