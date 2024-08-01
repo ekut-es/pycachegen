@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(Cache CXX)
 
-cmake_policy(SET CMP0144 NEW)
+if(NOT CMAKE_VERSION VERSION_LESS "3.27.0")
+    cmake_policy(SET CMP0144 NEW)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
