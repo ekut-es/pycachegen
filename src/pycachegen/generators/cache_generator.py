@@ -1017,7 +1017,6 @@ class CacheGenerator:
                         if self.NUM_WAYS > 1
                         else []
                     ),
-                    # be_address_o_reg(fe_address_i_reg), # This line is unnecessary and not so cool for synthesis?
                     # prepare memory request
                     (
                         [
