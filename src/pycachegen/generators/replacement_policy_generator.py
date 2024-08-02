@@ -75,7 +75,7 @@ class ReplacementPolicyGenerator:
             lru_fields = m.Reg(
                 "lru_fields", self.NUM_WAYS_W, dims=(self.NUM_SETS, self.NUM_WAYS)
             ) # for each way in a set, store the age of that way within the set
-            m.Always(Posedge(reset_n_i))(
+            m.Always(Posedge(clk_i))(
                 If(Not(reset_n_i))(
                     [
                         (
