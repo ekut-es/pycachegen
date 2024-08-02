@@ -10,13 +10,15 @@ from veriloggen import (
     OrList,
     Not,
     Repeat,
-    And
+    And,
 )
 
 
 class ReplacementPolicyGenerator:
 
-    def __init__(self, num_ways: int, num_sets: int, policy: str, prefix: str, enable_reset: bool) -> None:
+    def __init__(
+        self, num_ways: int, num_sets: int, policy: str, prefix: str, enable_reset: bool
+    ) -> None:
         """Replacement policy generator.
 
         Args:
@@ -67,6 +69,40 @@ class ReplacementPolicyGenerator:
                     next_replacement_o_reg[set_index_i](
                         next_replacement_o_reg[set_index_i] + 1, blk=True
                     )
+                )
+            )
+        elif self.POLICY == "lru":
+            lru_fields = m.Reg(
+                "lru_fields", self.NUM_WAYS_W, dims=(self.NUM_SETS, self.NUM_WAYS)
+            ) # for each way in a set, store the age of that way within the set
+            m.Always(Posedge(reset_n_i))(
+                If(Not(reset_n_i))(
+                    [
+                        (
+                            [lru_fields[i][j](j) for j in range(self.NUM_WAYS)],
+                            next_replacement_o_reg[i](self.NUM_WAYS - 1),
+                        )
+                        for i in range(self.NUM_SETS)
+                    ],
+                ).Elif(access_i)(
+                    [
+                        If(
+                            lru_fields[set_index_i][i]
+                            < lru_fields[set_index_i][block_index_i]
+                        )(
+                            # increment the age of all ways younger than the one just accessed
+                            lru_fields[set_index_i][i](
+                                lru_fields[set_index_i][i] + 1, blk=True
+                            ),
+                            If(lru_fields[set_index_i][i] == self.NUM_WAYS - 1)(
+                                # if that way is now the oldest way, it should be replaced next
+                                next_replacement_o_reg[set_index_i](i)
+                            ),
+                        )
+                        for i in range(self.NUM_WAYS)
+                    ],
+                    # set the age of the way just accessed to 0
+                    lru_fields[set_index_i][block_index_i](0, blk=True),
                 )
             )
         elif self.POLICY == "plru_mru":

@@ -1,6 +1,6 @@
 from math import log2, floor, ceil
 
-REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru")
+REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru", "lru")
 
 
 class ConfigurationError(ValueError):
