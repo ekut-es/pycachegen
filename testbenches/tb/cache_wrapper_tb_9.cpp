@@ -158,18 +158,28 @@ int sc_main(int argc, char** argv) {
         reset_n_i.write(1);
         tick(1);
 
-        write(4, 0x20, false);
-        write(6, 0x30, false);
-        write(8, 0x40, false);
+        write(0, 0x100, false);
+        write(2, 0x102, false);
+        write(4, 0x104, false);
+        write(6, 0x106, false);
+        write(8, 0x108, false);
+        write(10, 0x110, false);
+        write(12, 0x112, false);
+        write(14, 0x114, false);
 
         reset_n_i.write(0);
         tick(1);
         reset_n_i.write(1);
         tick(1);
 
+        read(0, 0, false);
+        read(2, 0, false);
         read(4, 0, false);
         read(6, 0, false);
         read(8, 0, false);
+        read(10, 0, false);
+        read(12, 0, false);
+        read(14, 0, false);
 
         tick(10);
     } catch (std::runtime_error& e) {

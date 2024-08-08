@@ -83,10 +83,20 @@ class FunctionalMemoryGenerator:
         m.Assign(write_done_o(write_done))
         m.Assign(port_ready_o(Not(processing_request)))
 
+        rst_i = m.Integer("rst_i")
+
         m.Always(Posedge(clk_i))(
             # nothing in progress
             If(And(self.ENABLE_RESET, Not(reset_n_i)))(
-                # no data_memory reset because that would create a huge number of lines
+                # Use a Verilog For Loop so we do not create a huge number of lines here
+                [
+                    For(
+                        rst_i(0),
+                        rst_i < (self.MAX_ADDRESS - self.MIN_ADDRESS),
+                        rst_i.inc(),
+                    )(data_memory[i][rst_i](0, blk=True))
+                    for i in range(self.BYTES_PER_WORD)
+                ],
                 latency_counter(0),
                 address(0),
                 write_data(0),

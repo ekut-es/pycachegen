@@ -14,6 +14,7 @@ from veriloggen import (
     Cond,
     Case,
     When,
+    For,
 )
 
 from pycachegen.generators.one_hot_to_bin_generator import (
@@ -469,7 +470,8 @@ class CacheGenerator:
         )
         if self.BLOCK_SIZE > 1:
             m.Assign(dmem_msb_addr_fe[: self.WORD_OFFSET_W](address_word_offset))
-            m.Assign(dmem_msb_addr_be[: self.WORD_OFFSET_W](
+            m.Assign(
+                dmem_msb_addr_be[: self.WORD_OFFSET_W](
                     # figure out the correct block offset
                     be_address_o_reg[: self.WORD_OFFSET_W]
                     + (
@@ -492,7 +494,9 @@ class CacheGenerator:
             if self.BLOCK_SIZE > 1:
                 m.Assign(dmem_msb_addr_wb[: self.WORD_OFFSET_W](write_back_word_offset))
             if self.NUM_SETS > 1:
-                m.Assign(dmem_msb_addr_wb[self.WORD_OFFSET_W :](write_back_address_index))
+                m.Assign(
+                    dmem_msb_addr_wb[self.WORD_OFFSET_W :](write_back_address_index)
+                )
             if self.BLOCK_SIZE == 1 and self.NUM_SETS == 1:
                 m.Assign(dmem_msb_addr_wb(0))
 
@@ -554,6 +558,7 @@ class CacheGenerator:
                 ),
             )
 
+        rst_idx = m.Integer("rst_idx")
         m.Always(Posedge(clk_i))(
             If(Not(reset_n_i))(
                 [
@@ -586,22 +591,20 @@ class CacheGenerator:
                     read_block_word_offset(0),
                     # internal memories
                     [
-                        [
+                        (
+                            For(rst_idx(0), rst_idx < self.NUM_SETS, rst_idx.inc())(
+                                tag_memory[way_idx][rst_idx](0),
+                                valid_memory[way_idx][rst_idx](0),
+                            ),
                             [
-                                tag_memory[way_idx][set_idx](0),
-                                valid_memory[way_idx][set_idx](0),
-                                [
-                                    [
-                                        data_memory[way_idx][byte_idx][
-                                            set_idx * word_idx
-                                        ](0)
-                                        for byte_idx in range(self.BYTES_PER_WORD)
-                                    ]
-                                    for word_idx in range(self.BLOCK_SIZE)
-                                ],
-                            ]
-                            for set_idx in range(self.NUM_SETS)
-                        ]
+                                For(
+                                    rst_idx(0),
+                                    rst_idx < self.NUM_SETS * self.BLOCK_SIZE,
+                                    rst_idx.inc(),
+                                )(data_memory[way_idx][byte_idx][rst_idx](0))
+                                for byte_idx in range(self.BYTES_PER_WORD)
+                            ],
+                        )
                         for way_idx in range(self.NUM_WAYS)
                     ],
                     # write back things

@@ -24,11 +24,11 @@ class ReplacementPolicyGenerator:
         Args:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
-            policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
+            policy (str): Can be either "fifo", "plru_mru", "plru_tree" or "lru".
             prefix (str): Prefix to be used for this module's name
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
-                Note that `plru_tree` requires a reset (or rather, special initial values) so reset logic will always be
-                implemented when using it.
+                Note that `plru_tree` and `lru` require a reset (or rather, special initial values) so reset logic will always be
+                implemented when using them.
         """
         # This module will only be generated if num_ways > 1
         self.NUM_WAYS = num_ways
@@ -63,8 +63,10 @@ class ReplacementPolicyGenerator:
 
         if self.POLICY == "fifo":
             m.Always(Posedge(clk_i))(
-                If(Not(reset_n_i))(
+                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                     [next_replacement_o_reg[i](0) for i in range(self.NUM_SETS)]
+                    if self.ENABLE_RESET
+                    else []
                 ).Elif(replace_i)(
                     next_replacement_o_reg[set_index_i](
                         next_replacement_o_reg[set_index_i] + 1, blk=True
@@ -74,7 +76,7 @@ class ReplacementPolicyGenerator:
         elif self.POLICY == "lru":
             lru_fields = m.Reg(
                 "lru_fields", self.NUM_WAYS_W, dims=(self.NUM_SETS, self.NUM_WAYS)
-            ) # for each way in a set, store the age of that way within the set
+            )  # for each way in a set, store the age of that way within the set
             m.Always(Posedge(clk_i))(
                 If(Not(reset_n_i))(
                     [
@@ -108,11 +110,13 @@ class ReplacementPolicyGenerator:
         elif self.POLICY == "plru_mru":
             mru_bits = m.Reg("mru_bits", self.NUM_WAYS, self.NUM_SETS)
             m.Always(Posedge(clk_i))(
-                If(Not(reset_n_i))(
+                If(And(self.ENABLE_RESET, Not(reset_n_i)))(
                     [
                         (mru_bits[i](0), next_replacement_o_reg[i](0))
                         for i in range(self.NUM_SETS)
                     ]
+                    if self.ENABLE_RESET
+                    else []
                 ).Elif(access_i)(
                     # update the mru bits
                     If(
