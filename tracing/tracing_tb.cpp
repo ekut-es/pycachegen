@@ -1,34 +1,35 @@
+#include <math.h>
 #include <systemc.h>
 #include <verilated.h>
 #include <verilated_vcd_sc.h>
 
 #include <chrono>
+#include <cstdint>
 #include <fstream>
-#include <iostream>
-#include <math.h>
 #include <iomanip>
+#include <iostream>
+#include <vector>
 
 #include "Vcustom_cache_wrapper.h"
-#include "mem_trace.h" // Specify trace file here
 
 // Testbench for executing traces on custom cache wrapper configurations
 
 // Trace and cache configuration variables
 // adjust these based on your own setup
-const int trace_data_width = 32; // can be at most 64 and needs to be a multiple of 8
+const int trace_data_width =
+    32;  // can be at most 64 and needs to be a multiple of 8
 const int cache_address_width = 15;
 const int cache_data_width = 16;
-const int cache_address_byte_offset_width = 1;  // number of byte offset bits in an address (usually log2(cache_data_width/8)).
-                                                // only affects the reads at the end
-
-const bool create_csv = false; // whether to create CSV files showing which instructions created hits and how long their execution took
+const int cache_address_byte_offset_width =
+    1;  // number of byte offset bits in an address (usually
+        // log2(cache_data_width/8)). only affects the reads at the end
+const bool create_csv =
+    false;  // whether to create CSV files showing which instructions created
+            // hits and how long their execution took
+using IntegerType = uint64_t; // select an integer type that fits one instruction
 
 int sc_main(int argc, char** argv) {
-
-    const int trace_bytes_per_word = (trace_data_width / 8);
-    const int trace_instruction_count = mem_trace_bin_len / trace_bytes_per_word;
-
-    Verilated::commandArgs(argc, argv);
+    // Verilated::commandArgs(argc, argv);
     Verilated::traceEverOn(true);
 
     std::string vcd_file_path;
@@ -36,6 +37,14 @@ int sc_main(int argc, char** argv) {
     if (argc == 2) {
         vcd_file_path = std::string(argv[1]);
     }
+
+    if (argc != 2) {
+        std::cerr << "Program needs to be called with exactly one argument "
+                     "specifying the trace file path."
+                  << std::endl;
+        return 1;
+    }
+    std::string trace_file = std::string(argv[1]);
 
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
@@ -74,13 +83,6 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_0_o(write_done_o);
     cache_wrapper->port_ready_0_o(port_ready_o);
 
-    std::cout << "Trace simulation start!" << std::endl;
-
-    const auto start_time = std::chrono::system_clock::now();
-
-    sc_start(0, SC_NS);
-    reset_n_i.write(1); // deactivate reset
-
     uint32_t sim_time = 0;
 
     auto tick = [&](int amount) {
@@ -98,33 +100,68 @@ int sc_main(int argc, char** argv) {
         while (!port_ready_o.read()) {
             sc_start(1, SC_NS);
         }
-        std::cout << "Reading from address " << address << "... " << read_data_o.read() << std::endl;
+        std::cout << "Reading from address " << address << "... "
+                  << read_data_o.read() << std::endl;
     };
 
+    const size_t trace_bytes_per_word = (trace_data_width / 8);
+
+    // Read the file
+    std::ifstream file(trace_file, std::ios::in | std::ios::binary);
+    if (!file) {
+        std::cerr << "File could not be opened." << std::endl;
+        return 1;
+    }
+
+    // Turn the file into a vector of instructions
+    std::vector<IntegerType> instructions;
+    uint8_t buffer[trace_bytes_per_word];
+    while (file.read(reinterpret_cast<char*>(buffer), trace_bytes_per_word)) {
+        IntegerType current_instruction = 0;
+
+        for (size_t i = 0; i < trace_bytes_per_word; i++) {
+            current_instruction |= (static_cast<IntegerType>(buffer[i])
+                                    << (trace_data_width - (1 + i) * 8));
+        }
+
+        instructions.push_back(current_instruction);
+    }
+    file.close();
+    const size_t instruction_count = instructions.size();
+
+    // Start the simulation
+    std::cout << "Trace simulation start!" << std::endl;
+    const auto start_time = std::chrono::system_clock::now();
+    sc_start(0, SC_NS);
+    reset_n_i.write(1);  // deactivate reset
+
     // Send all instructions to the cache, one after the other
-    const int word_buffer_width = 64; // mem trace is a char array so I first read one trace word into a buffer
-    // the size of that buffer must be known for shifting which I need to do for extracting the address, data, and write enable
+    const int word_buffer_width = sizeof(IntegerType) * 8;
     int progress = -1;
-    bool hits[trace_instruction_count];
-    int instruction_durations[trace_instruction_count];
-    int instruction_start_time = 0; 
-    for (uint64_t i = 0; i < mem_trace_bin_len; i += trace_bytes_per_word) {
-        int new_progress = int((float(i) / float(mem_trace_bin_len)) * 100.0);
+    bool hits[instruction_count];
+    int instruction_durations[instruction_count];
+    int instruction_start_time = 0;
+    for (size_t i = 0; i < instruction_count; i++) {
+        int new_progress = int((float(i) / float(instruction_count)) * 100.0);
         if (new_progress != progress) {
             progress = new_progress;
-            int instructions_processed = (i/trace_bytes_per_word);
             std::cout.flush();
-            std::cout << "Progress: " << instructions_processed << " of " << trace_instruction_count << " (" << progress << "%)\r";
+            std::cout << "Progress: " << i << " of " << instruction_count
+                      << " (" << progress << "%)\r";
         }
+
         // send the next instruction
-        uint64_t word = 0;
-        for (int j = 0; j < trace_bytes_per_word; j++) {
-            uint64_t next_byte = mem_trace_bin[i + j];
-            word |= (next_byte << (trace_data_width - (j + 1) * 8));
-        }
-        uint32_t address = (word << (word_buffer_width - cache_address_width)) >> (word_buffer_width - cache_address_width);
-        uint32_t write_data = (word << (word_buffer_width - cache_address_width - cache_data_width)) >> (word_buffer_width - cache_data_width);
-        uint32_t write_select = (word << (word_buffer_width - trace_data_width) >> (word_buffer_width - 1));
+        uint64_t current_instruction = instructions[i];
+        uint32_t address = (current_instruction
+                            << (word_buffer_width - cache_address_width)) >>
+                           (word_buffer_width - cache_address_width);
+        uint32_t write_data =
+            (current_instruction << (word_buffer_width - cache_address_width -
+                                     cache_data_width)) >>
+            (word_buffer_width - cache_data_width);
+        uint32_t write_select =
+            (current_instruction << (word_buffer_width - trace_data_width) >>
+             (word_buffer_width - 1));
 
         address_i.write(address);
         address_valid_i.write(1);
@@ -134,16 +171,18 @@ int sc_main(int argc, char** argv) {
 
         // wait at least one cycle
         tick(1);
-        // as soon as port_ready_o becomes true, the cache will have accepted the request we just sent
-        // so wait until it becomes ready and then proceed with the next request
+        // as soon as port_ready_o becomes true, the cache will have accepted
+        // the request we just sent so wait until it becomes ready and then
+        // proceed with the next request
         while (!port_ready_o.read()) {
             tick(1);
         }
         address_valid_i.write(0);
-        if(create_csv) {
+        if (create_csv) {
             if (i != 0) {
-                hits[(i / trace_bytes_per_word) - 1] = hit_o.read();
-                instruction_durations[(i / trace_bytes_per_word) - 1] = sim_time - instruction_start_time;
+                hits[i - 1] = hit_o.read();
+                instruction_durations[i - 1] =
+                    sim_time - instruction_start_time;
             }
             instruction_start_time = sim_time;
         }
@@ -156,25 +195,33 @@ int sc_main(int argc, char** argv) {
     }
 
     const auto end_time = std::chrono::system_clock::now();
-    const auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    const auto elapsed_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                              start_time)
+            .count();
 
-    if(create_csv) {
-        hits[trace_instruction_count - 1] = hit_o.read();
-        instruction_durations[trace_instruction_count - 1] = sim_time - instruction_start_time;
-        std::cout << "Writing hit and instruction execution times to CSV files..." << std::endl;
+    if (create_csv) {
+        hits[instruction_count - 1] = hit_o.read();
+        instruction_durations[instruction_count - 1] =
+            sim_time - instruction_start_time;
+        std::cout
+            << "Writing hit and instruction execution times to CSV files..."
+            << std::endl;
         ofstream hit_file("tracing_tb_hits.csv");
         ofstream durations_file("tracing_tb_instruction_execution_times.csv");
-        for (int i = 0; i < trace_instruction_count; i++) {
+        for (size_t i = 0; i < instruction_count; i++) {
             hit_file << hits[i] << ",";
             durations_file << instruction_durations[i] << ",";
         }
         hit_file.close();
         durations_file.close();
     }
-    
+
     // sanity check
-    std::cout << "Doing some reads as sanity check (execution time will not be counted)." << std::endl;
-    for (int i = 0; i < 8; i++){
+    std::cout << "Doing some reads as sanity check (execution time will not "
+                 "be counted)."
+              << std::endl;
+    for (size_t i = 0; i < 8; i++) {
         read(i << cache_address_byte_offset_width);
     }
 
@@ -183,6 +230,8 @@ int sc_main(int argc, char** argv) {
     std::cout << "Trace simulation done!" << std::endl;
 
     // One cycle gets wasted at the beginning, do not count that one
-    std::cout << "Trace execution took " << sim_time - 1 << " cycles (simulation took " << elapsed_time << " ms)" << std::endl;
+    std::cout << "Trace execution took " << sim_time - 1
+              << " cycles (simulation took " << elapsed_time << " ms)"
+              << std::endl;
     return 0;
 }
