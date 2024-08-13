@@ -10,7 +10,7 @@ There are many testbenches for different cache wrapper configurations. Go inside
 
 ## Creating Verilog Code for custom cache hierarchies
 
-To actually generate Verilog files for custom cache hierarchies, go to the `custom/` folder. There you'll find a `custom_cache_wrapper_generator.py` where you can configure a cache/memory hierarchy and generate an output file. There's also a `CMakeLists.txt` that will call the python script just mentioned, verilate the verilog code and compile it with a testbench for executing memory traces. The section below shows how to create trace files. In the testbench, change the address and data width variables at the top accordingly.
+To actually generate Verilog files for custom cache hierarchies, go to the `custom/` folder. There you'll find a `custom_cache_wrapper_generator.py` where you can configure a cache/memory hierarchy and generate an output file. There's also a `CMakeLists.txt` that will call the python script just mentioned, verilate the verilog code and compile it with a testbench for executing memory traces. The section below shows how to create trace files. In the testbench, change the variables for things like the address and data width at the top of the file accordingly. You can then call the executable with the path to the binary trace file. As a second parameter you can specify the path to a file to which the total number of cycles needed will be written, which is useful for doing automated testing.
 
 # Memory traces
 
@@ -22,9 +22,9 @@ You can execute memory traces one the FPGA or in simulation. Both methods use bi
         | write: 1, read: 0 | empty | write data (ignored if write bit is not set) | address   |
         +-------------------+-------+----------------------------------------------+-----------+
         
-Where `w` is the width of the whole instruction, `d` is the width of the write data and `a` is the address width. `w` needs to be of the form `2^n*8` with `n>=0`.
+Where `w` is the width of the whole instruction, `d` is the width of the write data and `a` is the address width. `w` needs to be of the form `n*8` with `n>0` if used for simulation or `2^n*8` with `n>=0` if used for the FPGA. When used for the simulation, `a` and `d` can only be up to 32 bits wide (you'd just have to change the signal widths in the testbench otherwise).
 
-Once you have a binary file with the instructions, use `xxd -i <filename.bin> > <filename.h>` to convert it to a C header file. You can then include it in the C/C++ program for the FPGA or for the simulation and then make sure that the program uses the correct data and length variables. If you named the binary `mem_trace.bin`, it will already be included correctly and also use the correct variables.
+The tracing testbench just reads this binary, but for executing it on the FPGA you'll need to convert it to a C header file so that it can be compiled into the executable. To do so, you can use `xxd -i <filename.bin> > <filename.h>`. You can then include it in the C/C++ program for the FPGA and then make sure that the program uses the correct data and length variables. If you named the binary `mem_trace.bin`, it will already be included correctly and also use the correct variables.
 
 # FPGA
 

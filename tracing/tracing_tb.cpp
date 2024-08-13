@@ -27,7 +27,7 @@ const bool create_csv =
     false;  // whether to create CSV files showing which instructions created
             // hits and how long their execution took
 using IntegerType =
-    uint64_t;  // select an integer type that fits one instruction
+    uint32_t;  // select an integer type that fits one instruction
 
 /// @brief Extract bits from an integer.
 /// @param num Number from which to extract the bits
