@@ -17,34 +17,42 @@
 // Trace and cache configuration variables
 // adjust these based on your own setup
 const int trace_data_width =
-    32;  // can be at most 64 and needs to be a multiple of 8
+    32;  // must fit in the IntegerType and needs to be a multiple of 8
 const int cache_address_width = 15;
 const int cache_data_width = 16;
 const int cache_address_byte_offset_width =
-    1;  // number of byte offset bits in an address (usually
+    2;  // number of byte offset bits in an address (usually
         // log2(cache_data_width/8)). only affects the reads at the end
 const bool create_csv =
     false;  // whether to create CSV files showing which instructions created
             // hits and how long their execution took
-using IntegerType = uint64_t; // select an integer type that fits one instruction
+using IntegerType =
+    uint64_t;  // select an integer type that fits one instruction
+
+/// @brief Extract bits from an integer.
+/// @param num Number from which to extract the bits
+/// @param start Start index (inclusive)
+/// @param end End index (exclusive)
+/// @return The extracted bits, shifted to the start
+uint32_t extract_bits(IntegerType num, size_t start, size_t end) {
+    size_t num_bits = end - start;
+    size_t mask = (1 << num_bits) - 1;
+    return (num >> start) & mask;
+}
 
 int sc_main(int argc, char** argv) {
-    // Verilated::commandArgs(argc, argv);
-    Verilated::traceEverOn(true);
+    // argv[1]: path to trace file
+    // argv[2]: path to result file (optional)
 
-    std::string vcd_file_path;
-
-    if (argc == 2) {
-        vcd_file_path = std::string(argv[1]);
-    }
-
-    if (argc != 2) {
-        std::cerr << "Program needs to be called with exactly one argument "
-                     "specifying the trace file path."
+    if (argc < 2) {
+        std::cerr << "Program needs to be called with at least one argument "
+                     "specifying the trace file to use."
                   << std::endl;
         return 1;
     }
     std::string trace_file = std::string(argv[1]);
+
+    // Create signals and connect them to the Cache Wrapper
 
     sc_clock clk_i{"clk_i", 1, SC_NS, 0.5, 0, SC_NS, true};
     sc_signal<bool> reset_n_i;
@@ -83,7 +91,9 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->write_done_0_o(write_done_o);
     cache_wrapper->port_ready_0_o(port_ready_o);
 
-    uint32_t sim_time = 0;
+    uint32_t sim_time = 0;  // amount of cycles that the simulation used
+
+    // Functions for use during the simulation
 
     auto tick = [&](int amount) {
         sc_start(amount, SC_NS);
@@ -137,7 +147,7 @@ int sc_main(int argc, char** argv) {
 
     // Send all instructions to the cache, one after the other
     const int word_buffer_width = sizeof(IntegerType) * 8;
-    int progress = -1;
+    int progress = -1;  // progress of the simulation in percent
     bool hits[instruction_count];
     int instruction_durations[instruction_count];
     int instruction_start_time = 0;
@@ -151,17 +161,14 @@ int sc_main(int argc, char** argv) {
         }
 
         // send the next instruction
-        uint64_t current_instruction = instructions[i];
-        uint32_t address = (current_instruction
-                            << (word_buffer_width - cache_address_width)) >>
-                           (word_buffer_width - cache_address_width);
+        IntegerType current_instruction = instructions[i];
+        uint32_t address =
+            extract_bits(current_instruction, 0, cache_address_width);
         uint32_t write_data =
-            (current_instruction << (word_buffer_width - cache_address_width -
-                                     cache_data_width)) >>
-            (word_buffer_width - cache_data_width);
-        uint32_t write_select =
-            (current_instruction << (word_buffer_width - trace_data_width) >>
-             (word_buffer_width - 1));
+            extract_bits(current_instruction, cache_address_width,
+                         cache_address_width + cache_data_width);
+        uint32_t write_select = extract_bits(
+            current_instruction, trace_data_width - 1, trace_data_width);
 
         address_i.write(address);
         address_valid_i.write(1);
@@ -226,6 +233,13 @@ int sc_main(int argc, char** argv) {
     }
 
     cache_wrapper->final();
+
+    if (argc >= 3) {
+        // Write the result to the file name given in argv[3] if it exists.
+        ofstream result_file(argv[2]);
+        result_file << sim_time - 1;
+        result_file.close();
+    }
 
     std::cout << "Trace simulation done!" << std::endl;
 
