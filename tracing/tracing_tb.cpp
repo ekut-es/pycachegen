@@ -16,28 +16,30 @@
 
 // Trace and cache configuration variables
 // adjust these based on your own setup
-const int trace_data_width =
-    32;  // must fit in the IntegerType and needs to be a multiple of 8
-const int cache_address_width = 15;
-const int cache_data_width = 16;
-const int cache_address_byte_offset_width =
+using IntegerType =
+    uint64_t;  // select an integer type that fits one instruction
+const IntegerType trace_data_width =
+    32;  // an instruction must fit in the IntegerType and its width needs to be a multiple of 8
+const IntegerType cache_address_width = 15;
+const IntegerType cache_data_width = 16;
+const IntegerType cache_address_byte_offset_width =
     2;  // number of byte offset bits in an address (usually
         // log2(cache_data_width/8)). only affects the reads at the end
 const bool create_csv =
     false;  // whether to create CSV files showing which instructions created
             // hits and how long their execution took
-using IntegerType =
-    uint32_t;  // select an integer type that fits one instruction
+
 
 /// @brief Extract bits from an integer.
 /// @param num Number from which to extract the bits
 /// @param start Start index (inclusive)
 /// @param end End index (exclusive)
 /// @return The extracted bits, shifted to the start
-uint32_t extract_bits(IntegerType num, size_t start, size_t end) {
-    size_t num_bits = end - start;
-    size_t mask = (1 << num_bits) - 1;
-    return (num >> start) & mask;
+uint32_t extract_bits(IntegerType num, IntegerType start, IntegerType end) {
+    IntegerType num_bits = end - start;
+    IntegerType mask = ((IntegerType) 1 << num_bits) - 1;
+    IntegerType result = (num >> start) & mask;
+    return result;
 }
 
 int sc_main(int argc, char** argv) {
@@ -148,8 +150,8 @@ int sc_main(int argc, char** argv) {
     // Send all instructions to the cache, one after the other
     const int word_buffer_width = sizeof(IntegerType) * 8;
     int progress = -1;  // progress of the simulation in percent
-    bool hits[instruction_count];
-    int instruction_durations[instruction_count];
+    std::vector<bool> hits(instruction_count);
+    std::vector<int> instruction_durations(instruction_count);
     int instruction_start_time = 0;
     for (size_t i = 0; i < instruction_count; i++) {
         int new_progress = int((float(i) / float(instruction_count)) * 100.0);
@@ -169,6 +171,10 @@ int sc_main(int argc, char** argv) {
                          cache_address_width + cache_data_width);
         uint32_t write_select = extract_bits(
             current_instruction, trace_data_width - 1, trace_data_width);
+
+        // if (i < 10) {
+        //     std::cout << std::hex << current_instruction << " " << write_select << " " << write_data << " " << address << std::dec << std::endl;
+        // }
 
         address_i.write(address);
         address_valid_i.write(1);
@@ -235,7 +241,7 @@ int sc_main(int argc, char** argv) {
     cache_wrapper->final();
 
     if (argc >= 3) {
-        // Write the result to the file name given in argv[3] if it exists.
+        // Write the result to the file name given in argv[2] if it exists.
         ofstream result_file(argv[2]);
         result_file << sim_time - 1;
         result_file.close();
