@@ -4,46 +4,7 @@ from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.sim import Simulator
 from pycachegen.cache_config_validation import InternalMemoryConfig, MemoryConfig
-
-
-class MemoryBusSignature(wiring.Signature):
-    def __init__(self, address_width: int, data_width: int, bytes_per_word: int):
-        self.address_width = address_width
-        self.data_width = data_width
-        self.bytes_per_word = bytes_per_word
-        super().__init__(
-            [
-                ("address", Out(address_width)),
-                ("write_data", Out(data_width)),
-                ("write_strobe", Out(bytes_per_word)),
-                ("request_valid", Out(1)),
-                ("read_data", In(data_width)),
-                ("read_data_valid", In(1)),
-                ("port_ready", In(1)),
-            ]
-        )
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, MemoryBusSignature)
-            and self.address_width == other.address_width
-            and self.data_width == other.data_width
-            and self.bytes_per_word == other.bytes_per_word
-        )
-
-    def __repr__(self):
-        return f"MemoryBusSignature({self.address_width}, {self.data_width}, {self.bytes_per_word})"
-
-    def create(self, *, path=None, src_loc_at=0):
-        return MemoryBusInterface(self, path=path, src_loc_at=1 + src_loc_at)
-
-
-class MemoryBusInterface(wiring.PureInterface):
-    def is_read_request(self):
-        return self.request_valid & (self.write_strobe == 0)
-
-    def is_write_request(self):
-        return self.request_valid & (self.write_strobe != 0)
+from pycachegen.amaranth.memory_bus import MemoryBusSignature
 
 
 class MainMemory(wiring.Component):
@@ -69,9 +30,13 @@ class MainMemory(wiring.Component):
         processing_request = Signal(1)  # whether a request is currently being processed
         m.d.comb += self.mem_if.port_ready.eq(~processing_request)
         request_type = Signal(1)  # type of current request (read: 0, write: 1)
-        latency_counter = Signal(range(max(self.config.READ_LATENCY, self.config.WRITE_LATENCY)))
+        latency_counter = Signal(
+            range(max(self.config.READ_LATENCY, self.config.WRITE_LATENCY))
+        )
         # align address for Amaranth Memory with specified memory range
-        aligned_address = Signal(range(0, self.config.MAX_ADDRESS - self.config.MIN_ADDRESS))
+        aligned_address = Signal(
+            range(0, self.config.MAX_ADDRESS - self.config.MIN_ADDRESS)
+        )
         m.d.comb += aligned_address.eq(self.mem_if.address - self.config.MIN_ADDRESS)
 
         m.submodules.data_memory = data_memory = Memory(
@@ -112,8 +77,14 @@ class MainMemory(wiring.Component):
             m.d.sync += read_port.en.eq(0)
             m.d.sync += write_port.en.eq(0)
             with m.If(
-                ((request_type == 0) & (latency_counter == self.config.READ_LATENCY - 1))
-                | ((request_type == 1) & (latency_counter == self.config.WRITE_LATENCY - 1))
+                (
+                    (request_type == 0)
+                    & (latency_counter == self.config.READ_LATENCY - 1)
+                )
+                | (
+                    (request_type == 1)
+                    & (latency_counter == self.config.WRITE_LATENCY - 1)
+                )
             ):
                 # Reset internal registers
                 m.d.sync += processing_request.eq(0)
@@ -171,7 +142,7 @@ if __name__ == "__main__":
         assert ctx.get(dut.mem_if.port_ready)
         assert ctx.get(dut.mem_if.read_data_valid)
         assert ctx.get(dut.mem_if.read_data == 0xA0A100A3)
-        
+
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
