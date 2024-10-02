@@ -58,6 +58,7 @@ class Cache(wiring.Component):
     # fmt: off
     def elaborate(self, platform) -> Module:
         m = Module()
+        ## input buffers
         fe_buffer_address = Signal(
             CacheAddressLayout(
                 index_width=self.index_width,
@@ -68,21 +69,29 @@ class Cache(wiring.Component):
         fe_buffer_write_data = Signal(self.config.DATA_WIDTH)
         fe_buffer_write_strobe = Signal(self.bytes_per_word)
         fe_buffer_flush = Signal(1)
+        ## internal registers
+        # FSM state
         state = Signal(States)
+        # FSM state that will be taken after the SEND_MEM_REQUEST state
         send_mem_request_next_state = Signal(States)
+        # register for counting the time it took to execute a request
         latency_counter = Signal(
             range(max(self.config.HIT_LATENCY, self.config.MISS_LATENCY))
         )
+        # one bit per way to indicate a hit in that way
         hit_vector = Signal(unsigned(self.config.NUM_WAYS))
+        # purely for statistics: let the outside know if we had a hit
         m.d.comb += self.hit_o.eq(hit_vector.any())
+        # one hot encode the vector into this signal
         hit_index = Signal(unsigned(self.index_width))
         m.submodules.hit_index_encoder = hit_index_encoder = coding.Encoder(hit_vector.shape().width)
         m.d.comb += hit_index_encoder.i.eq(hit_vector)
         m.d.comb += hit_index.eq(hit_index_encoder.o)
+        # a view for convenient access to the tag/index/word offset bits
         fe_address_view = data.View(self.fe_signature, self.fe.address)
 
         # Create be buffers that use our own data/address/write strobe widths
-        # Then shift the data/write strobe into place in the real be interface
+        # Then "shift" the data/write strobe into place in the real be interface
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(self.config.DATA_WIDTH))
         be_buffer_write_strobe = Signal(unsigned(self.bytes_per_word))
@@ -97,30 +106,30 @@ class Cache(wiring.Component):
         # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
         # data memory contains values that represent whole blocks (potentially multiple words!)
         valid_mem = Array()
-        for i in range(self.config.NUM_WAYS):
-            new_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
-            m.submodules["valid_mem_{i}"] = new_mem
-            valid_mem.append((new_mem.read_port(), new_mem.write_port()))
         dirty_mem = Array()
-        for i in range(self.config.NUM_WAYS):
-            new_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
-            m.submodules["dirty_mem_{i}"] = new_mem
-            dirty_mem.append((new_mem.read_port(), new_mem.write_port()))
         tag_mem = Array()
-        for i in range(self.config.NUM_WAYS):
-            new_mem = Memory(shape=unsigned(self.tag_width), depth=self.config.NUM_SETS)
-            m.submodules["tag_mem_{i}"] = new_mem
-            tag_mem.append((new_mem.read_port(), new_mem.write_port()))
         data_mem = Array()
         for i in range(self.config.NUM_WAYS):
-            new_mem = Memory(
+            new_valid_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
+            m.submodules["valid_mem_{i}"] = new_valid_mem
+            valid_mem.append((new_valid_mem.read_port(), new_valid_mem.write_port()))
+
+            new_dirty_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
+            m.submodules["dirty_mem_{i}"] = new_dirty_mem
+            dirty_mem.append((new_dirty_mem.read_port(), new_dirty_mem.write_port()))
+
+            new_tag_mem = Memory(shape=unsigned(self.tag_width), depth=self.config.NUM_SETS)
+            m.submodules["tag_mem_{i}"] = new_tag_mem
+            tag_mem.append((new_tag_mem.read_port(), new_tag_mem.write_port()))
+
+            new_data_mem = Memory(
                 shape=unsigned(self.config.DATA_WIDTH), depth=self.config.NUM_SETS*self.config.BLOCK_SIZE
             )
-            m.submodules["data_mem_{i}"] = new_mem
+            m.submodules["data_mem_{i}"] = new_data_mem
             data_mem.append(
                 (
-                    new_mem.read_port(),
-                    new_mem.write_port(granularity=self.config.BYTE_SIZE),
+                    new_data_mem.read_port(),
+                    new_data_mem.write_port(granularity=self.config.BYTE_SIZE),
                 )
             )
 
@@ -140,18 +149,14 @@ class Cache(wiring.Component):
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
                     m.d.sync += fe_buffer_write_data.eq(self.fe.write_data)
                     # query valid and tag memories
+                    # this needs to happen in m.d.comb so that the address gets set
+                    # BEFORE the positive clk edge that triggers any sync statements
                     for i in range(self.NUM_WAYS):
-                        m.d.sync += valid_mem[i][0].addr.eq(fe_address_view.index)
-                        m.d.sync += valid_mem[i][0].en.eq(1)
-                        m.d.sync += tag_mem[i][0].addr.eq(fe_address_view.index)
-                        m.d.sync += tag_mem[i][0].en.eq(1)
+                        m.d.comb += valid_mem[i][0].addr.eq(fe_address_view.index)
+                        m.d.comb += tag_mem[i][0].addr.eq(fe_address_view.index)
             with m.Case(States.HIT_LOOKUP):
                 m.d.sync += state.eq(States.HIT_LOOKUP_DONE)
                 m.d.sync += latency_counter.eq(latency_counter + 1)
-                # stop querying valid and tag memories
-                for i in range(self.NUM_WAYS):
-                    m.d.sync += valid_mem[i][0].en.eq(0)
-                    m.d.sync += tag_mem[i][0].en.eq(0)
                 # check whether we have a hit in any way
                 for i in range(self.config.NUM_WAYS):
                     m.d.sync += hit_vector[i].eq(
@@ -165,14 +170,14 @@ class Cache(wiring.Component):
                     # TODO update the replacement policy state
                     with m.If(fe_buffer_write_strobe.any()):
                         # handle write
-                        m.d.sync += data_mem[hit_index][1].en.eq(fe_buffer_write_strobe)
-                        m.d.sync += data_mem[hit_index][1].address.eq(Cat(fe_address_view.word_offset, fe_address_view.index))
-                        m.d.sync += data_mem[hit_index][1].data.eq(fe_buffer_write_data)
+                        m.d.comb += data_mem[hit_index][1].en.eq(fe_buffer_write_strobe)
+                        m.d.comb += data_mem[hit_index][1].address.eq(Cat(fe_address_view.word_offset, fe_address_view.index))
+                        m.d.comb += data_mem[hit_index][1].data.eq(fe_buffer_write_data)
                         if self.config.WRITE_BACK:
                             # mark dirty if write back
-                            m.d.sync += dirty_mem[hit_index][1].en.eq(1)
-                            m.d.sync += dirty_mem[hit_index][1].address.eq(fe_address_view.index)
-                            m.d.sync += dirty_mem[hit_index][1].data.eq(1)
+                            m.d.comb += dirty_mem[hit_index][1].en.eq(1)
+                            m.d.comb += dirty_mem[hit_index][1].address.eq(fe_address_view.index)
+                            m.d.comb += dirty_mem[hit_index][1].data.eq(1)
                             m.d.sync += state.eq(States.STALL)
                         else:
                             # write to lower mem if write through
