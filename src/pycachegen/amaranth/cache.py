@@ -154,9 +154,9 @@ class Cache(wiring.Component):
         write_back_next_state = Signal(States)
 
 
-        def send_buffered_request_to_lower_mem(next_state: States):
-            """Uses the buffered inputs to send a request to the lower memory.
-            Goes to the SEND_MEM_REQUEST state to do so.
+        def send_fe_buffer_request_to_lower_mem(next_state: States):
+            """Uses the request stored in the fe buffers to send a request
+            to the lower memory. Goes to the SEND_MEM_REQUEST state to do so.
             """
             m.d.sync += be_buffer_address.eq(fe_buffer_address)
             m.d.sync += be_buffer_write_data.eq(fe_buffer_write_data)
@@ -193,6 +193,12 @@ class Cache(wiring.Component):
                         (tag_mem[i][0].data == fe_buffer_address.tag)
                         & valid_mem[i][0].data
                     )
+                # we might need the data from the data_mem and dirty_mem
+                # so read from all of them
+                for i in range(self.config.NUM_WAYS):
+                    m.d.comb += data_mem[i][0].en.eq(1)
+                    m.d.comb += data_mem[i][0].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                    m.d.comb += dirty_mem[i][0].addr.eq(fe_buffer_address.index)
             with m.Case(States.HIT_LOOKUP_DONE):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(hit_vector.any()):
@@ -201,27 +207,26 @@ class Cache(wiring.Component):
                     with m.If(fe_buffer_write_strobe.any()):
                         # handle write
                         m.d.comb += data_mem[hit_index][1].en.eq(fe_buffer_write_strobe)
-                        m.d.comb += data_mem[hit_index][1].addr.eq(Cat(fe_address_view.word_offset, fe_address_view.index))
+                        m.d.comb += data_mem[hit_index][1].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
                         m.d.comb += data_mem[hit_index][1].data.eq(fe_buffer_write_data)
                         if self.config.WRITE_BACK:
                             # mark dirty if write back
                             m.d.comb += dirty_mem[hit_index][1].en.eq(1)
-                            m.d.comb += dirty_mem[hit_index][1].addr.eq(fe_address_view.index)
+                            m.d.comb += dirty_mem[hit_index][1].addr.eq(fe_buffer_address.index)
                             m.d.comb += dirty_mem[hit_index][1].data.eq(1)
                             m.d.sync += state.eq(States.STALL)
                         else:
                             # write to lower mem if write through
-                            send_buffered_request_to_lower_mem(next_state=States.STALL)
+                            send_fe_buffer_request_to_lower_mem(next_state=States.STALL)
                     with m.Else():
                         # handle read
                         m.d.sync += state.eq(States.STALL)
-                        # FIXME read not initiatet, .data forgotten
-                        self.fe.read_data.eq(data_mem[hit_index][Cat(fe_address_view.word_offset, fe_address_view.index)])
+                        m.d.sync += self.fe.read_data.eq(data_mem[hit_index][0].data)
                 with m.Else():
                     # Handle miss
                     with m.If((not self.config.WRITE_ALLOCATE) & fe_buffer_write_strobe.any()):
                         # write miss and write no-allocate -> only write to lower memory
-                        send_buffered_request_to_lower_mem(next_state=States.STALL)
+                        send_fe_buffer_request_to_lower_mem(next_state=States.STALL)
                     with m.Else():
                         # It's a miss and we have to replace a block
 
@@ -243,7 +248,6 @@ class Cache(wiring.Component):
                             m.d.comb += dirty_mem[hit_index][1].addr.eq(fe_buffer_address.index)
                             m.d.comb += dirty_mem[hit_index][1].data.eq(1)
                         # TODO update the replacement policy
-                        # TODO initiate read from dirty memories in the previous state
                         with m.If(self.config.WRITE_BACK & dirty_mem[next_block_replacement][0].data):
                             # We have to write back the block to be replaced first because its dirty
                             m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
@@ -251,19 +255,23 @@ class Cache(wiring.Component):
                             m.d.sync += write_back_address.word_offset.eq(0) # start at the first word
                             m.d.sync += write_back_way.eq(next_block_replacement)
                             m.d.sync += write_back_next_state.eq(next_state)
+                            # initiate a read from data_mem for the data to be written back
+                            # so that WRITE_BACK_BLOCK can put the data in the be buffer register
+                            m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
+                            m.d.comb += data_mem[next_block_replacement][0].address.eq(fe_buffer_address) # FIXME For this address, the word offset needs to be set to 0 first....
                         with m.Else():
                             # No write back needed
                             m.d.sync += state.eq(next_state)
             with m.Case(States.WRITE_BACK_BLOCK):
                 # Write back the block specified by the respective registers
-                # initiate a read from the data memory. tell the SEND_MEM_REQUEST
-                # state that it should use the data from there
-                m.d.comb += data_mem[write_back_way][0].en.eq(1)
-                m.d.comb += data_mem[write_back_way][0].address.eq(write_back_address)
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(write_back_address)
                 m.d.sync += be_buffer_write_strobe.eq(-1) # NOTE This might not work
+                # data_mem read needs to be initiated by previous state (HIT_LOOKUP_DONE or SEND_MEM_REQUEST_WAIT) NOTE
+                m.d.sync += be_buffer_write_data.eq(data_mem[write_back_way][0].data)
                 m.d.sync += state(States.SEND_MEM_REQUEST)
+                # increment word offset of write back address
+                m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
                 with m.If(write_back_address.word_offset == (self.config.BLOCK_SIZE - 1)):
                     # This is the last word to write back
                     m.d.sync += send_mem_request_next_state.eq(write_back_next_state)
