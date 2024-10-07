@@ -1,4 +1,4 @@
-from math import log2
+from math import log2, ceil
 from enum import Enum
 from amaranth import *
 from amaranth.lib import wiring, data, coding
@@ -21,6 +21,7 @@ class States(Enum):
     STALL = 8
     FLUSH_CACHE = 9
     FLUSH_BACKEND = 10
+    FLUSH_CACHE_BLOCK = 1
 
 
 class Cache(wiring.Component):
@@ -43,6 +44,15 @@ class Cache(wiring.Component):
             data_width=config.BE_DATA_WIDTH,
             bytes_per_word=self.be_bytes_per_word,
         )
+        self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
+        self.READ_BLOCK_REQUESTS_NEEDED = ceil(
+            self.bytes_per_word * config.BLOCK_SIZE / self.be_bytes_per_word
+        )
+        self.READ_BLOCK_WC = min(
+            self.be_byte_multiplier, config.BLOCK_SIZE
+        )  # the words read from the BE cache can be bigger than our own words so
+        # we might be able to extract multiple words from that single word. This
+        # variable specifies how many times we can do that per BE word.
         super().__init__(
             {
                 "fe": In(self.fe_signature),
@@ -91,13 +101,43 @@ class Cache(wiring.Component):
         fe_address_view = data.View(self.fe_signature, self.fe.address)
         # block to be replaced next
         next_block_replacement = Signal(unsigned(range(self.config.NUM_WAYS)))
+        # counter for counting which word of the be read data to write to the
+        # data_mem next. To get the full index,
+        be_read_data_word_counter = Signal(self.READ_BLOCK_WC)
+        be_read_data_total_word_offset = Signal(self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH)
+        m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH])
+        if self.config.BLOCK_SIZE == 1:
+            # block size == 1 -> the bits we cut off from the be buffer address are the index
+            m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address[: -self.config.BE_ADDRESS_WIDTH])
+        elif self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH <= self.word_offset_width:
+            # one block is exactly one be word or needs multiple be words -> the counter is the index
+            m.d.comb += be_read_data_total_word_offset.eq(be_read_data_word_counter)
+        elif self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH > self.word_offset_width:
+            # one be word is as big as two or more of our blocks -> take the bits we cut off + the counter as index
+            m.d.comb += be_read_data_total_word_offset.eq(
+                Cat(
+                    be_read_data_word_counter,
+                    be_buffer_address[self.word_offset_width : -self.config.BE_ADDRESS_WIDTH]
+                    )
+                )
+        # counter for the READ BLOCK state that indicates how many words have been read so far
+        read_block_word_offset = Signal(self.word_offset_width)
+        # Index of the data_mem that contains the data requested
+        # Used in the STALL state to select the read data from the correct data_mem
+        read_data_mem_select = Signal(unsigned(range(self.config.NUM_WAYS)))
+        # index of the set to be flushed next
+        flush_set_index = Signal(self.index_width)
+        # index of the block that is currently being flushed
+        flush_block_index = Signal(range(self.config.NUM_WAYS))
+        # whether we already told the backend to flush itself
+        be_flush_requested = Signal()
 
         # Create be buffers that use our own data/address/write strobe widths
         # Then "shift" the data/write strobe into place in the real be interface
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(self.config.DATA_WIDTH))
         be_buffer_write_strobe = Signal(unsigned(self.bytes_per_word))
-        be_buffer_address = Signal(unsigned(self.config.ADDRESS_WIDTH))
+        be_buffer_address = Signal(CacheAddressLayout(index_width=self.index_width, tag_width=self.tag_width, word_offset_width=self.word_offset_width))
         m.d.comb += self.be.address.eq(be_buffer_address[-self.config.BE_ADDRESS_WIDTH : ])
         m.d.comb += self.be.write_data.eq(0)
         m.d.comb += self.be.write_strobe.eq(0)
@@ -166,14 +206,14 @@ class Cache(wiring.Component):
 
         with m.Switch(state):
             with m.Case(States.READY):
-                with m.If(self.fe.flush | fe_buffer_flush):
+                with m.If(self.flush_i | fe_buffer_flush):
                     m.d.sync += state.eq(States.FLUSH_CACHE)
                 with m.Elif(self.fe.request_valid):
                     m.d.sync += state.eq(States.HIT_LOOKUP)
                     m.d.sync += latency_counter.eq(latency_counter + 1)
                     # Reset fe outputs
                     m.d.sync += self.fe.read_data_valid.eq(0)
-                    m.d.sync += self.fe.flush_done.eq(0)
+                    m.d.sync += self.flush_done_o.eq(0)
                     # buffer inputs
                     m.d.sync += fe_buffer_address.eq(self.fe.address)
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
@@ -221,7 +261,9 @@ class Cache(wiring.Component):
                     with m.Else():
                         # handle read
                         m.d.sync += state.eq(States.STALL)
-                        m.d.sync += self.fe.read_data.eq(data_mem[hit_index][0].data)
+                        m.d.comb += data_mem[hit_index][0].address.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                        m.d.comb += data_mem[hit_index][0].en.eq(1)
+                        m.d.sync += read_data_mem_select.eq(hit_index)
                 with m.Else():
                     # Handle miss
                     with m.If((not self.config.WRITE_ALLOCATE) & fe_buffer_write_strobe.any()):
@@ -287,5 +329,140 @@ class Cache(wiring.Component):
                     m.d.comb += self.be.request_valid.eq(1)
             with m.Case(States.SEND_MEM_REQUEST_WAIT):
                 with m.If((~be_buffer_write_strobe.any()) | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
+                    # The last request was "processed" (write request was accepted, read request got answered)
                     m.d.sync += latency_counter.eq(latency_counter + 1)
-                    
+                    with m.If(be_buffer_write_strobe.any()):
+                        # Write - go to the next state
+                        m.d.sync += state.eq(send_mem_request_next_state)
+                    with m.Else():
+                        with m.If(self.READ_BLOCK_WC == 1):
+                        # We only need to read one word, go to the next state
+                            m.d.sync += state.eq(send_mem_request_next_state)
+                        with m.Elif(be_read_data_word_counter == self.READ_BLOCK_WC - 1):
+                            # If we're done reading all words into the block, go to the next state
+                            m.d.sync += state.eq(send_mem_request_next_state)
+                            m.d.sync += be_read_data_word_counter.eq(0)
+                        with m.Else():
+                            # Else increse the counter
+                            m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
+                        # Now do the actual writing the be read data into the block in the data_mem
+                        m.d.comb += data_mem[next_block_replacement][1].address.eq(Cat(be_read_data_word_counter, be_buffer_address.index))
+                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(self.config.DATA_WIDTH, be_read_data_total_word_offset))
+                        m.d.sync += data_mem[next_block_replacement][1].en.eq(-1)
+            with m.Case(States.READ_BLOCK):
+                m.d.sync += latency_counter.eq(latency_counter + 1)
+                m.d.sync += be_buffer_address.eq(Cat(read_block_word_offset, fe_buffer_address.index, fe_buffer_address.tag))
+                m.d.sync += be_buffer_write_strobe.eq(0)
+                with m.If(read_block_word_offset == self.config.BLOCK_SIZE - self.READ_BLOCK_WC):
+                    # We're done, go back
+                    m.d.sync += send_mem_request_next_state.eq(States.READ_BLOCK_DONE)
+                with m.Else():
+                    # Come back, we're not done
+                    send_mem_request_next_state(States.READ_BLOCK)
+                # Send the memory request except for when its the address to which
+                # we want to write anyway AND write strobe is all ones AND we would not
+                # read any other byte from the word the BE would give is in this request (self.READ_BLOCK_WC == 1)
+                with m.If(
+                        fe_buffer_write_strobe.all()
+                        & (fe_buffer_address.word_offset == read_block_word_offset)
+                        & (self.READ_BLOCK_WC == 1)
+                    ):
+                    m.d.sync += state.eq(States.READ_BLOCK_DONE)
+                with m.Else():
+                    m.d.sync += state.eq(States.SEND_MEM_REQUEST)
+            with m.Case(States.READ_BLOCK_DONE):
+                m.d.sync += latency_counter.eq(latency_counter + 1)
+                with m.If(fe_buffer_write_strobe):
+                    # Handle write request
+                    # Write data to internal data_mem
+                    m.d.comb += data_mem[next_block_replacement][1].address.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                    m.d.comb += data_mem[next_block_replacement][1].data.eq(fe_buffer_write_data)
+                    m.d.comb += data_mem[next_block_replacement][1].en.eq(fe_buffer_write_strobe)
+                    with m.If(self.config.WRITE_BACK):
+                        # Stall if write back
+                        m.d.sync += state.eq(States.STALL)
+                    with m.Else():
+                        # Send request to lower memory if write through
+                        send_fe_buffer_request_to_lower_mem(States.STALL)
+                with m.Else():
+                    # Handle read request
+                    m.d.sync += state.eq(States.STALL)
+                    m.d.comb += data_mem[next_block_replacement][0].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index)) # NOTE simply setting it to fe_buffer_address should be fine since the most significant bits will get cut off I think
+                    m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
+                    m.d.sync += read_data_mem_select.eq(next_block_replacement)
+            with m.Case(States.STALL):
+                hit_latency_reached =  hit_vector.any() & ((self.config.HIT_LATENCY == 0) | (latency_counter == (self.config.HIT_LATENCY - 1)))
+                miss_latency_reached = (~hit_vector.any()) & ((self.config.MISS_LATENCY == 0) | (latency_counter == (self.config.MISS_LATENCY - 1)))
+                with m.If(hit_latency_reached | miss_latency_reached):
+                    m.d.sync += self.fe.read_data_valid.eq(~(fe_buffer_write_strobe.any()))
+                    m.d.sync += data_mem[read_data_mem_select][0].data
+                    m.d.sync += latency_counter.eq(0)
+                    with m.If(fe_buffer_flush):
+                        m.d.sync += state.eq(States.FLUSH_CACHE)
+                    with m.Else():
+                        m.d.sync += state.eq(States.READY)
+                with m.Else():
+                    m.d.sync += latency_counter.eq(latency_counter + 1)
+            with m.Case(States.FLUSH_CACHE):
+                m.d.sync += self.flush_done_o.eq(0)
+                with m.If(self.config.WRITE_BACK):
+                    # Flush the cache
+                    # query valid, dirty and tag memories
+                    m.d.comb += dirty_mem[flush_block_index][0].addr.eq(flush_set_index)
+                    m.d.comb += dirty_mem[flush_block_index][0].en.eq(1)
+                    m.d.comb += valid_mem[flush_block_index][0].addr.eq(flush_set_index)
+                    m.d.comb += valid_mem[flush_block_index][0].addr.eq(1)
+                    m.d.comb += tag_mem[flush_block_index][0].addr.eq(flush_set_index)
+                    m.d.comb += tag_mem[flush_block_index][0].addr.eq(1)
+                    # Go to a state that will check if this block needs to be flushed
+                    m.d.sync += state.eq(States.FLUSH_CACHE_BLOCK)
+                with m.Else():
+                    # flush the backend
+                    m.d.sync += state.eq(States.FLUSH_BACKEND)
+                    m.d.comb += self.flush_o.eq(1)
+            with m.Case(States.FLUSH_CACHE_BLOCK):
+                # Increment set/block indices
+                m.d.sync += flush_set_index.eq(flush_set_index + 1)
+                with m.If(flush_set_index == self.config.NUM_SETS - 1):
+                    m.d.sync += flush_block_index.eq(flush_block_index + 1)
+
+                # Is this the last set in the last block?
+                is_last_block = (flush_set_index == self.config.NUM_SETS - 1) & (flush_block_index == self.config.NUM_WAYS - 1)
+                # Determine the next state/the next state after write back
+                next_state = Mux(is_last_block, States.FLUSH_BACKEND, States.FLUSH_CACHE)
+
+                with m.If(dirty_mem[flush_block_index][0].data & valid_mem[flush_block_index][0].data):
+                    # This block needs to be written back
+                    # prepare things for the write back state and transition into it
+                    m.d.sync += write_back_address.tag.eq(tag_mem[flush_block_index][0].data)
+                    m.d.sync += write_back_address.index.eq(flush_set_index)
+                    m.d.sync += write_back_address.word_offset.eq(0)
+                    # tell the write back state which way to use
+                    m.d.sync += write_back_way.eq(flush_block_index)
+                    # query the data memory so the write back state can access the data. It'll do that on its own for the following words.
+                    m.d.comb += data_mem[flush_block_index][0].addr.eq(Cat(C(0, shape=unsigned(self.word_offset_width)), flush_set_index))
+                    m.d.comb += data_mem[flush_block_index][0].en.eq(1)
+                    # set the next states
+                    m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
+                    m.d.sync += write_back_next_state.eq(next_state)
+                    # clear dirty bit
+                    m.d.comb += dirty_mem[flush_block_index][1].addr.eq(flush_set_index)
+                    m.d.comb += dirty_mem[flush_block_index][1].data.eq(1)
+                    m.d.comb += dirty_mem[flush_block_index][1].en.eq(1)
+                with m.Else():
+                    # Block doesn't need to be written back
+                    m.d.sync += state.eq(next_state)
+            with m.Case(States.FLUSH_BACKEND):
+                with m.If(~be_flush_requested):
+                    # Send flush signal to be
+                    m.d.comb += self.flush_o.eq(1)
+                    m.d.sync += be_flush_requested.eq(1)
+                with m.Elif(self.flush_done_i):
+                    # be is also done flushing
+                    m.d.sync += state.eq(States.READY)
+                    m.d.sync += self.flush_done_o.eq(1)
+                    m.d.sync += fe_buffer_flush.eq(0)
+                    # latency counter was incremented all the time by write back state, reset it
+                    m.d.sync += latency_counter.eq(0)
+                    # reset flush requested
+                    m.d.sync += be_flush_requested.eq(0)
