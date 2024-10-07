@@ -279,4 +279,13 @@ class Cache(wiring.Component):
                     # We're not done yet, come back after mem request has finished
                     m.d.sync += send_mem_request_next_state.eq(States.WRITE_BACK_BLOCK)
             with m.Case(States.SEND_MEM_REQUEST):
-                ...
+                # Wait for the lower memory to become ready
+                with m.If(self.be.port_ready):
+                    # Send request to lower memory
+                    m.d.sync += latency_counter.eq(latency_counter + 1)
+                    m.d.sync += state.eq(States.SEND_MEM_REQUEST_WAIT)
+                    m.d.comb += self.be.request_valid.eq(1)
+            with m.Case(States.SEND_MEM_REQUEST_WAIT):
+                with m.If((~be_buffer_write_strobe.any()) | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
+                    m.d.sync += latency_counter.eq(latency_counter + 1)
+                    
