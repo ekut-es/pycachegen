@@ -2,10 +2,10 @@ from math import log2, ceil
 from enum import Enum
 from amaranth import *
 from amaranth.lib import wiring, data, coding
-from amaranth.lib.memory import Memory, ReadPort, WritePort
+from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from pycachegen.cache_config_validation import InternalCacheConfig
-from pycachegen.amaranth.memory_bus import MemoryBusSignature, MemoryBusInterface
+from pycachegen.amaranth.memory_bus import MemoryBusSignature
 from pycachegen.amaranth.cache_address import CacheAddressLayout
 
 
@@ -45,10 +45,10 @@ class Cache(wiring.Component):
             bytes_per_word=self.be_bytes_per_word,
         )
         self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
-        self.READ_BLOCK_REQUESTS_NEEDED = ceil(
+        self.read_block_requests_needed = ceil(
             self.bytes_per_word * config.BLOCK_SIZE / self.be_bytes_per_word
         )
-        self.READ_BLOCK_WC = min(
+        self.read_block_wc = min(
             self.be_byte_multiplier, config.BLOCK_SIZE
         )  # the words read from the BE cache can be bigger than our own words so
         # we might be able to extract multiple words from that single word. This
@@ -68,7 +68,7 @@ class Cache(wiring.Component):
     # fmt: off
     def elaborate(self, platform) -> Module:
         m = Module()
-        ## input buffers
+        ## frontend input buffers
         fe_buffer_address = Signal(
             CacheAddressLayout(
                 index_width=self.index_width,
@@ -79,6 +79,20 @@ class Cache(wiring.Component):
         fe_buffer_write_data = Signal(self.config.DATA_WIDTH)
         fe_buffer_write_strobe = Signal(self.bytes_per_word)
         fe_buffer_flush = Signal(1)
+
+        ## backend output buffers
+        # Create be buffers that use our own data/address/write strobe widths
+        # Then "shift" the data/write strobe into place in the real be interface
+        # according to the bits we cut off from the address
+        be_buffer_write_data = Signal(unsigned(self.config.DATA_WIDTH))
+        be_buffer_write_strobe = Signal(unsigned(self.bytes_per_word))
+        be_buffer_address = Signal(CacheAddressLayout(index_width=self.index_width, tag_width=self.tag_width, word_offset_width=self.word_offset_width))
+        m.d.comb += self.be.address.eq(be_buffer_address[-self.config.BE_ADDRESS_WIDTH : ])
+        m.d.comb += self.be.write_data.eq(0)
+        m.d.comb += self.be.write_strobe.eq(0)
+        m.d.comb += self.be.write_data.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.config.DATA_WIDTH).eq(be_buffer_write_data)
+        m.d.comb += self.be.write_strobe.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.bytes_per_word).eq(be_buffer_write_strobe)
+
         ## internal registers
         # FSM state
         state = Signal(States)
@@ -102,10 +116,10 @@ class Cache(wiring.Component):
         # block to be replaced next
         next_block_replacement = Signal(unsigned(range(self.config.NUM_WAYS)))
         # counter for counting which word of the be read data to write to the
-        # data_mem next. To get the full index,
-        be_read_data_word_counter = Signal(self.READ_BLOCK_WC)
+        # data_mem next.
+        be_read_data_word_counter = Signal(self.read_block_wc)
+        # the full index for pulling a word out of a be word
         be_read_data_total_word_offset = Signal(self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH)
-        m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH])
         if self.config.BLOCK_SIZE == 1:
             # block size == 1 -> the bits we cut off from the be buffer address are the index
             m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address[: -self.config.BE_ADDRESS_WIDTH])
@@ -131,18 +145,6 @@ class Cache(wiring.Component):
         flush_block_index = Signal(range(self.config.NUM_WAYS))
         # whether we already told the backend to flush itself
         be_flush_requested = Signal()
-
-        # Create be buffers that use our own data/address/write strobe widths
-        # Then "shift" the data/write strobe into place in the real be interface
-        # according to the bits we cut off from the address
-        be_buffer_write_data = Signal(unsigned(self.config.DATA_WIDTH))
-        be_buffer_write_strobe = Signal(unsigned(self.bytes_per_word))
-        be_buffer_address = Signal(CacheAddressLayout(index_width=self.index_width, tag_width=self.tag_width, word_offset_width=self.word_offset_width))
-        m.d.comb += self.be.address.eq(be_buffer_address[-self.config.BE_ADDRESS_WIDTH : ])
-        m.d.comb += self.be.write_data.eq(0)
-        m.d.comb += self.be.write_strobe.eq(0)
-        m.d.comb += self.be.write_data.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.config.DATA_WIDTH).eq(be_buffer_write_data)
-        m.d.comb += self.be.write_strobe.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.bytes_per_word).eq(be_buffer_write_strobe)
 
         # Create valid, dirty, tag, data memories - one per way
         # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
@@ -335,10 +337,10 @@ class Cache(wiring.Component):
                         # Write - go to the next state
                         m.d.sync += state.eq(send_mem_request_next_state)
                     with m.Else():
-                        with m.If(self.READ_BLOCK_WC == 1):
+                        with m.If(self.read_block_wc == 1):
                         # We only need to read one word, go to the next state
                             m.d.sync += state.eq(send_mem_request_next_state)
-                        with m.Elif(be_read_data_word_counter == self.READ_BLOCK_WC - 1):
+                        with m.Elif(be_read_data_word_counter == self.read_block_wc - 1):
                             # If we're done reading all words into the block, go to the next state
                             m.d.sync += state.eq(send_mem_request_next_state)
                             m.d.sync += be_read_data_word_counter.eq(0)
@@ -353,7 +355,7 @@ class Cache(wiring.Component):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(Cat(read_block_word_offset, fe_buffer_address.index, fe_buffer_address.tag))
                 m.d.sync += be_buffer_write_strobe.eq(0)
-                with m.If(read_block_word_offset == self.config.BLOCK_SIZE - self.READ_BLOCK_WC):
+                with m.If(read_block_word_offset == self.config.BLOCK_SIZE - self.read_block_wc):
                     # We're done, go back
                     m.d.sync += send_mem_request_next_state.eq(States.READ_BLOCK_DONE)
                 with m.Else():
@@ -361,11 +363,11 @@ class Cache(wiring.Component):
                     send_mem_request_next_state(States.READ_BLOCK)
                 # Send the memory request except for when its the address to which
                 # we want to write anyway AND write strobe is all ones AND we would not
-                # read any other byte from the word the BE would give is in this request (self.READ_BLOCK_WC == 1)
+                # read any other byte from the word the BE would give is in this request (self.read_block_wc == 1)
                 with m.If(
                         fe_buffer_write_strobe.all()
                         & (fe_buffer_address.word_offset == read_block_word_offset)
-                        & (self.READ_BLOCK_WC == 1)
+                        & (self.read_block_wc == 1)
                     ):
                     m.d.sync += state.eq(States.READ_BLOCK_DONE)
                 with m.Else():
@@ -391,12 +393,18 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
                     m.d.sync += read_data_mem_select.eq(next_block_replacement)
             with m.Case(States.STALL):
+                # Check if the configured latency was reached. Get ready and hand out
+                # the read data if that is the case.
                 hit_latency_reached =  hit_vector.any() & ((self.config.HIT_LATENCY == 0) | (latency_counter == (self.config.HIT_LATENCY - 1)))
                 miss_latency_reached = (~hit_vector.any()) & ((self.config.MISS_LATENCY == 0) | (latency_counter == (self.config.MISS_LATENCY - 1)))
                 with m.If(hit_latency_reached | miss_latency_reached):
+                    # latency reached
+                    # hand out read data
                     m.d.sync += self.fe.read_data_valid.eq(~(fe_buffer_write_strobe.any()))
-                    m.d.sync += data_mem[read_data_mem_select][0].data
+                    m.d.sync += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
+                    # reset latency counter
                     m.d.sync += latency_counter.eq(0)
+                    # directly proceed with flushing if a flush was requested, else go to READY state
                     with m.If(fe_buffer_flush):
                         m.d.sync += state.eq(States.FLUSH_CACHE)
                     with m.Else():
@@ -466,3 +474,7 @@ class Cache(wiring.Component):
                     m.d.sync += latency_counter.eq(0)
                     # reset flush requested
                     m.d.sync += be_flush_requested.eq(0)
+
+        with m.If((state != States.FLUSH_CACHE) & (state != States.FLUSH_CACHE_BLOCK) & (state != States.FLUSH_BACKEND)):
+            # Always accept new flush requests (except for when we're already flushing)
+            m.d.sync += fe_buffer_flush.eq(fe_buffer_flush | self.flush_i)
