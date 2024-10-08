@@ -7,6 +7,7 @@ from amaranth.lib.wiring import In, Out
 from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.amaranth.memory_bus import MemoryBusSignature
 from pycachegen.amaranth.cache_address import CacheAddressLayout
+from pycachegen.amaranth.replacement_policy import ReplacementPolicy
 
 
 class States(Enum):
@@ -113,8 +114,6 @@ class Cache(wiring.Component):
         m.d.comb += hit_index.eq(hit_index_encoder.o)
         # a view for convenient access to the tag/index/word offset bits
         fe_address_view = data.View(self.fe_signature, self.fe.address)
-        # block to be replaced next
-        next_block_replacement = Signal(unsigned(range(self.config.NUM_WAYS)))
         # counter for counting which word of the be read data to write to the
         # data_mem next.
         be_read_data_word_counter = Signal(self.read_block_wc)
@@ -145,6 +144,13 @@ class Cache(wiring.Component):
         flush_block_index = Signal(range(self.config.NUM_WAYS))
         # whether we already told the backend to flush itself
         be_flush_requested = Signal()
+
+        ## replacement policy things
+        # block to be replaced next for the set of the current fe_buffer_address
+        next_block_replacement = Signal(unsigned(range(self.config.NUM_WAYS)))
+        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.NUM_WAYS, num_sets = self.config.num_sets, policy = self.config.REPLACEMENT_POLICY)
+        # put the replacement signals in an array so we can access them nicely
+        next_replacements = Array([replacement_policy.next_replacement(i) for i in range(self.num_sets)])
 
         # Create valid, dirty, tag, data memories - one per way
         # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
@@ -241,11 +247,16 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[i][0].en.eq(1)
                     m.d.comb += data_mem[i][0].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
                     m.d.comb += dirty_mem[i][0].addr.eq(fe_buffer_address.index)
+                # buffer the next way to be replaced for this set (shall we need to do that)
+                next_block_replacement.eq(next_replacements[fe_buffer_address.index])
             with m.Case(States.HIT_LOOKUP_DONE):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(hit_vector.any()):
                     # We have a hit
-                    # TODO update the replacement policy state
+                    # update the replacement policy state
+                    m.d.comb += replacement_policy.access_i.eq(1)
+                    m.d.comb += replacement_policy.set_i.eq(fe_buffer_address.index)
+                    m.d.comb += replacement_policy.way_i.eq(hit_index)
                     with m.If(fe_buffer_write_strobe.any()):
                         # handle write
                         m.d.comb += data_mem[hit_index][1].en.eq(fe_buffer_write_strobe)
@@ -291,7 +302,11 @@ class Cache(wiring.Component):
                             m.d.comb += dirty_mem[hit_index][1].en.eq(1)
                             m.d.comb += dirty_mem[hit_index][1].addr.eq(fe_buffer_address.index)
                             m.d.comb += dirty_mem[hit_index][1].data.eq(1)
-                        # TODO update the replacement policy
+                        # update the replacement policy
+                        m.d.comb += replacement_policy.access_i.eq(1)
+                        m.d.comb += replacement_policy.replace_i.eq(1)
+                        m.d.comb += replacement_policy.set_i.eq(fe_buffer_address.index)
+                        m.d.comb += replacement_policy.way_i.eq(next_block_replacement)
                         with m.If(self.config.WRITE_BACK & dirty_mem[next_block_replacement][0].data):
                             # We have to write back the block to be replaced first because its dirty
                             m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
@@ -311,7 +326,7 @@ class Cache(wiring.Component):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(write_back_address)
                 m.d.sync += be_buffer_write_strobe.eq(-1) # NOTE This might not work
-                # data_mem read needs to be initiated by previous state (HIT_LOOKUP_DONE or SEND_MEM_REQUEST_WAIT) NOTE
+                # data_mem read needs to be initiated by previous state
                 m.d.sync += be_buffer_write_data.eq(data_mem[write_back_way][0].data)
                 m.d.sync += state(States.SEND_MEM_REQUEST)
                 # increment word offset of write back address
@@ -478,3 +493,5 @@ class Cache(wiring.Component):
         with m.If((state != States.FLUSH_CACHE) & (state != States.FLUSH_CACHE_BLOCK) & (state != States.FLUSH_BACKEND)):
             # Always accept new flush requests (except for when we're already flushing)
             m.d.sync += fe_buffer_flush.eq(fe_buffer_flush | self.flush_i)
+
+        return m
