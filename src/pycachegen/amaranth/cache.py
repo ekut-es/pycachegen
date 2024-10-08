@@ -245,7 +245,7 @@ class Cache(wiring.Component):
                 # so read from all of them
                 for i in range(self.config.NUM_WAYS):
                     m.d.comb += data_mem[i][0].en.eq(1)
-                    m.d.comb += data_mem[i][0].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                    m.d.comb += data_mem[i][0].addr.eq(fe_buffer_address)
                     m.d.comb += dirty_mem[i][0].addr.eq(fe_buffer_address.index)
                 # buffer the next way to be replaced for this set (shall we need to do that)
                 next_block_replacement.eq(next_replacements[fe_buffer_address.index])
@@ -260,7 +260,7 @@ class Cache(wiring.Component):
                     with m.If(fe_buffer_write_strobe.any()):
                         # handle write
                         m.d.comb += data_mem[hit_index][1].en.eq(fe_buffer_write_strobe)
-                        m.d.comb += data_mem[hit_index][1].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                        m.d.comb += data_mem[hit_index][1].addr.eq(fe_buffer_address)
                         m.d.comb += data_mem[hit_index][1].data.eq(fe_buffer_write_data)
                         if self.config.WRITE_BACK:
                             # mark dirty if write back
@@ -274,7 +274,7 @@ class Cache(wiring.Component):
                     with m.Else():
                         # handle read
                         m.d.sync += state.eq(States.STALL)
-                        m.d.comb += data_mem[hit_index][0].address.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                        m.d.comb += data_mem[hit_index][0].address.eq(fe_buffer_address)
                         m.d.comb += data_mem[hit_index][0].en.eq(1)
                         m.d.sync += read_data_mem_select.eq(hit_index)
                 with m.Else():
@@ -317,7 +317,8 @@ class Cache(wiring.Component):
                             # initiate a read from data_mem for the data to be written back
                             # so that WRITE_BACK_BLOCK can put the data in the be buffer register
                             m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
-                            m.d.comb += data_mem[next_block_replacement][0].address.eq(fe_buffer_address) # FIXME For this address, the word offset needs to be set to 0 first....
+                            # initiate read for the first word to be written back. clear the word offset so that the actual first word gets read.
+                            m.d.comb += data_mem[next_block_replacement][0].address.eq(Cat(C(0, unsigned(self.word_offset_width)), fe_buffer_address.index))
                         with m.Else():
                             # No write back needed
                             m.d.sync += state.eq(next_state)
@@ -325,7 +326,7 @@ class Cache(wiring.Component):
                 # Write back the block specified by the respective registers
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(write_back_address)
-                m.d.sync += be_buffer_write_strobe.eq(-1) # NOTE This might not work
+                m.d.sync += be_buffer_write_strobe.eq(-1)
                 # data_mem read needs to be initiated by previous state
                 m.d.sync += be_buffer_write_data.eq(data_mem[write_back_way][0].data)
                 m.d.sync += state(States.SEND_MEM_REQUEST)
@@ -353,7 +354,7 @@ class Cache(wiring.Component):
                         m.d.sync += state.eq(send_mem_request_next_state)
                     with m.Else():
                         with m.If(self.read_block_wc == 1):
-                        # We only need to read one word, go to the next state
+                            # We only need to read one word, go to the next state
                             m.d.sync += state.eq(send_mem_request_next_state)
                         with m.Elif(be_read_data_word_counter == self.read_block_wc - 1):
                             # If we're done reading all words into the block, go to the next state
@@ -392,7 +393,7 @@ class Cache(wiring.Component):
                 with m.If(fe_buffer_write_strobe):
                     # Handle write request
                     # Write data to internal data_mem
-                    m.d.comb += data_mem[next_block_replacement][1].address.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index))
+                    m.d.comb += data_mem[next_block_replacement][1].address.eq(fe_buffer_address)
                     m.d.comb += data_mem[next_block_replacement][1].data.eq(fe_buffer_write_data)
                     m.d.comb += data_mem[next_block_replacement][1].en.eq(fe_buffer_write_strobe)
                     with m.If(self.config.WRITE_BACK):
@@ -404,7 +405,7 @@ class Cache(wiring.Component):
                 with m.Else():
                     # Handle read request
                     m.d.sync += state.eq(States.STALL)
-                    m.d.comb += data_mem[next_block_replacement][0].addr.eq(Cat(fe_buffer_address.word_offset, fe_buffer_address.index)) # NOTE simply setting it to fe_buffer_address should be fine since the most significant bits will get cut off I think
+                    m.d.comb += data_mem[next_block_replacement][0].addr.eq(fe_buffer_address)
                     m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
                     m.d.sync += read_data_mem_select.eq(next_block_replacement)
             with m.Case(States.STALL):
