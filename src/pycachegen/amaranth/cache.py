@@ -57,12 +57,8 @@ class Cache(wiring.Component):
         super().__init__(
             {
                 "fe": In(self.fe_signature),
-                "flush_i": In(1),
                 "hit_o": Out(1),
-                "flush_done_o": Out(1),
                 "be": Out(self.be_signature),
-                "flush_o": Out(1),
-                "flush_done_i": In(1),
             }
         )
 
@@ -144,6 +140,8 @@ class Cache(wiring.Component):
         flush_block_index = Signal(range(self.config.NUM_WAYS))
         # whether we already told the backend to flush itself
         be_flush_requested = Signal()
+        # Output port ready status based on current state
+        m.d.comb += self.fe.port_ready.eq(state == States.READY)
 
         ## replacement policy things
         # block to be replaced next for the set of the current fe_buffer_address
@@ -214,14 +212,14 @@ class Cache(wiring.Component):
 
         with m.Switch(state):
             with m.Case(States.READY):
-                with m.If(self.flush_i | fe_buffer_flush):
+                with m.If(self.fe.flush | fe_buffer_flush):
                     m.d.sync += state.eq(States.FLUSH_CACHE)
                 with m.Elif(self.fe.request_valid):
                     m.d.sync += state.eq(States.HIT_LOOKUP)
                     m.d.sync += latency_counter.eq(latency_counter + 1)
                     # Reset fe outputs
                     m.d.sync += self.fe.read_data_valid.eq(0)
-                    m.d.sync += self.flush_done_o.eq(0)
+                    m.d.sync += self.fe.flush_done.eq(0)
                     # buffer inputs
                     m.d.sync += fe_buffer_address.eq(self.fe.address)
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
@@ -428,7 +426,7 @@ class Cache(wiring.Component):
                 with m.Else():
                     m.d.sync += latency_counter.eq(latency_counter + 1)
             with m.Case(States.FLUSH_CACHE):
-                m.d.sync += self.flush_done_o.eq(0)
+                m.d.sync += self.fe.flush_done.eq(0)
                 with m.If(self.config.WRITE_BACK):
                     # Flush the cache
                     # query valid, dirty and tag memories
@@ -443,7 +441,7 @@ class Cache(wiring.Component):
                 with m.Else():
                     # flush the backend
                     m.d.sync += state.eq(States.FLUSH_BACKEND)
-                    m.d.comb += self.flush_o.eq(1)
+                    m.d.comb += self.be.flush.eq(1)
             with m.Case(States.FLUSH_CACHE_BLOCK):
                 # Increment set/block indices
                 m.d.sync += flush_set_index.eq(flush_set_index + 1)
@@ -479,12 +477,12 @@ class Cache(wiring.Component):
             with m.Case(States.FLUSH_BACKEND):
                 with m.If(~be_flush_requested):
                     # Send flush signal to be
-                    m.d.comb += self.flush_o.eq(1)
+                    m.d.comb += self.be.flush.eq(1)
                     m.d.sync += be_flush_requested.eq(1)
-                with m.Elif(self.flush_done_i):
+                with m.Elif(self.be.flush_done):
                     # be is also done flushing
                     m.d.sync += state.eq(States.READY)
-                    m.d.sync += self.flush_done_o.eq(1)
+                    m.d.sync += self.fe.flush_done.eq(1)
                     m.d.sync += fe_buffer_flush.eq(0)
                     # latency counter was incremented all the time by write back state, reset it
                     m.d.sync += latency_counter.eq(0)
@@ -493,6 +491,6 @@ class Cache(wiring.Component):
 
         with m.If((state != States.FLUSH_CACHE) & (state != States.FLUSH_CACHE_BLOCK) & (state != States.FLUSH_BACKEND)):
             # Always accept new flush requests (except for when we're already flushing)
-            m.d.sync += fe_buffer_flush.eq(fe_buffer_flush | self.flush_i)
+            m.d.sync += fe_buffer_flush.eq(fe_buffer_flush | self.fe.flush)
 
         return m
