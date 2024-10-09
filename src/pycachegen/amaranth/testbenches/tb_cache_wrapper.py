@@ -36,7 +36,7 @@ async def tick(ctx, count: int = 1):
 
 
 async def read(ctx, address: int, data_expected: int, hit_expected: bool):
-    print(f"READ  at {elapsed_time}: addr {address}...", end=" ")
+    print(f"{'{: =4}'.format(elapsed_time)}: R addr 0x{'{:0=4X}'.format(address)}")
     ctx.set(dut.fe.address, address)
     ctx.set(dut.fe.write_strobe, 0)
     ctx.set(dut.fe.request_valid, 1)
@@ -46,11 +46,12 @@ async def read(ctx, address: int, data_expected: int, hit_expected: bool):
         await tick(ctx)
     assert ctx.get(dut.fe.read_data) == data_expected
     assert ctx.get(dut.hit_o) == hit_expected
-    print("success")
 
 
 async def write(ctx, address: int, data: int, hit_expected: bool):
-    print(f"WRITE at {elapsed_time}: addr {address}, data {data}...", end=" ")
+    print(
+        f"{'{: =4}'.format(elapsed_time)}: W addr 0x{'{:0=4X}'.format(address)}, data 0x{'{:0=4X}'.format(data)}"
+    )
     ctx.set(dut.fe.address, address)
     ctx.set(dut.fe.write_data, data)
     ctx.set(dut.fe.write_strobe, -1)
@@ -65,7 +66,6 @@ async def write(ctx, address: int, data: int, hit_expected: bool):
         dut.fe.read_data_valid
     )  # Not that important but it should still happen and thus be checked
     assert ctx.get(dut.hit_o) == hit_expected
-    print("success")
 
 
 async def bench(ctx):
