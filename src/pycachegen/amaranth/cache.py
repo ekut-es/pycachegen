@@ -161,21 +161,21 @@ class Cache(wiring.Component):
         data_mem = Array()
         for i in range(self.config.NUM_WAYS):
             new_valid_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS, init=[])
-            m.submodules["valid_mem_{i}"] = new_valid_mem
+            m.submodules[f"valid_mem_{i}"] = new_valid_mem
             valid_mem.append((new_valid_mem.read_port(), new_valid_mem.write_port()))
 
             new_dirty_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS, init=[])
-            m.submodules["dirty_mem_{i}"] = new_dirty_mem
+            m.submodules[f"dirty_mem_{i}"] = new_dirty_mem
             dirty_mem.append((new_dirty_mem.read_port(), new_dirty_mem.write_port()))
 
             new_tag_mem = Memory(shape=unsigned(self.tag_width), depth=self.config.NUM_SETS, init=[])
-            m.submodules["tag_mem_{i}"] = new_tag_mem
+            m.submodules[f"tag_mem_{i}"] = new_tag_mem
             tag_mem.append((new_tag_mem.read_port(), new_tag_mem.write_port()))
 
             new_data_mem = Memory(
                 shape=unsigned(self.config.DATA_WIDTH), depth=self.config.NUM_SETS*self.config.BLOCK_SIZE, init=[]
             )
-            m.submodules["data_mem_{i}"] = new_data_mem
+            m.submodules[f"data_mem_{i}"] = new_data_mem
             data_mem.append(
                 (
                     new_data_mem.read_port(),
@@ -340,7 +340,7 @@ class Cache(wiring.Component):
                     m.d.sync += state.eq(States.SEND_MEM_REQUEST_WAIT)
                     m.d.comb += self.be.request_valid.eq(1)
             with m.Case(States.SEND_MEM_REQUEST_WAIT):
-                with m.If((~be_buffer_write_strobe.any()) | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
+                with m.If(be_buffer_write_strobe.any() | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
                     # The last request was "processed" (write request was accepted, read request got answered)
                     m.d.sync += latency_counter.eq(latency_counter + 1)
                     with m.If(be_buffer_write_strobe.any()):

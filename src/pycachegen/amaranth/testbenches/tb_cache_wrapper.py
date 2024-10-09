@@ -26,21 +26,69 @@ dut = CacheWrapper(
     ),
 )
 
+elapsed_time = 0
 
-async def bench(ctx):
-    ctx.set(dut.fe.address, 0)
+
+async def tick(ctx, count: int = 1):
+    global elapsed_time
+    elapsed_time += count
+    await ctx.tick().repeat(count)
+
+
+async def read(ctx, address: int, data_expected: int, hit_expected: bool):
+    print(f"READ  at {elapsed_time}: addr {address}...", end=" ")
+    ctx.set(dut.fe.address, address)
     ctx.set(dut.fe.write_strobe, 0)
     ctx.set(dut.fe.request_valid, 1)
-    await ctx.tick()
+    await tick(ctx)
     ctx.set(dut.fe.request_valid, 0)
-    while not ctx.get(dut.fe.port_ready):
-        await ctx.tick()
-    assert ctx.get(dut.fe.read_data_valid) == 1
-    assert ctx.get(dut.fe.read_data) == 0
+    while not ctx.get(dut.fe.read_data_valid):
+        await tick(ctx)
+    assert ctx.get(dut.fe.read_data) == data_expected
+    assert ctx.get(dut.hit_o) == hit_expected
+    print("success")
+
+
+async def write(ctx, address: int, data: int, hit_expected: bool):
+    print(f"WRITE at {elapsed_time}: addr {address}, data {data}...", end=" ")
+    ctx.set(dut.fe.address, address)
+    ctx.set(dut.fe.write_data, data)
+    ctx.set(dut.fe.write_strobe, -1)
+    ctx.set(dut.fe.request_valid, 1)
+    await tick(ctx)
+    ctx.set(dut.fe.request_valid, 0)
+    while not ctx.get(
+        dut.fe.port_ready
+    ):  # NOTE waiting for port ready might not always be desired
+        await tick(ctx)
+    assert not ctx.get(
+        dut.fe.read_data_valid
+    )  # Not that important but it should still happen and thus be checked
+    assert ctx.get(dut.hit_o) == hit_expected
+    print("success")
+
+
+async def bench(ctx):
+    await read(ctx, 0, 0, False)
+    await read(ctx, 1, 0, False)
+    await read(ctx, 2, 0, False)
+    await read(ctx, 3, 0, False)
+
+    await read(ctx, 0, 0, True)
+    await read(ctx, 1, 0, True)
+    await read(ctx, 2, 0, True)
+    await read(ctx, 3, 0, True)
+
+    await write(ctx, 4, 333, False)
+    await read(ctx, 0, 0, True)
+    await read(ctx, 4, 333, False)
+    await read(ctx, 4, 333, True)
+    await read(ctx, 0, 0, False)
+    await read(ctx, 0, 0, True)
 
 
 sim = Simulator(dut)
 sim.add_clock(1e-6)
 sim.add_testbench(bench)
 with sim.write_vcd("cache_wrapper.vcd"):
-    sim.run()
+    sim.run_until(1000 * 1e-6)
