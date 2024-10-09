@@ -5,6 +5,8 @@ from pycachegen.amaranth.testbenches.tb_utils import (
 from pycachegen.amaranth.cache_wrapper import CacheWrapper
 from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
 
+# Testbench for testing a direct mapped cache
+
 dut = CacheWrapper(
     num_ports=1,
     arbiter_policy="priority",

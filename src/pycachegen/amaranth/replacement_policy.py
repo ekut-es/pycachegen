@@ -44,7 +44,7 @@ class ReplacementPolicy(wiring.Component):
 
         if self.policy == "fifo":
             with m.If(self.replace_i):
-                next_replacement_regs[self.set_i].eq(
+                m.d.sync += next_replacement_regs[self.set_i].eq(
                     next_replacement_regs[self.set_i] + 1
                 )
 

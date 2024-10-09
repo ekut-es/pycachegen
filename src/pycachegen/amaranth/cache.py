@@ -242,7 +242,7 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[i][0].addr.eq(fe_buffer_address)
                     m.d.comb += dirty_mem[i][0].addr.eq(fe_buffer_address.index)
                 # buffer the next way to be replaced for this set (shall we need to do that)
-                next_block_replacement.eq(next_replacements[fe_buffer_address.index])
+                m.d.sync += next_block_replacement.eq(next_replacements[fe_buffer_address.index])
             with m.Case(States.HIT_LOOKUP_DONE):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(hit_vector.any()):
@@ -286,16 +286,16 @@ class Cache(wiring.Component):
                         read_block_operation_needed = (~fe_buffer_write_strobe).any() | (self.config.BLOCK_SIZE > 1)
                         next_state = Mux(read_block_operation_needed, States.READ_BLOCK, States.READ_BLOCK_DONE)
                         # Update valid/dirty/tag memories
-                        m.d.comb += valid_mem[hit_index][1].en.eq(1)
-                        m.d.comb += valid_mem[hit_index][1].addr.eq(fe_buffer_address.index)
-                        m.d.comb += valid_mem[hit_index][1].data.eq(1)
-                        m.d.comb += tag_mem[hit_index][1].en.eq(1)
-                        m.d.comb += tag_mem[hit_index][1].addr.eq(fe_buffer_address.index)
-                        m.d.comb += tag_mem[hit_index][1].data.eq(fe_buffer_address.tag)
+                        m.d.comb += valid_mem[next_block_replacement][1].en.eq(1)
+                        m.d.comb += valid_mem[next_block_replacement][1].addr.eq(fe_buffer_address.index)
+                        m.d.comb += valid_mem[next_block_replacement][1].data.eq(1)
+                        m.d.comb += tag_mem[next_block_replacement][1].en.eq(1)
+                        m.d.comb += tag_mem[next_block_replacement][1].addr.eq(fe_buffer_address.index)
+                        m.d.comb += tag_mem[next_block_replacement][1].data.eq(fe_buffer_address.tag)
                         if self.config.WRITE_BACK:
-                            m.d.comb += dirty_mem[hit_index][1].en.eq(1)
-                            m.d.comb += dirty_mem[hit_index][1].addr.eq(fe_buffer_address.index)
-                            m.d.comb += dirty_mem[hit_index][1].data.eq(1)
+                            m.d.comb += dirty_mem[next_block_replacement][1].en.eq(1)
+                            m.d.comb += dirty_mem[next_block_replacement][1].addr.eq(fe_buffer_address.index)
+                            m.d.comb += dirty_mem[next_block_replacement][1].data.eq(1)
                         # update the replacement policy
                         m.d.comb += replacement_policy.access_i.eq(1)
                         m.d.comb += replacement_policy.replace_i.eq(1)
