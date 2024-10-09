@@ -1,4 +1,4 @@
-from pycachegen.amaranth.testbenches.cache_wrapper_tb_utils import (
+from pycachegen.amaranth.testbenches.tb_utils import (
     CacheWrapperBenchHelper,
     run_bench,
 )
