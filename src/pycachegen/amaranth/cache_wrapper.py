@@ -41,7 +41,6 @@ class CacheWrapper(wiring.Component):
         self.ARBITER_POLICY = arbiter_policy
         self.BYTE_SIZE = byte_size
         self.ENABLE_RESET = enable_reset
-        self.ADDRESS_WIDTH = address_width
         self.NUM_CACHES = len(cache_configs)
         self.FE_ADDRESS_WIDTH = address_width
 
@@ -54,14 +53,14 @@ class CacheWrapper(wiring.Component):
         self.CACHE_CONFIGS: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
-            cache_address_width = self.ADDRESS_WIDTH - int(
+            cache_address_width = self.FE_ADDRESS_WIDTH - int(
                 log2(config.DATA_WIDTH // self.FE_DATA_WIDTH)
             )
             if i < len(cache_configs) - 1:
                 be_data_width = cache_configs[i + 1].DATA_WIDTH
             else:
                 be_data_width = memory_config.DATA_WIDTH
-            be_address_width = self.ADDRESS_WIDTH - int(
+            be_address_width = self.FE_ADDRESS_WIDTH - int(
                 log2(be_data_width // self.FE_DATA_WIDTH)
             )
             self.CACHE_CONFIGS.append(
@@ -77,7 +76,7 @@ class CacheWrapper(wiring.Component):
             )
 
         # create internal memory config
-        memory_address_width = self.ADDRESS_WIDTH - int(
+        memory_address_width = self.FE_ADDRESS_WIDTH - int(
             log2(memory_config.DATA_WIDTH // self.FE_DATA_WIDTH)
         )
         self.MEMORY_CONFIG = InternalMemoryConfig(

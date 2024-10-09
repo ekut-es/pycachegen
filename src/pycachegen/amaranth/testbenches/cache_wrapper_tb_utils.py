@@ -1,0 +1,85 @@
+import os
+import inspect
+from math import ceil
+from amaranth.sim import Simulator
+from pycachegen.amaranth.cache_wrapper import CacheWrapper
+
+
+class CacheWrapperBenchHelper:
+    """This object provides useful functions for testing cache wrappers.
+    To construct it, simply pass the cache wrapper elaboratable to __init__.
+    You can then use methods like read and write by passing the simulator
+    context object to them.
+    """
+
+    def __init__(self, cache_wrapper: CacheWrapper):
+        self._dut = cache_wrapper
+        self._address_format_spec = (
+            "{:0=" + str(ceil(cache_wrapper.FE_ADDRESS_WIDTH / 4)) + "X}"
+        )
+        self._data_format_spec = (
+            "{:0=" + str(ceil(cache_wrapper.FE_DATA_WIDTH / 4)) + "X}"
+        )
+        self.elapsed_time = 0
+
+    def _get_timestamp(self):
+        return "{: =4}".format(self.elapsed_time)
+
+    def _addr_to_str(self, addr: int) -> str:
+        return "0x" + self._address_format_spec.format(addr)
+
+    def _data_to_str(self, data: int) -> str:
+        return "0x" + self._data_format_spec.format(data)
+
+    async def _tick(self, ctx, count: int = 1):
+        self.elapsed_time += count
+        await ctx.tick().repeat(count)
+
+    async def read(self, ctx, address: int, data_expected: int, hit_expected: bool):
+        print(f"{self._get_timestamp()}: R addr {self._addr_to_str(address)}")
+        ctx.set(self._dut.fe.address, address)
+        ctx.set(self._dut.fe.write_strobe, 0)
+        ctx.set(self._dut.fe.request_valid, 1)
+        await self._tick(ctx)
+        ctx.set(self._dut.fe.request_valid, 0)
+        while not ctx.get(self._dut.fe.read_data_valid):
+            await self._tick(ctx)
+        assert ctx.get(self._dut.fe.read_data) == data_expected
+        assert ctx.get(self._dut.hit_o) == hit_expected
+
+    async def write(self, ctx, address: int, data: int, hit_expected: bool):
+        print(
+            f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}"
+        )
+        ctx.set(self._dut.fe.address, address)
+        ctx.set(self._dut.fe.write_data, data)
+        ctx.set(self._dut.fe.write_strobe, -1)
+        ctx.set(self._dut.fe.request_valid, 1)
+        await self._tick(ctx)
+        ctx.set(self._dut.fe.request_valid, 0)
+        while not ctx.get(
+            self._dut.fe.port_ready
+        ):  # NOTE waiting for port ready might not always be desired
+            await self._tick(ctx)
+        assert not ctx.get(
+            self._dut.fe.read_data_valid
+        )  # Not that important but it should still happen and thus be checked
+        assert ctx.get(self._dut.hit_o) == hit_expected
+
+
+def run_bench(dut, bench, vcd_filename: str = ""):
+    """Runs the given testbench on the given dut.
+    The waveform will be recorded and saved under the given filename.
+    If no filename was provided, the filename of the calling function
+    will be used with the .py suffix replaced by .vcd.
+    """
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    if not vcd_filename:
+        caller_filename = os.path.basename(inspect.stack()[1].filename)
+        if not caller_filename.endswith(".py"):
+            raise RuntimeError("Automatic vcd filename determination failed.")
+        vcd_filename = caller_filename.removesuffix(".py") + ".vcd"
+    with sim.write_vcd(vcd_filename):
+        sim.run()
