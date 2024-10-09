@@ -17,8 +17,8 @@ class ReplacementPolicy(wiring.Component):
         self.policy = policy
 
         io_ports = {
-            "access_i": In(),
-            "replace_i": In(),
+            "access_i": In(1),
+            "replace_i": In(1),
             "set_i": In(range(num_sets)),
             "way_i": In(range(num_ways)),
         }
@@ -47,3 +47,5 @@ class ReplacementPolicy(wiring.Component):
                 next_replacement_regs[self.set_i].eq(
                     next_replacement_regs[self.set_i] + 1
                 )
+
+        return m

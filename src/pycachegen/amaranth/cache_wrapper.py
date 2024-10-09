@@ -22,7 +22,7 @@ class CacheWrapper(wiring.Component):
         enable_reset: bool,
         address_width: int,
         memory_config: MemoryConfig,
-        *cache_configs: CacheConfig,
+        cache_configs: list[CacheConfig],
     ) -> None:
         """Generates a top level module containing an arbitrary amount of caches and a main memory.
         There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
@@ -45,19 +45,24 @@ class CacheWrapper(wiring.Component):
         self.NUM_CACHES = len(cache_configs)
         self.FE_ADDRESS_WIDTH = address_width
 
+        if self.NUM_CACHES:
+            self.FE_DATA_WIDTH = cache_configs[0].DATA_WIDTH
+        else:
+            self.FE_DATA_WIDTH = memory_config.DATA_WIDTH
+
         # create internal cache configs
         self.CACHE_CONFIGS: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
             cache_address_width = self.ADDRESS_WIDTH - int(
-                log2(config.DATA_WIDTH // self.BYTE_SIZE)
+                log2(config.DATA_WIDTH // self.FE_DATA_WIDTH)
             )
             if i < len(cache_configs) - 1:
                 be_data_width = cache_configs[i + 1].DATA_WIDTH
             else:
                 be_data_width = memory_config.DATA_WIDTH
             be_address_width = self.ADDRESS_WIDTH - int(
-                log2(be_data_width // self.BYTE_SIZE)
+                log2(be_data_width // self.FE_DATA_WIDTH)
             )
             self.CACHE_CONFIGS.append(
                 InternalCacheConfig(
@@ -73,7 +78,7 @@ class CacheWrapper(wiring.Component):
 
         # create internal memory config
         memory_address_width = self.ADDRESS_WIDTH - int(
-            log2(memory_config.DATA_WIDTH // self.BYTE_SIZE)
+            log2(memory_config.DATA_WIDTH // self.FE_DATA_WIDTH)
         )
         self.MEMORY_CONFIG = InternalMemoryConfig(
             memory_config=memory_config,
@@ -82,23 +87,25 @@ class CacheWrapper(wiring.Component):
             enable_reset=self.ENABLE_RESET,
         )
 
-        if self.NUM_CACHES > 0:
-            self.L1_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
-            self.FE_DATA_WIDTH = self.CACHE_CONFIGS[0].DATA_WIDTH
-        else:
-            self.L1_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
-            self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
+        # if self.NUM_CACHES > 0:
+        #     self.L1_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
+        #     self.FE_DATA_WIDTH = self.CACHE_CONFIGS[0].DATA_WIDTH
+        # else:
+        #     self.L1_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
+        #     self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
         self.FE_BYTES_PER_WORD = self.FE_DATA_WIDTH // self.BYTE_SIZE
-        self.FE_BYTE_OFFSET_WIDTH = int(log2(self.FE_BYTES_PER_WORD))
+        # self.FE_BYTE_OFFSET_WIDTH = int(log2(self.FE_BYTES_PER_WORD))
 
         super().__init__(
             {
-                "fe": MemoryBusSignature(
-                    address_width=self.FE_ADDRESS_WIDTH,
-                    data_width=self.FE_DATA_WIDTH,
-                    bytes_per_word=self.FE_BYTES_PER_WORD,
+                "fe": In(
+                    MemoryBusSignature(
+                        address_width=self.FE_ADDRESS_WIDTH,
+                        data_width=self.FE_DATA_WIDTH,
+                        bytes_per_word=self.FE_BYTES_PER_WORD,
+                    )
                 ),
-                "hit": Out(1),
+                "hit_o": Out(1),
             }
         )
 
@@ -114,15 +121,15 @@ class CacheWrapper(wiring.Component):
 
         # connect the hit signal of the first cache to this modules hit port
         if len(caches):
-            m.d.comb += self.hit.eq(caches[0].hit)
+            m.d.comb += self.hit_o.eq(caches[0].hit_o)
 
         # create the main memory
         m.submodules.main_memory = main_memory = MainMemory(config=self.MEMORY_CONFIG)
 
-        caches_and_memory = caches + main_memory
+        caches_and_memory = caches + [main_memory]
 
         # connect first cache/memory to this modules fe
-        wiring.connect(m, self.fe, caches_and_memory[0].fe)
+        wiring.connect(m, wiring.flipped(self.fe), caches_and_memory[0].fe)
 
         # connect the caches/memory with each other
         for previous, current in zip(caches_and_memory, caches_and_memory[1:]):

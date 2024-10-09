@@ -45,15 +45,22 @@ class Cache(wiring.Component):
             data_width=config.BE_DATA_WIDTH,
             bytes_per_word=self.be_bytes_per_word,
         )
-        self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
-        self.read_block_requests_needed = ceil(
-            self.bytes_per_word * config.BLOCK_SIZE / self.be_bytes_per_word
+        self.address_layout = CacheAddressLayout(
+            index_width=self.index_width,
+            tag_width=self.tag_width,
+            word_offset_width=self.word_offset_width,
         )
-        self.read_block_wc = min(
-            self.be_byte_multiplier, config.BLOCK_SIZE
-        )  # the words read from the BE cache can be bigger than our own words so
+        # how many times bigger the be words are compared to ours
+        self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
+
+        # self.read_block_requests_needed = ceil(
+        #     self.bytes_per_word * config.BLOCK_SIZE / self.be_bytes_per_word
+        # )
+
+        # the words read from the BE cache can be bigger than our own words so
         # we might be able to extract multiple words from that single word. This
         # variable specifies how many times we can do that per BE word.
+        self.read_block_wc = min(self.be_byte_multiplier, config.BLOCK_SIZE)
         super().__init__(
             {
                 "fe": In(self.fe_signature),
@@ -66,12 +73,7 @@ class Cache(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
         ## frontend input buffers
-        fe_buffer_address = Signal(
-            CacheAddressLayout(
-                index_width=self.index_width,
-                tag_width=self.tag_width,
-                word_offset_width=self.word_offset_width,
-            )
+        fe_buffer_address = Signal(self.address_layout
         )
         fe_buffer_write_data = Signal(self.config.DATA_WIDTH)
         fe_buffer_write_strobe = Signal(self.bytes_per_word)
@@ -83,12 +85,12 @@ class Cache(wiring.Component):
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(self.config.DATA_WIDTH))
         be_buffer_write_strobe = Signal(unsigned(self.bytes_per_word))
-        be_buffer_address = Signal(CacheAddressLayout(index_width=self.index_width, tag_width=self.tag_width, word_offset_width=self.word_offset_width))
-        m.d.comb += self.be.address.eq(be_buffer_address[-self.config.BE_ADDRESS_WIDTH : ])
+        be_buffer_address = Signal(self.address_layout)
+        m.d.comb += self.be.address.eq(be_buffer_address.as_value()[-self.config.BE_ADDRESS_WIDTH : ])
         m.d.comb += self.be.write_data.eq(0)
         m.d.comb += self.be.write_strobe.eq(0)
-        m.d.comb += self.be.write_data.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.config.DATA_WIDTH).eq(be_buffer_write_data)
-        m.d.comb += self.be.write_strobe.word_select(be_buffer_address[:-self.config.BE_ADDRESS_WIDTH], self.bytes_per_word).eq(be_buffer_write_strobe)
+        m.d.comb += self.be.write_data.word_select(be_buffer_address.as_value()[:-self.config.BE_ADDRESS_WIDTH], self.config.DATA_WIDTH).eq(be_buffer_write_data)
+        m.d.comb += self.be.write_strobe.word_select(be_buffer_address.as_value()[:-self.config.BE_ADDRESS_WIDTH], self.bytes_per_word).eq(be_buffer_write_strobe)
 
         ## internal registers
         # FSM state
@@ -104,12 +106,12 @@ class Cache(wiring.Component):
         # purely for statistics: let the outside know if we had a hit
         m.d.comb += self.hit_o.eq(hit_vector.any())
         # one hot encode the vector into this signal
-        hit_index = Signal(unsigned(range(self.config.NUM_WAYS)))
+        hit_index = Signal(range(self.config.NUM_WAYS))
         m.submodules.hit_index_encoder = hit_index_encoder = coding.Encoder(hit_vector.shape().width)
         m.d.comb += hit_index_encoder.i.eq(hit_vector)
         m.d.comb += hit_index.eq(hit_index_encoder.o)
         # a view for convenient access to the tag/index/word offset bits
-        fe_address_view = data.View(self.fe_signature, self.fe.address)
+        fe_address_view = data.View(self.address_layout, self.fe.address)
         # counter for counting which word of the be read data to write to the
         # data_mem next.
         be_read_data_word_counter = Signal(self.read_block_wc)
@@ -117,7 +119,7 @@ class Cache(wiring.Component):
         be_read_data_total_word_offset = Signal(self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH)
         if self.config.BLOCK_SIZE == 1:
             # block size == 1 -> the bits we cut off from the be buffer address are the index
-            m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address[: -self.config.BE_ADDRESS_WIDTH])
+            m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address.as_value()[: -self.config.BE_ADDRESS_WIDTH])
         elif self.config.ADDRESS_WIDTH - self.config.BE_ADDRESS_WIDTH <= self.word_offset_width:
             # one block is exactly one be word or needs multiple be words -> the counter is the index
             m.d.comb += be_read_data_total_word_offset.eq(be_read_data_word_counter)
@@ -126,14 +128,14 @@ class Cache(wiring.Component):
             m.d.comb += be_read_data_total_word_offset.eq(
                 Cat(
                     be_read_data_word_counter,
-                    be_buffer_address[self.word_offset_width : -self.config.BE_ADDRESS_WIDTH]
+                    be_buffer_address.as_value()[self.word_offset_width : -self.config.BE_ADDRESS_WIDTH]
                     )
                 )
         # counter for the READ BLOCK state that indicates how many words have been read so far
         read_block_word_offset = Signal(self.word_offset_width)
         # Index of the data_mem that contains the data requested
         # Used in the STALL state to select the read data from the correct data_mem
-        read_data_mem_select = Signal(unsigned(range(self.config.NUM_WAYS)))
+        read_data_mem_select = Signal(range(self.config.NUM_WAYS))
         # index of the set to be flushed next
         flush_set_index = Signal(self.index_width)
         # index of the block that is currently being flushed
@@ -145,10 +147,10 @@ class Cache(wiring.Component):
 
         ## replacement policy things
         # block to be replaced next for the set of the current fe_buffer_address
-        next_block_replacement = Signal(unsigned(range(self.config.NUM_WAYS)))
-        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.NUM_WAYS, num_sets = self.config.num_sets, policy = self.config.REPLACEMENT_POLICY)
+        next_block_replacement = Signal(range(self.config.NUM_WAYS))
+        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.NUM_WAYS, num_sets = self.config.NUM_SETS, policy = self.config.REPLACEMENT_POLICY)
         # put the replacement signals in an array so we can access them nicely
-        next_replacements = Array([replacement_policy.next_replacement(i) for i in range(self.num_sets)])
+        next_replacements = Array([replacement_policy.next_replacement(i) for i in range(self.config.NUM_SETS)])
 
         # Create valid, dirty, tag, data memories - one per way
         # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
@@ -158,20 +160,20 @@ class Cache(wiring.Component):
         tag_mem = Array()
         data_mem = Array()
         for i in range(self.config.NUM_WAYS):
-            new_valid_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
+            new_valid_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS, init=[])
             m.submodules["valid_mem_{i}"] = new_valid_mem
             valid_mem.append((new_valid_mem.read_port(), new_valid_mem.write_port()))
 
-            new_dirty_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS)
+            new_dirty_mem = Memory(shape=unsigned(1), depth=self.config.NUM_SETS, init=[])
             m.submodules["dirty_mem_{i}"] = new_dirty_mem
             dirty_mem.append((new_dirty_mem.read_port(), new_dirty_mem.write_port()))
 
-            new_tag_mem = Memory(shape=unsigned(self.tag_width), depth=self.config.NUM_SETS)
+            new_tag_mem = Memory(shape=unsigned(self.tag_width), depth=self.config.NUM_SETS, init=[])
             m.submodules["tag_mem_{i}"] = new_tag_mem
             tag_mem.append((new_tag_mem.read_port(), new_tag_mem.write_port()))
 
             new_data_mem = Memory(
-                shape=unsigned(self.config.DATA_WIDTH), depth=self.config.NUM_SETS*self.config.BLOCK_SIZE
+                shape=unsigned(self.config.DATA_WIDTH), depth=self.config.NUM_SETS*self.config.BLOCK_SIZE, init=[]
             )
             m.submodules["data_mem_{i}"] = new_data_mem
             data_mem.append(
@@ -188,14 +190,8 @@ class Cache(wiring.Component):
 
         ## things for write back
         # address and way to identify the block to be written back
-        write_back_address = Signal(
-            CacheAddressLayout(
-                index_width=self.index_width,
-                tag_width=self.tag_width,
-                word_offset_width=self.word_offset_width,
-            )
-        )
-        write_back_way = Signal(unsigned(range(self.config.NUM_WAYS)))
+        write_back_address = Signal(self.address_layout)
+        write_back_way = Signal(range(self.config.NUM_WAYS))
         # state to take after the WRITE_BACK state
         write_back_next_state = Signal(States)
 
@@ -227,7 +223,7 @@ class Cache(wiring.Component):
                     # query valid and tag memories
                     # this needs to happen in m.d.comb so that the address gets set
                     # BEFORE the positive clk edge that triggers any sync statements
-                    for i in range(self.NUM_WAYS):
+                    for i in range(self.config.NUM_WAYS):
                         m.d.comb += valid_mem[i][0].addr.eq(fe_address_view.index)
                         m.d.comb += tag_mem[i][0].addr.eq(fe_address_view.index)
             with m.Case(States.HIT_LOOKUP):
@@ -272,7 +268,7 @@ class Cache(wiring.Component):
                     with m.Else():
                         # handle read
                         m.d.sync += state.eq(States.STALL)
-                        m.d.comb += data_mem[hit_index][0].address.eq(fe_buffer_address)
+                        m.d.comb += data_mem[hit_index][0].addr.eq(fe_buffer_address)
                         m.d.comb += data_mem[hit_index][0].en.eq(1)
                         m.d.sync += read_data_mem_select.eq(hit_index)
                 with m.Else():
@@ -316,7 +312,7 @@ class Cache(wiring.Component):
                             # so that WRITE_BACK_BLOCK can put the data in the be buffer register
                             m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
                             # initiate read for the first word to be written back. clear the word offset so that the actual first word gets read.
-                            m.d.comb += data_mem[next_block_replacement][0].address.eq(Cat(C(0, unsigned(self.word_offset_width)), fe_buffer_address.index))
+                            m.d.comb += data_mem[next_block_replacement][0].addr.eq(Cat(C(0, unsigned(self.word_offset_width)), fe_buffer_address.index))
                         with m.Else():
                             # No write back needed
                             m.d.sync += state.eq(next_state)
@@ -327,7 +323,7 @@ class Cache(wiring.Component):
                 m.d.sync += be_buffer_write_strobe.eq(-1)
                 # data_mem read needs to be initiated by previous state
                 m.d.sync += be_buffer_write_data.eq(data_mem[write_back_way][0].data)
-                m.d.sync += state(States.SEND_MEM_REQUEST)
+                m.d.sync += state.eq(States.SEND_MEM_REQUEST)
                 # increment word offset of write back address
                 m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
                 with m.If(write_back_address.word_offset == (self.config.BLOCK_SIZE - 1)):
@@ -362,9 +358,9 @@ class Cache(wiring.Component):
                             # Else increse the counter
                             m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
                         # Now do the actual writing the be read data into the block in the data_mem
-                        m.d.comb += data_mem[next_block_replacement][1].address.eq(Cat(be_read_data_word_counter, be_buffer_address.index))
-                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(self.config.DATA_WIDTH, be_read_data_total_word_offset))
-                        m.d.sync += data_mem[next_block_replacement][1].en.eq(-1)
+                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(Cat(be_read_data_word_counter, be_buffer_address.index))
+                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_read_data_total_word_offset, self.config.DATA_WIDTH))
+                        m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
             with m.Case(States.READ_BLOCK):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(Cat(read_block_word_offset, fe_buffer_address.index, fe_buffer_address.tag))
@@ -374,7 +370,7 @@ class Cache(wiring.Component):
                     m.d.sync += send_mem_request_next_state.eq(States.READ_BLOCK_DONE)
                 with m.Else():
                     # Come back, we're not done
-                    send_mem_request_next_state(States.READ_BLOCK)
+                    m.d.sync += send_mem_request_next_state.eq(States.READ_BLOCK)
                 # Send the memory request except for when its the address to which
                 # we want to write anyway AND write strobe is all ones AND we would not
                 # read any other byte from the word the BE would give is in this request (self.read_block_wc == 1)
@@ -391,7 +387,7 @@ class Cache(wiring.Component):
                 with m.If(fe_buffer_write_strobe):
                     # Handle write request
                     # Write data to internal data_mem
-                    m.d.comb += data_mem[next_block_replacement][1].address.eq(fe_buffer_address)
+                    m.d.comb += data_mem[next_block_replacement][1].addr.eq(fe_buffer_address)
                     m.d.comb += data_mem[next_block_replacement][1].data.eq(fe_buffer_write_data)
                     m.d.comb += data_mem[next_block_replacement][1].en.eq(fe_buffer_write_strobe)
                     with m.If(self.config.WRITE_BACK):
