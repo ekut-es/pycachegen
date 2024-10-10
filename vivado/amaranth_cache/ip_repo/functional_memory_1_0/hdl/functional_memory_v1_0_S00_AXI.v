@@ -1,18 +1,17 @@
 
 `timescale 1 ns / 1 ps
 
-	module cache_wrapper_1_v1_1_S00_AXI #
+	module functional_memory_v1_0_S00_AXI #
 	(
 		// Users to add parameters here
-        parameter integer CACHE_ADDRESS_WIDTH = 8,
-        parameter integer CACHE_DATA_WIDTH = 16,
+
 		// User parameters ends
 		// Do not modify the parameters beyond this line
 
 		// Width of S_AXI data bus
 		parameter integer C_S_AXI_DATA_WIDTH	= 32,
 		// Width of S_AXI address bus
-		parameter integer C_S_AXI_ADDR_WIDTH	= 6
+		parameter integer C_S_AXI_ADDR_WIDTH	= 4
 	)
 	(
 		// Users to add ports here
@@ -100,20 +99,15 @@
 	// ADDR_LSB = 2 for 32 bits (n downto 2)
 	// ADDR_LSB = 3 for 64 bits (n downto 3)
 	localparam integer ADDR_LSB = (C_S_AXI_DATA_WIDTH/32) + 1;
-	localparam integer OPT_MEM_ADDR_BITS = 3;
+	localparam integer OPT_MEM_ADDR_BITS = 1;
 	//----------------------------------------------
 	//-- Signals for user logic register space example
 	//------------------------------------------------
-	//-- Number of Slave Registers 9
+	//-- Number of Slave Registers 4
 	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg0;
 	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg1;
 	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg2;
 	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg3;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg4;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg5;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg6;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg7;
-	reg [C_S_AXI_DATA_WIDTH-1:0]	slv_reg8;
 	wire	 slv_reg_rden;
 	wire	 slv_reg_wren;
 	reg [C_S_AXI_DATA_WIDTH-1:0]	 reg_data_out;
@@ -230,53 +224,44 @@
 	      slv_reg1 <= 0;
 	      slv_reg2 <= 0;
 	      slv_reg3 <= 0;
-	      slv_reg4 <= 0;
 	    end
 	  else begin
 	    if (slv_reg_wren)
 	      begin
 	        case ( axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] )
-	          4'h0:
+	          2'h0:
 	            for ( byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index+1 )
 	              if ( S_AXI_WSTRB[byte_index] == 1 ) begin
 	                // Respective byte enables are asserted as per write strobes
 	                // Slave register 0
 	                slv_reg0[(byte_index*8) +: 8] <= S_AXI_WDATA[(byte_index*8) +: 8];
 	              end
-	          4'h1:
+	          2'h1:
 	            for ( byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index+1 )
 	              if ( S_AXI_WSTRB[byte_index] == 1 ) begin
 	                // Respective byte enables are asserted as per write strobes
 	                // Slave register 1
 	                slv_reg1[(byte_index*8) +: 8] <= S_AXI_WDATA[(byte_index*8) +: 8];
 	              end
-	          4'h2:
+	          2'h2:
 	            for ( byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index+1 )
 	              if ( S_AXI_WSTRB[byte_index] == 1 ) begin
 	                // Respective byte enables are asserted as per write strobes
 	                // Slave register 2
 	                slv_reg2[(byte_index*8) +: 8] <= S_AXI_WDATA[(byte_index*8) +: 8];
 	              end
-	          4'h3:
+	          2'h3:
 	            for ( byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index+1 )
 	              if ( S_AXI_WSTRB[byte_index] == 1 ) begin
 	                // Respective byte enables are asserted as per write strobes
 	                // Slave register 3
 	                slv_reg3[(byte_index*8) +: 8] <= S_AXI_WDATA[(byte_index*8) +: 8];
 	              end
-	          4'h4:
-	            for ( byte_index = 0; byte_index <= (C_S_AXI_DATA_WIDTH/8)-1; byte_index = byte_index+1 )
-	              if ( S_AXI_WSTRB[byte_index] == 1 ) begin
-	                // Respective byte enables are asserted as per write strobes
-	                // Slave register 4
-	                slv_reg4[(byte_index*8) +: 8] <= S_AXI_WDATA[(byte_index*8) +: 8];
-	              end
 	          default : begin
 	                      slv_reg0 <= slv_reg0;
 	                      slv_reg1 <= slv_reg1;
 	                      slv_reg2 <= slv_reg2;
 	                      slv_reg3 <= slv_reg3;
-	                      slv_reg4 <= slv_reg4;
 	                    end
 	        endcase
 	      end
@@ -385,15 +370,10 @@
 	begin
 	      // Address decoding for reading registers
 	      case ( axi_araddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB] )
-	        4'h0   : reg_data_out <= slv_reg0;
-	        4'h1   : reg_data_out <= slv_reg1;
-	        4'h2   : reg_data_out <= slv_reg2;
-	        4'h3   : reg_data_out <= slv_reg3;
-	        4'h4   : reg_data_out <= slv_reg4;
-	        4'h5   : reg_data_out <= slv_reg5;
-	        4'h6   : reg_data_out <= slv_reg6;
-	        4'h7   : reg_data_out <= slv_reg7;
-	        4'h8   : reg_data_out <= slv_reg8;
+	        2'h0   : reg_data_out <= slv_reg0;
+	        2'h1   : reg_data_out <= slv_reg1;
+	        2'h2   : reg_data_out <= slv_reg2;
+	        2'h3   : reg_data_out <= slv_reg3;
 	        default : reg_data_out <= 0;
 	      endcase
 	end
@@ -418,63 +398,30 @@
 	end
 
 	// Add user logic here
+	wire mem_reset;
+	wire mem_address;
+	wire mem_address_valid;
+	wire mem_write_data;
+	wire mem_write_data_valid;
+    wire mem_read_write_select;
+    wire[15:0] mem_read_data;
+    wire mem_read_data_valid;
+    wire mem_port_ready;
 
-	// input registers:
-	// slv_reg0: flush, rw_select, wdata_valid, addr_valid
-	// slv_reg1: addr
-	// slv_reg2: wdata
-	//
-	// output registers:
-	// slv_reg5: flush_done, hit, rdata_valid, w_done, p_ready
-	// slv_reg6: rdata
-
-    // output wires
-    wire cache_read_data_valid;
-    wire cache_write_done;
-    wire cache_port_ready;
-    wire cache_hit;
-    wire flush_done;
-    wire[CACHE_DATA_WIDTH-1 : 0] cache_read_data;
-    wire cache_reset;
-    assign cache_reset = 0; // deactivate reset to allow BRAM synthesis
-
-    wire[1:0] write_strobe;
-    assign write_strobe = {2{slv_reg0[2]}};
-
-    wire request_valid;
-    assign request_valid = (slv_reg0[0] && (!slv_reg0[2] || slv_reg0[1]));
-
-    assign write_done = cache_port_ready;
-
-    CacheWrapper
-    CacheWrapper (
-        .clk(S_AXI_ACLK),
-        .rst(cache_reset),
-        .fe__flush(slv_reg0[3]),
-        .fe__address(slv_reg1[CACHE_ADDRESS_WIDTH-1 : 0]), //FIXME
-        .fe__write_data(slv_reg2[CACHE_DATA_WIDTH-1 : 0]),
-        .fe__write_strobe(write_strobe),
-        .fe__request_valid(request_valid),
-        .fe__read_data_valid(cache_read_data_valid),
-        .fe__read_data(cache_read_data),
-        .fe__port_ready(cache_port_ready),
-        .fe__flush_done(flush_done),
-        .hit_o(cache_hit)
+    functional_memory
+    data_memory (
+        .clk_i(S_AXI_ACLK),
+        .reset_n_i(mem_reset),
+        .address_0_i(mem_address),
+        .address_valid_0_i(mem_address_valid),
+        .write_data_0_i(mem_write_data),
+        .write_data_valid_0_i(mem_write_data_valid),
+        .read_write_select_0_i(mem_read_write_select),
+        .read_data_0_o(mem_read_data),
+        .read_data_valid_0_o(mem_read_data_valid),
+        .port_ready_0_o(mem_port_ready)
     );
 
-    always @( posedge S_AXI_ACLK ) begin
-        if (S_AXI_ARESETN == 1'b0) begin
-            slv_reg5 <= 0;
-            slv_reg6 <= 0;
-            slv_reg7 <= 0;
-            slv_reg8 <= 0;
-        end else begin
-            slv_reg5 <= {27'b0, flush_done, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
-            slv_reg6 <= {{32-CACHE_DATA_WIDTH{1'b0}}, cache_read_data};
-            slv_reg7 <= 0;
-            slv_reg8 <= 0;
-        end
-    end
 	// User logic ends
 
 	endmodule
