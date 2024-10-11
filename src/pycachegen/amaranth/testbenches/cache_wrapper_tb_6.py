@@ -5,7 +5,7 @@ from pycachegen.amaranth.testbenches.tb_utils import (
 from pycachegen.amaranth.cache_wrapper import CacheWrapper
 from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
 
-# Testbench for testing the plru_tree replacement policy
+# Testbench for testing the write back, write allocate policy
 
 dut = CacheWrapper(
     num_ports=1,
@@ -21,8 +21,8 @@ dut = CacheWrapper(
             replacement_policy="plru_tree",
             hit_latency=10,
             miss_latency=15,
-            write_through=True,
-            write_allocate=False,
+            write_through=False,
+            write_allocate=True,
             block_size=1,
         )
     ],
@@ -35,20 +35,25 @@ helper = CacheWrapperBenchHelper(dut)
 
 
 async def bench(ctx):
-    # Read from 0, 2, 4, 6 (all go into the same set)
-    await helper.read(ctx, 0, 0, False)
-    await helper.read(ctx, 2, 0, False)
-    await helper.read(ctx, 0, 0, True)
-    await helper.read(ctx, 4, 0, False)
-    await helper.read(ctx, 6, 0, False)
-    await helper.read(ctx, 4, 0, True)
-    await helper.read(ctx, 8, 0, False)
-    await helper.read(ctx, 4, 0, True)
-    await helper.read(ctx, 2, 0, True)
-    await helper.read(ctx, 8, 0, True)
-    await helper.read(ctx, 0, 0, False)
-    await helper.read(ctx, 2, 0, True)
-    await helper.read(ctx, 4, 0, False)
+    # Check that write allocate works
+    await helper.write(ctx, 0, 0x1000, False)
+    await helper.read(ctx, 0, 0x1000, True)
+
+    # Fill the block so that 0 gets replaced
+    await helper.write(ctx, 2, 0x1020, False)
+    await helper.write(ctx, 4, 0x1040, False)
+    await helper.write(ctx, 6, 0x1060, False)
+    await helper.write(ctx, 8, 0x1080, False)
+
+    # Check that 0 got written back
+    await helper.read(ctx, 0, 0x1000, False)
+
+    # Randomly write to 8
+    await helper.write(ctx, 8, 0x1081, True)
+
+    # Check that 2 got replaced and that writing to it still works
+    await helper.write(ctx, 2, 0x1021, False)
+    await helper.read(ctx, 2, 0x1021, True)
 
 
 run_bench(dut=dut, bench=bench)

@@ -235,12 +235,13 @@ class Cache(wiring.Component):
                         (tag_mem[i][0].data == fe_buffer_address.tag)
                         & valid_mem[i][0].data
                     )
-                # we might need the data from the data_mem and dirty_mem
+                # we might need the data from the data/tag/dirty mems
                 # so read from all of them
                 for i in range(self.config.NUM_WAYS):
                     m.d.comb += data_mem[i][0].en.eq(1)
                     m.d.comb += data_mem[i][0].addr.eq(fe_buffer_address)
                     m.d.comb += dirty_mem[i][0].addr.eq(fe_buffer_address.index)
+                    m.d.comb += tag_mem[i][0].addr.eq(fe_buffer_address.index)
                 # buffer the next way to be replaced for this set (shall we need to do that)
                 m.d.sync += next_block_replacement.eq(next_replacements[fe_buffer_address.index])
             with m.Case(States.HIT_LOOKUP_DONE):
@@ -293,9 +294,10 @@ class Cache(wiring.Component):
                         m.d.comb += tag_mem[next_block_replacement][1].addr.eq(fe_buffer_address.index)
                         m.d.comb += tag_mem[next_block_replacement][1].data.eq(fe_buffer_address.tag)
                         if self.config.WRITE_BACK:
+                            # If it is a write request, mark the block dirty; else clear the dirty bit
                             m.d.comb += dirty_mem[next_block_replacement][1].en.eq(1)
                             m.d.comb += dirty_mem[next_block_replacement][1].addr.eq(fe_buffer_address.index)
-                            m.d.comb += dirty_mem[next_block_replacement][1].data.eq(1)
+                            m.d.comb += dirty_mem[next_block_replacement][1].data.eq(fe_buffer_write_strobe.any())
                         # update the replacement policy
                         m.d.comb += replacement_policy.access_i.eq(1)
                         m.d.comb += replacement_policy.replace_i.eq(1)
@@ -304,8 +306,10 @@ class Cache(wiring.Component):
                         with m.If(self.config.WRITE_BACK & dirty_mem[next_block_replacement][0].data):
                             # We have to write back the block to be replaced first because its dirty
                             m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
-                            m.d.sync += write_back_address.eq(fe_buffer_address)
-                            m.d.sync += write_back_address.word_offset.eq(0) # start at the first word
+                            # Construct the correct address
+                            m.d.sync += write_back_address.index.eq(fe_buffer_address.index)
+                            m.d.sync += write_back_address.tag.eq(tag_mem[next_block_replacement][0].data)
+                            m.d.sync += write_back_address.word_offset.eq(0)
                             m.d.sync += write_back_way.eq(next_block_replacement)
                             m.d.sync += write_back_next_state.eq(next_state)
                             # initiate a read from data_mem for the data to be written back
