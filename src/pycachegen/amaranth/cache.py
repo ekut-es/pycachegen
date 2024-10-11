@@ -336,6 +336,9 @@ class Cache(wiring.Component):
                 with m.Else():
                     # We're not done yet, come back after mem request has finished
                     m.d.sync += send_mem_request_next_state.eq(States.WRITE_BACK_BLOCK)
+                    # initiate read for the word to be written back next
+                    m.d.comb += data_mem[write_back_way][0].addr.eq(write_back_address.as_value() + 1)
+                    m.d.comb += data_mem[write_back_way][0].en.eq(1)
             with m.Case(States.SEND_MEM_REQUEST):
                 # Wait for the lower memory to become ready
                 with m.If(self.be.port_ready):
@@ -362,13 +365,15 @@ class Cache(wiring.Component):
                             # Else increse the counter
                             m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
                         # Now do the actual writing the be read data into the block in the data_mem
-                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(Cat(be_read_data_word_counter, be_buffer_address.index))
+                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(Cat(be_read_data_word_counter + be_buffer_address.word_offset, be_buffer_address.index))
                         m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_read_data_total_word_offset, self.config.DATA_WIDTH))
                         m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
             with m.Case(States.READ_BLOCK):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(Cat(read_block_word_offset, fe_buffer_address.index, fe_buffer_address.tag))
                 m.d.sync += be_buffer_write_strobe.eq(0)
+                # increment word offset for the read block operation (shouldn't do anything bad if block_size == 1 or block_size == read_block_wc)
+                m.d.sync += read_block_word_offset.eq(read_block_word_offset + self.read_block_wc)
                 with m.If(read_block_word_offset == self.config.BLOCK_SIZE - self.read_block_wc):
                     # We're done, go back
                     m.d.sync += send_mem_request_next_state.eq(States.READ_BLOCK_DONE)
@@ -378,14 +383,18 @@ class Cache(wiring.Component):
                 # Send the memory request except for when its the address to which
                 # we want to write anyway AND write strobe is all ones AND we would not
                 # read any other byte from the word the BE would give is in this request (self.read_block_wc == 1)
-                with m.If(
-                        fe_buffer_write_strobe.all()
-                        & (fe_buffer_address.word_offset == read_block_word_offset)
-                        & (self.read_block_wc == 1)
+                with m.If(~(
+                            fe_buffer_write_strobe.all()
+                            & (fe_buffer_address.word_offset == read_block_word_offset)
+                            & (self.read_block_wc == 1)
+                        )
                     ):
-                    m.d.sync += state.eq(States.READ_BLOCK_DONE)
-                with m.Else():
                     m.d.sync += state.eq(States.SEND_MEM_REQUEST)
+                with m.Elif(read_block_word_offset + 1 == 0):
+                    # If the memory request is not needed AND this the last word in the block,
+                    # then we can go to READ_BLOCK_DONE. Else stay in this state and continue
+                    # with the next word (no state modification needed!)
+                    m.d.sync += state.eq(States.READ_BLOCK_DONE)
             with m.Case(States.READ_BLOCK_DONE):
                 m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(fe_buffer_write_strobe):
