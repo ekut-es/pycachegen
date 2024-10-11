@@ -25,7 +25,7 @@ dependencies = ["veriloggen>=2.3.0", "amaranth[builtin-yosys]==0.5.0"]
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
-dev = ["pre-commit", "bumpver"]
+dev = ["pre-commit", "bumpver", "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/ekut-es/pycachegen"
@@ -41,3 +41,7 @@ push = true
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"',]
 "src/pycachegen/__init__.py" = ['__version__ = "{version}"']
+
+[tool.pytest.ini_options]
+testpaths = "src/pycachegen/amaranth/testbenches"
+python_files = "*_tb_*.py"

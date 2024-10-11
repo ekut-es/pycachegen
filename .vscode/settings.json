@@ -61,5 +61,8 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "bit": "cpp"
-    }
+    },
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
 }
+
