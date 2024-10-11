@@ -21,6 +21,7 @@ class CacheWrapperBenchHelper:
             "{:0=" + str(ceil(cache_wrapper.FE_DATA_WIDTH / 4)) + "X}"
         )
         self.elapsed_time = 0
+        self.max_time = 1000
 
     def _get_timestamp(self):
         return "{: =4}".format(self.elapsed_time)
@@ -32,6 +33,8 @@ class CacheWrapperBenchHelper:
         return "0x" + self._data_format_spec.format(data)
 
     async def _tick(self, ctx, count: int = 1):
+        if self.elapsed_time >= self.max_time:
+            raise RuntimeError("Exceeded maximum simulation time")
         self.elapsed_time += count
         await ctx.tick().repeat(count)
 
@@ -65,6 +68,14 @@ class CacheWrapperBenchHelper:
             self._dut.fe.read_data_valid
         )  # Not that important but it should still happen and thus be checked
         assert ctx.get(self._dut.hit_o) == hit_expected
+
+    async def flush(self, ctx):
+        print(f"{self._get_timestamp()}: Flush")
+        ctx.set(self._dut.fe.flush, 1)
+        await self._tick(ctx)
+        ctx.set(self._dut.fe.flush, 0)
+        while not ctx.get(self._dut.fe.flush_done):
+            await self._tick(ctx)
 
 
 def run_bench(dut, bench, vcd_filename: str = ""):

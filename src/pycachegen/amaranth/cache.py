@@ -22,7 +22,7 @@ class States(Enum):
     STALL = 8
     FLUSH_CACHE = 9
     FLUSH_BACKEND = 10
-    FLUSH_CACHE_BLOCK = 1
+    FLUSH_CACHE_BLOCK = 11
 
 
 class Cache(wiring.Component):
@@ -431,11 +431,8 @@ class Cache(wiring.Component):
                     # Flush the cache
                     # query valid, dirty and tag memories
                     m.d.comb += dirty_mem[flush_block_index][0].addr.eq(flush_set_index)
-                    m.d.comb += dirty_mem[flush_block_index][0].en.eq(1)
                     m.d.comb += valid_mem[flush_block_index][0].addr.eq(flush_set_index)
-                    m.d.comb += valid_mem[flush_block_index][0].addr.eq(1)
                     m.d.comb += tag_mem[flush_block_index][0].addr.eq(flush_set_index)
-                    m.d.comb += tag_mem[flush_block_index][0].addr.eq(1)
                     # Go to a state that will check if this block needs to be flushed
                     m.d.sync += state.eq(States.FLUSH_CACHE_BLOCK)
                 with m.Else():
@@ -469,7 +466,7 @@ class Cache(wiring.Component):
                     m.d.sync += write_back_next_state.eq(next_state)
                     # clear dirty bit
                     m.d.comb += dirty_mem[flush_block_index][1].addr.eq(flush_set_index)
-                    m.d.comb += dirty_mem[flush_block_index][1].data.eq(1)
+                    m.d.comb += dirty_mem[flush_block_index][1].data.eq(0)
                     m.d.comb += dirty_mem[flush_block_index][1].en.eq(1)
                 with m.Else():
                     # Block doesn't need to be written back
