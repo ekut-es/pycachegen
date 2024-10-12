@@ -112,5 +112,57 @@ class ReplacementPolicy(wiring.Component):
                     m.d.comb += next_replacement[self.num_ways_width - 1 - i].eq(
                         bits.bit_select(total_bit_index, 1)
                     )
+        elif self.policy == "plru_mru":
+            mru_bits = Array([Signal(self.num_ways) for _ in range(self.num_sets)])
+
+            # Update the mru bits when a way gets accessed
+            with m.If(self.access_i):
+                with m.If((mru_bits[self.index_i] | (1 << self.way_i)) == -1):
+                    # If all the other bits are 1, clear the other bits and set this bit
+                    m.d.sync += mru_bits[self.index_i].eq(1 << self.way_i)
+                with m.Else():
+                    # Else just set this bit
+                    m.d.sync += mru_bits[self.index_i].eq(
+                        mru_bits[self.index_i] | (1 << self.way_i)
+                    )
+
+            # Compute the next way to replace for each set
+            for next_replacement, bits in zip(next_replacement_regs, mru_bits):
+                # Simply priority encode the negated bits
+                # Doing this in reverse should not really make a difference
+                # but the way to be replaced first will be 0, which is consistent with
+                # the other policies
+                for i in reversed(range(self.num_ways)):
+                    if ~bits[i]:
+                        m.d.comb += next_replacement.eq(i)
+        elif self.policy == "lru":
+            # for each set, create num_ways fields that indicate the age of the field
+            # initialize the ages so that way 0 has the highest age
+            lru_fields = Array(
+                [
+                    [
+                        Signal(range(self.num_ways), init=(self.num_ways - 1 - j))
+                        for j in range(self.num_ways)
+                    ]
+                    for i in range(self.num_sets)
+                ]
+            )
+
+            # Update the age fields when a way gets accessed
+            with m.If(self.access_i):
+                accessed_age = lru_fields[self.set_i][self.way_i]
+                # Increment the age of all younger fields
+                for age_field_idx, age_field in enumerate(lru_fields[self.set_i]):
+                    with m.If(age_field < accessed_age):
+                        m.d.sync += age_field.eq(age_field + 1)
+                        with m.If(age_field == self.num_ways - 2):
+                            # if this way has/had age num_ways - 2, it will now be the oldest
+                            # way - otherwise the oldest way has not changed
+                            m.d.sync += next_replacement_regs[self.set_i].eq(
+                                age_field_idx
+                            )
+
+                # Set the accessed field's age to 0
+                m.d.sync += accessed_age.eq(0)
 
         return m
