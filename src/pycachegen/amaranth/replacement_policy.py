@@ -117,13 +117,13 @@ class ReplacementPolicy(wiring.Component):
 
             # Update the mru bits when a way gets accessed
             with m.If(self.access_i):
-                with m.If((mru_bits[self.index_i] | (1 << self.way_i)) == -1):
+                with m.If((mru_bits[self.set_i] | 1 << self.way_i).all()):
                     # If all the other bits are 1, clear the other bits and set this bit
-                    m.d.sync += mru_bits[self.index_i].eq(1 << self.way_i)
+                    m.d.sync += mru_bits[self.set_i].eq(1 << self.way_i)
                 with m.Else():
                     # Else just set this bit
-                    m.d.sync += mru_bits[self.index_i].eq(
-                        mru_bits[self.index_i] | (1 << self.way_i)
+                    m.d.sync += mru_bits[self.set_i].eq(
+                        mru_bits[self.set_i] | (1 << self.way_i)
                     )
 
             # Compute the next way to replace for each set
@@ -133,7 +133,7 @@ class ReplacementPolicy(wiring.Component):
                 # but the way to be replaced first will be 0, which is consistent with
                 # the other policies
                 for i in reversed(range(self.num_ways)):
-                    if ~bits[i]:
+                    with m.If(~bits[i]):
                         m.d.comb += next_replacement.eq(i)
         elif self.policy == "lru":
             # for each set, create num_ways fields that indicate the age of the field
