@@ -140,10 +140,12 @@ class ReplacementPolicy(wiring.Component):
             # initialize the ages so that way 0 has the highest age
             lru_fields = Array(
                 [
-                    [
-                        Signal(range(self.num_ways), init=(self.num_ways - 1 - j))
-                        for j in range(self.num_ways)
-                    ]
+                    Array(
+                        [
+                            Signal(range(self.num_ways), init=(self.num_ways - 1 - j))
+                            for j in range(self.num_ways)
+                        ]
+                    )
                     for i in range(self.num_sets)
                 ]
             )
