@@ -50,6 +50,15 @@ class CacheWrapperBenchHelper:
         assert ctx.get(self._dut.fe.read_data) == data_expected
         assert ctx.get(self._dut.hit_o) == hit_expected
 
+    async def assert_doesnt_start_read(self, ctx, address: int):
+        print(f"{self._get_timestamp()}: R addr {self._addr_to_str(address)}")
+        ctx.set(self._dut.fe.address, address)
+        ctx.set(self._dut.fe.write_strobe, 0)
+        ctx.set(self._dut.fe.request_valid, 1)
+        await self._tick(ctx)
+        ctx.set(self._dut.fe.request_valid, 0)
+        assert ctx.get(self._dut.fe.port_ready)
+
     async def write(self, ctx, address: int, data: int, hit_expected: bool):
         print(
             f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}"
