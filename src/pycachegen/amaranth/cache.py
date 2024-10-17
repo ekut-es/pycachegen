@@ -144,8 +144,6 @@ class Cache(wiring.Component):
         # block to be replaced next for the set of the current fe_buffer_address
         next_block_replacement = Signal(range(self.config.NUM_WAYS))
         m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.NUM_WAYS, num_sets = self.config.NUM_SETS, policy = self.config.REPLACEMENT_POLICY)
-        # put the replacement signals in an array so we can access them nicely
-        next_replacements = Array([replacement_policy.next_replacement(i) for i in range(self.config.NUM_SETS)])
 
         # Create valid, dirty, tag, data memories - one per way
         # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
@@ -227,7 +225,8 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[i][0].addr.eq(fe_buffer_address)
                     m.d.comb += tag_mem[i][0].addr.eq(fe_buffer_address.index)
                 # buffer the next way to be replaced for this set (shall we need to do that)
-                m.d.sync += next_block_replacement.eq(next_replacements[fe_buffer_address.index])
+                m.d.comb += replacement_policy.set_i.eq(fe_buffer_address.index)
+                m.d.sync += next_block_replacement.eq(replacement_policy.next_replacement_o)
             with m.Case(States.HIT_LOOKUP_DONE):
                 with m.If(hit_vector.any()):
                     # We have a hit

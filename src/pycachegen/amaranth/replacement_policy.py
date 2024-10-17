@@ -22,34 +22,27 @@ class ReplacementPolicy(wiring.Component):
             "replace_i": In(1),
             "set_i": In(range(num_sets)),
             "way_i": In(range(num_ways)),
+            "next_replacement_o": Out(range(num_ways)),
         }
 
         self.num_ways_width = exact_log2(num_ways)
 
-        for i in range(num_sets):
-            io_ports[f"next_replacement_{i}_o"] = Out(range(num_ways))
-
         super().__init__(io_ports)
-
-    def next_replacement(self, index: int):
-        return getattr(self, f"next_replacement_{index}_o")
 
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # Create an array for the way indices so we can access these registers using signals.
-        # Then assign them to the actual outputs.
-        next_replacement_regs = Array(
-            [Signal(range(self.num_ways)) for _ in range(self.num_sets)]
-        )
-        for i in range(self.num_sets):
-            m.d.comb += self.next_replacement(i).eq(next_replacement_regs[i])
-
         if self.policy == "fifo":
+            # Array of the way indices that were accessed last for each set
+            next_replacement_regs = Array(
+                [Signal(range(self.num_ways)) for _ in range(self.num_sets)]
+            )
             with m.If(self.replace_i):
                 m.d.sync += next_replacement_regs[self.set_i].eq(
                     next_replacement_regs[self.set_i] + 1
                 )
+
+            m.d.comb += self.next_replacement_o.eq(next_replacement_regs[self.set_i])
         elif self.policy == "plru_tree":
             # Array of the tree bits. Store one tree per set.
             # Imagine that the leaves of a tree are the blocks, so there are num_ways leaves per tree.
@@ -92,26 +85,25 @@ class ReplacementPolicy(wiring.Component):
                         plru_bits[self.set_i].bit_select(total_bit_index, 1).eq(new_bit)
                     )
 
-            # Compute the next way to replace for each set
-            for next_replacement, bits in zip(next_replacement_regs, plru_bits):
-                # To do this, we basically do the opposite of what we did when a way gets accessed
-                # Walk from the root down to the leaf. Each layer will add one bit the the way to replace (next_replacement).
-                # At the first layer, the next_replacement bit simply gets set to bits[0]
-                # At the following layers, use the previous bits (next_replacement[self.num_ways_width-i:]) to compute
-                # the position we're currently at. Then use that current position to compute the position of the left/right child,
-                # depending on what the current bit is. With this new position, we can lookup the new bit for next_replacement[self.num_ways_width - 1 - i].
-                for i in range(self.num_ways_width):
-                    # the previous next_replacement bits indicate the index of the current bit within the current row/layer
-                    index_within_layer = next_replacement[self.num_ways_width - i :]
-                    # the index of the first bit inside this layer is just the number of nodes in the previous layers
-                    index_of_first_bit = 2**i - 1
-                    # if we add those two together, we get the total index
-                    total_bit_index = index_within_layer + index_of_first_bit
+            # Compute the next way to replace
+            # To do this, we basically do the opposite of what we did when a way gets accessed
+            # Walk from the root down to the leaf. Each layer will add one bit the the way to replace (next_replacement_o).
+            # At the first layer, the next_replacement bit simply gets set to plru_bits[...][0]
+            # At the following layers, use the previous bits (next_replacement_o[self.num_ways_width-i:]) to compute
+            # the position we're currently at. Then use that current position to compute the position of the left/right child,
+            # depending on what the current bit is. With this new position, we can lookup the new bit for next_replacement_o[self.num_ways_width - 1 - i].
+            for i in range(self.num_ways_width):
+                # the previous next_replacement bits indicate the index of the current bit within the current row/layer
+                index_within_layer = self.next_replacement_o[self.num_ways_width - i :]
+                # the index of the first bit inside this layer is just the number of nodes in the previous layers
+                index_of_first_bit = 2**i - 1
+                # if we add those two together, we get the total index
+                total_bit_index = index_within_layer + index_of_first_bit
 
-                    # now assign the plru_bits bit at that position to the next_replacement bit
-                    m.d.comb += next_replacement[self.num_ways_width - 1 - i].eq(
-                        bits.bit_select(total_bit_index, 1)
-                    )
+                # now assign the plru_bits bit at that position to the next_replacement bit
+                m.d.comb += self.next_replacement_o[self.num_ways_width - 1 - i].eq(
+                    plru_bits[self.set_i].bit_select(total_bit_index, 1)
+                )
         elif self.policy == "plru_mru":
             mru_bits = Array([Signal(self.num_ways) for _ in range(self.num_sets)])
 
@@ -126,15 +118,14 @@ class ReplacementPolicy(wiring.Component):
                         mru_bits[self.set_i] | (1 << self.way_i)
                     )
 
-            # Compute the next way to replace for each set
-            for next_replacement, bits in zip(next_replacement_regs, mru_bits):
-                # Simply priority encode the negated bits
-                # Doing this in reverse should not really make a difference
-                # but the way to be replaced first will be 0, which is consistent with
-                # the other policies
-                for i in reversed(range(self.num_ways)):
-                    with m.If(~bits[i]):
-                        m.d.comb += next_replacement.eq(i)
+            # Compute the next way to replace
+            # Simply priority encode the negated bits
+            # Doing this in reverse should not really make a difference, but
+            # the way to be replaced first will be 0, which is consistent with
+            # the other policies
+            for i in reversed(range(self.num_ways)):
+                with m.If(~mru_bits[self.set_i][i]):
+                    m.d.comb += self.next_replacement_o.eq(i)
         elif self.policy == "lru":
             # for each set, create num_ways fields that indicate the age of the field
             # initialize the ages so that way 0 has the highest age
@@ -154,17 +145,16 @@ class ReplacementPolicy(wiring.Component):
             with m.If(self.access_i):
                 accessed_age = lru_fields[self.set_i][self.way_i]
                 # Increment the age of all younger fields
-                for age_field_idx, age_field in enumerate(lru_fields[self.set_i]):
+                for age_field in lru_fields[self.set_i]:
                     with m.If(age_field < accessed_age):
                         m.d.sync += age_field.eq(age_field + 1)
-                        with m.If(age_field == self.num_ways - 2):
-                            # if this way has/had age num_ways - 2, it will now be the oldest
-                            # way - otherwise the oldest way has not changed
-                            m.d.sync += next_replacement_regs[self.set_i].eq(
-                                age_field_idx
-                            )
 
                 # Set the accessed field's age to 0
                 m.d.sync += accessed_age.eq(0)
+
+            # Compute the next way to replace
+            for i, age_field in enumerate(lru_fields[self.set_i]):
+                with m.If(age_field == self.num_ways - 1):
+                    m.d.comb += self.next_replacement_o.eq(i)
 
         return m
