@@ -96,10 +96,6 @@ class Cache(wiring.Component):
         state = Signal(States)
         # FSM state that will be taken after the SEND_MEM_REQUEST state
         send_mem_request_next_state = Signal(States)
-        # register for counting the time it took to execute a request
-        latency_counter = Signal(
-            range(max(self.config.HIT_LATENCY, self.config.MISS_LATENCY))
-        )
         # one bit per way to indicate a hit in that way
         hit_vector = Signal(unsigned(self.config.NUM_WAYS))
         # purely for statistics: let the outside know if we had a hit
@@ -213,7 +209,6 @@ class Cache(wiring.Component):
                     m.d.sync += self.fe.read_data_valid.eq(0)
                 with m.Elif(self.fe.request_valid):
                     m.d.sync += state.eq(States.HIT_LOOKUP)
-                    m.d.sync += latency_counter.eq(latency_counter + 1)
                     # Reset fe outputs
                     m.d.sync += self.fe.read_data_valid.eq(0)
                     # buffer inputs
@@ -228,7 +223,6 @@ class Cache(wiring.Component):
                         m.d.comb += tag_mem[i][0].addr.eq(fe_address_view.index)
             with m.Case(States.HIT_LOOKUP):
                 m.d.sync += state.eq(States.HIT_LOOKUP_DONE)
-                m.d.sync += latency_counter.eq(latency_counter + 1)
                 # check whether we have a hit in any way
                 for i in range(self.config.NUM_WAYS):
                     m.d.sync += hit_vector[i].eq(
@@ -245,7 +239,6 @@ class Cache(wiring.Component):
                 # buffer the next way to be replaced for this set (shall we need to do that)
                 m.d.sync += next_block_replacement.eq(next_replacements[fe_buffer_address.index])
             with m.Case(States.HIT_LOOKUP_DONE):
-                m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(hit_vector.any()):
                     # We have a hit
                     # update the replacement policy state
@@ -322,7 +315,6 @@ class Cache(wiring.Component):
                             m.d.sync += state.eq(next_state)
             with m.Case(States.WRITE_BACK_BLOCK):
                 # Write back the block specified by the respective registers
-                m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(write_back_address)
                 m.d.sync += be_buffer_write_strobe.eq(-1)
                 # data_mem read needs to be initiated by previous state
@@ -343,13 +335,11 @@ class Cache(wiring.Component):
                 # Wait for the lower memory to become ready
                 with m.If(self.be.port_ready):
                     # Send request to lower memory
-                    m.d.sync += latency_counter.eq(latency_counter + 1)
                     m.d.sync += state.eq(States.SEND_MEM_REQUEST_WAIT)
                     m.d.comb += self.be.request_valid.eq(1)
             with m.Case(States.SEND_MEM_REQUEST_WAIT):
                 with m.If(be_buffer_write_strobe.any() | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
                     # The last request was "processed" (write request was accepted, read request got answered)
-                    m.d.sync += latency_counter.eq(latency_counter + 1)
                     with m.If(be_buffer_write_strobe.any()):
                         # Write - go to the next state
                         m.d.sync += state.eq(send_mem_request_next_state)
@@ -371,7 +361,6 @@ class Cache(wiring.Component):
                         m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_read_data_total_word_offset, self.config.DATA_WIDTH))
                         m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
             with m.Case(States.READ_BLOCK):
-                m.d.sync += latency_counter.eq(latency_counter + 1)
                 m.d.sync += be_buffer_address.eq(Cat(read_block_word_offset, fe_buffer_address.index, fe_buffer_address.tag))
                 m.d.sync += be_buffer_write_strobe.eq(0)
                 # increment word offset for the read block operation (shouldn't do anything bad if block_size == 1 or block_size == read_block_wc)
@@ -398,7 +387,6 @@ class Cache(wiring.Component):
                     # with the next word (no state modification needed!)
                     m.d.sync += state.eq(States.READ_BLOCK_DONE)
             with m.Case(States.READ_BLOCK_DONE):
-                m.d.sync += latency_counter.eq(latency_counter + 1)
                 with m.If(fe_buffer_write_strobe):
                     # Handle write request
                     # Write data to internal data_mem
@@ -419,20 +407,13 @@ class Cache(wiring.Component):
                     m.d.sync += read_data_mem_select.eq(next_block_replacement)
             with m.Case(States.STALL):
                 # Check if the configured latency was reached. Get ready and hand out
-                # the read data if that is the case.
-                hit_latency_reached =  hit_vector.any() & ((self.config.HIT_LATENCY == 0) | (latency_counter == (self.config.HIT_LATENCY - 1)))
-                miss_latency_reached = (~hit_vector.any()) & ((self.config.MISS_LATENCY == 0) | (latency_counter == (self.config.MISS_LATENCY - 1)))
-                with m.If(hit_latency_reached | miss_latency_reached):
-                    # latency reached
-                    # hand out read data
-                    m.d.sync += self.fe.read_data_valid.eq(~(fe_buffer_write_strobe.any()))
-                    m.d.sync += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
-                    # reset latency counter
-                    m.d.sync += latency_counter.eq(0)
-                    # go to READY again
-                    m.d.sync += state.eq(States.READY)
-                with m.Else():
-                    m.d.sync += latency_counter.eq(latency_counter + 1)
+                # the read data if that is the case. FIXME Remove this comment once the change below gets implemented
+                # FIXME remoe Stall state entirely since the latency parameter is no longer supported
+                # hand out read data
+                m.d.sync += self.fe.read_data_valid.eq(~(fe_buffer_write_strobe.any()))
+                m.d.sync += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
+                # go to READY again
+                m.d.sync += state.eq(States.READY)
             with m.Case(States.FLUSH_CACHE):
                 with m.If(self.config.WRITE_BACK):
                     # Flush the cache
@@ -488,8 +469,6 @@ class Cache(wiring.Component):
                         # If the port is ready and we've already sent the request, then
                         # the backend must be done flushing
                         m.d.sync += state.eq(States.READY)
-                        # latency counter was incremented all the time by write back state, reset it
-                        m.d.sync += latency_counter.eq(0)
                         # reset flush requested register
                         m.d.sync += be_flush_requested.eq(0)
 
