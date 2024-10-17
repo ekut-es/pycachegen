@@ -29,8 +29,6 @@ class MainMemory(wiring.Component):
         # whether a request is currently being processed
         processing_request = Signal(1)
         m.d.comb += self.fe.port_ready.eq(~processing_request)
-        # Memory cant be flushed so its always done flushing
-        m.d.comb += self.fe.flush_done.eq(1)
         # type of current request (read: 0, write: 1)
         request_type = Signal(1)
         # counter for counting the execution time of a request

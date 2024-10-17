@@ -83,7 +83,7 @@ class CacheWrapperBenchHelper:
         ctx.set(self._dut.fe.flush, 1)
         await self._tick(ctx)
         ctx.set(self._dut.fe.flush, 0)
-        while not ctx.get(self._dut.fe.flush_done):
+        while not ctx.get(self._dut.fe.port_ready):
             await self._tick(ctx)
 
 

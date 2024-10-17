@@ -17,7 +17,6 @@ class MemoryBusSignature(wiring.Signature):
                 ("read_data_valid", In(1)),
                 ("port_ready", In(1)),
                 ("flush", Out(1)),
-                ("flush_done", In(1)),
             ]
         )
 

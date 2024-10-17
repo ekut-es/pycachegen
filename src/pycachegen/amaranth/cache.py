@@ -77,7 +77,6 @@ class Cache(wiring.Component):
         )
         fe_buffer_write_data = Signal(self.config.DATA_WIDTH)
         fe_buffer_write_strobe = Signal(self.bytes_per_word)
-        fe_buffer_flush = Signal(1)
 
         ## backend output buffers
         # Create be buffers that use our own data/address/write strobe widths
@@ -208,14 +207,15 @@ class Cache(wiring.Component):
 
         with m.Switch(state):
             with m.Case(States.READY):
-                with m.If(self.fe.flush | fe_buffer_flush):
+                with m.If(self.fe.flush):
                     m.d.sync += state.eq(States.FLUSH_CACHE)
+                    # Reset fe outputs
+                    m.d.sync += self.fe.read_data_valid.eq(0)
                 with m.Elif(self.fe.request_valid):
                     m.d.sync += state.eq(States.HIT_LOOKUP)
                     m.d.sync += latency_counter.eq(latency_counter + 1)
                     # Reset fe outputs
                     m.d.sync += self.fe.read_data_valid.eq(0)
-                    m.d.sync += self.fe.flush_done.eq(0)
                     # buffer inputs
                     m.d.sync += fe_buffer_address.eq(self.fe.address)
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
@@ -429,15 +429,11 @@ class Cache(wiring.Component):
                     m.d.sync += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
                     # reset latency counter
                     m.d.sync += latency_counter.eq(0)
-                    # directly proceed with flushing if a flush was requested, else go to READY state
-                    with m.If(fe_buffer_flush):
-                        m.d.sync += state.eq(States.FLUSH_CACHE)
-                    with m.Else():
-                        m.d.sync += state.eq(States.READY)
+                    # go to READY again
+                    m.d.sync += state.eq(States.READY)
                 with m.Else():
                     m.d.sync += latency_counter.eq(latency_counter + 1)
             with m.Case(States.FLUSH_CACHE):
-                m.d.sync += self.fe.flush_done.eq(0)
                 with m.If(self.config.WRITE_BACK):
                     # Flush the cache
                     # query valid, dirty and tag memories
@@ -483,22 +479,18 @@ class Cache(wiring.Component):
                     # Block doesn't need to be written back
                     m.d.sync += state.eq(next_state)
             with m.Case(States.FLUSH_BACKEND):
-                with m.If(~be_flush_requested):
-                    # Send flush signal to be
-                    m.d.comb += self.be.flush.eq(1)
-                    m.d.sync += be_flush_requested.eq(1)
-                with m.Elif(self.be.flush_done):
-                    # be is also done flushing
-                    m.d.sync += state.eq(States.READY)
-                    m.d.sync += self.fe.flush_done.eq(1)
-                    m.d.sync += fe_buffer_flush.eq(0)
-                    # latency counter was incremented all the time by write back state, reset it
-                    m.d.sync += latency_counter.eq(0)
-                    # reset flush requested
-                    m.d.sync += be_flush_requested.eq(0)
-
-        with m.If((state != States.FLUSH_CACHE) & (state != States.FLUSH_CACHE_BLOCK) & (state != States.FLUSH_BACKEND)):
-            # Always accept new flush requests (except for when we're already flushing)
-            m.d.sync += fe_buffer_flush.eq(fe_buffer_flush | self.fe.flush)
+                with m.If(self.be.port_ready):
+                    with m.If(~be_flush_requested):
+                        # Send flush signal to be once it gets ready
+                        m.d.comb += self.be.flush.eq(1)
+                        m.d.sync += be_flush_requested.eq(1)
+                    with m.Else():
+                        # If the port is ready and we've already sent the request, then
+                        # the backend must be done flushing
+                        m.d.sync += state.eq(States.READY)
+                        # latency counter was incremented all the time by write back state, reset it
+                        m.d.sync += latency_counter.eq(0)
+                        # reset flush requested register
+                        m.d.sync += be_flush_requested.eq(0)
 
         return m
