@@ -21,10 +21,9 @@ class States(Enum):
     READ_BLOCK_DONE = 5
     SEND_MEM_REQUEST = 6
     SEND_MEM_REQUEST_WAIT = 7
-    STALL = 8
-    FLUSH_CACHE = 9
-    FLUSH_BACKEND = 10
-    FLUSH_CACHE_BLOCK = 11
+    FLUSH_CACHE = 8
+    FLUSH_BACKEND = 9
+    FLUSH_CACHE_BLOCK = 10
 
 
 class Cache(wiring.Component):
@@ -111,9 +110,6 @@ class Cache(wiring.Component):
                 )
         # counter for the READ BLOCK state that indicates how many words have been read so far
         read_block_word_offset = Signal(self.config.word_offset_width)
-        # Index of the data_mem that contains the data requested
-        # Used in the STALL state to select the read data from the correct data_mem
-        read_data_mem_select = Signal(range(self.config.num_ways))
         # index of the set to be flushed next
         flush_set_index = Signal(self.config.index_width)
         # index of the block that is currently being flushed
@@ -155,6 +151,11 @@ class Cache(wiring.Component):
             # thats necessary because the read data might only be needed
             # after several cycles
             m.d.comb += data_mem[-1][0].en.eq(0)
+
+        # Index of the data_mem that contains the data requested by the frontend
+        read_data_mem_select = Signal(range(self.config.num_ways))
+        # Use that index to assign the correct read data to the fe port
+        m.d.comb += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
 
         ## things for write back
         # address and way to identify the block to be written back
@@ -225,21 +226,22 @@ class Cache(wiring.Component):
                         if self.config.write_back:
                             # mark dirty if write back
                             m.d.sync += dirty_mem[hit_index][fe_buffer_address.index].eq(1)
-                            m.d.sync += state.eq(States.STALL)
+                            m.d.sync += state.eq(States.READY)
                         else:
                             # write to lower mem if write through
-                            send_fe_buffer_request_to_lower_mem(next_state=States.STALL)
+                            send_fe_buffer_request_to_lower_mem(next_state=States.READY)
                     with m.Else():
                         # handle read
-                        m.d.sync += state.eq(States.STALL)
+                        m.d.sync += state.eq(States.READY)
+                        m.d.sync += read_data_mem_select.eq(hit_index)
+                        m.d.sync += self.fe.read_data_valid.eq(1)
                         m.d.comb += data_mem[hit_index][0].addr.eq(fe_buffer_address)
                         m.d.comb += data_mem[hit_index][0].en.eq(1)
-                        m.d.sync += read_data_mem_select.eq(hit_index)
                 with m.Else():
                     # Handle miss
                     with m.If((not self.config.write_allocate) & fe_buffer_write_strobe.any()):
                         # write miss and write no-allocate -> only write to lower memory
-                        send_fe_buffer_request_to_lower_mem(next_state=States.STALL)
+                        send_fe_buffer_request_to_lower_mem(next_state=States.READY)
                     with m.Else():
                         # It's a miss and we have to replace a block
 
@@ -360,26 +362,18 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[next_block_replacement][1].data.eq(fe_buffer_write_data)
                     m.d.comb += data_mem[next_block_replacement][1].en.eq(fe_buffer_write_strobe)
                     with m.If(self.config.write_back):
-                        # Stall if write back
-                        m.d.sync += state.eq(States.STALL)
+                        # We're done if using write back
+                        m.d.sync += state.eq(States.READY)
                     with m.Else():
                         # Send request to lower memory if write through
-                        send_fe_buffer_request_to_lower_mem(States.STALL)
+                        send_fe_buffer_request_to_lower_mem(States.READY)
                 with m.Else():
                     # Handle read request
-                    m.d.sync += state.eq(States.STALL)
+                    m.d.sync += state.eq(States.READY)
+                    m.d.sync += read_data_mem_select.eq(next_block_replacement)
+                    m.d.sync += self.fe.read_data_valid.eq(1)
                     m.d.comb += data_mem[next_block_replacement][0].addr.eq(fe_buffer_address)
                     m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
-                    m.d.sync += read_data_mem_select.eq(next_block_replacement)
-            with m.Case(States.STALL):
-                # Check if the configured latency was reached. Get ready and hand out
-                # the read data if that is the case. FIXME Remove this comment once the change below gets implemented
-                # FIXME remoe Stall state entirely since the latency parameter is no longer supported
-                # hand out read data
-                m.d.sync += self.fe.read_data_valid.eq(~(fe_buffer_write_strobe.any()))
-                m.d.sync += self.fe.read_data.eq(data_mem[read_data_mem_select][0].data)
-                # go to READY again
-                m.d.sync += state.eq(States.READY)
             with m.Case(States.FLUSH_CACHE):
                 with m.If(self.config.write_back):
                     # Flush the cache
