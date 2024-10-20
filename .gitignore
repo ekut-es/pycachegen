@@ -164,6 +164,7 @@ cython_debug/
 
 # Verilator
 *.vcd
+vcd/
 
 # SystemC
 systemc-2.3.3

@@ -3,6 +3,7 @@ import inspect
 from math import ceil
 from amaranth.sim import Simulator
 from pycachegen.amaranth.cache_wrapper import CacheWrapper
+from pathlib import Path
 
 
 class CacheWrapperBenchHelper:
@@ -87,12 +88,14 @@ class CacheWrapperBenchHelper:
             await self._tick(ctx)
 
 
-def run_bench(dut, bench, vcd_filename: str = ""):
+def run_bench(dut, bench, vcd_path: str = "vcd", vcd_filename: str = ""):
     """Runs the given testbench on the given dut.
-    The waveform will be recorded and saved under the given filename.
+    The waveform will be recorded and saved using the given filename
+    in the given file path.
     If no filename was provided, the filename of the calling function
     will be used with the .py suffix replaced by .vcd.
     """
+    # setup simulator
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
@@ -101,5 +104,8 @@ def run_bench(dut, bench, vcd_filename: str = ""):
         if not caller_filename.endswith(".py"):
             raise RuntimeError("Automatic vcd filename determination failed.")
         vcd_filename = caller_filename.removesuffix(".py") + ".vcd"
-    with sim.write_vcd(vcd_filename):
+    # create output directory
+    Path(vcd_path).mkdir(parents=True, exist_ok=True)
+    # run simulation and save vcd in output directory
+    with sim.write_vcd(str(Path(vcd_path, vcd_filename))):
         sim.run()
