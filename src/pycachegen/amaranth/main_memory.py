@@ -9,7 +9,6 @@ from pycachegen.amaranth.memory_bus import MemoryBusSignature
 class MainMemory(wiring.Component):
     def __init__(self, config: InternalMemoryConfig) -> None:
         self.config = config
-        self.bytes_per_word = config.DATA_WIDTH // config.BYTE_SIZE
 
         super().__init__(
             {
@@ -17,7 +16,7 @@ class MainMemory(wiring.Component):
                     MemoryBusSignature(
                         address_width=config.ADDRESS_WIDTH,
                         data_width=config.DATA_WIDTH,
-                        bytes_per_word=self.bytes_per_word,
+                        bytes_per_word=config.BYTES_PER_WORD,
                     )
                 )
             }

@@ -90,7 +90,7 @@ def assert_address_config_valid(
     to the address width.
 
     Args:
-        address_width (int): width of the word addressing address (without the bits for a byte offset)
+        address_width (int): width of the address (addresses don't include any byte offset bits)
         num_sets (int): number of sets
         num_ways (int): number of ways
         block_size (int): words per block
@@ -148,12 +148,12 @@ def assert_address_range_valid(
     min_address: int, max_address: int, address_width: int
 ) -> None:
     """Throws an error if the given address range has size 0 or if it is not within the boundaries
-    set by the address width.
+    set by the address width. Note that addresses generally don't include any byte offset bits.
 
     Args:
-        min_address (int): The smallest address (inclusive) including byte offset bits.
-        max_address (int): The greatest address (exclusive) including byte offset bits.
-        address_width (int): The width of the address in bits, including byte offset bits.
+        min_address (int): The smallest address (inclusive).
+        max_address (int): The greatest address (exclusive).
+        address_width (int): The width of the address in bits.
     """
     if min_address >= max_address:
         raise ConfigurationError(
@@ -282,8 +282,8 @@ class MemoryConfig:
             data_width (int): Width of one data word in bits.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. This parameter includes a byte offset.
-            max_address (int): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. This parameter includes a byte offset.
+            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
+            max_address (int): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset.
         """
         self.DATA_WIDTH = data_width
         self.READ_LATENCY = read_latency
@@ -312,12 +312,10 @@ class InternalMemoryConfig:
         assert_greater_equal(memory_config.WRITE_LATENCY, 2, "write_latency")
         assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
 
-        byte_offset_width = exact_log2(memory_config.DATA_WIDTH // byte_size)
-
         assert_address_range_valid(
             memory_config.MIN_ADDRESS,
             memory_config.MAX_ADDRESS,
-            address_width + byte_offset_width,
+            address_width,
         )
 
         self.DATA_WIDTH = memory_config.DATA_WIDTH
@@ -325,6 +323,7 @@ class InternalMemoryConfig:
         self.READ_LATENCY = memory_config.READ_LATENCY
         self.WRITE_LATENCY = memory_config.WRITE_LATENCY
         self.BYTE_SIZE = byte_size
-        self.MIN_ADDRESS = memory_config.MIN_ADDRESS >> byte_offset_width
-        self.MAX_ADDRESS = memory_config.MAX_ADDRESS >> byte_offset_width
+        self.MIN_ADDRESS = memory_config.MIN_ADDRESS
+        self.MAX_ADDRESS = memory_config.MAX_ADDRESS
         self.ENABLE_RESET = enable_reset
+        self.BYTES_PER_WORD = memory_config.DATA_WIDTH // byte_size

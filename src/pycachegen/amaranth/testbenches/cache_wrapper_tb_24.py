@@ -20,7 +20,7 @@ def test():
             read_latency=10,
             write_latency=15,
             min_address=0,
-            max_address=16,
+            max_address=8,
         ),
     )
 

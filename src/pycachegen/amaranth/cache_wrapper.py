@@ -33,7 +33,7 @@ class CacheWrapper(wiring.Component):
             arbiter_policy (str): Policy for the arbiter in case there is more than one port. Can be one of "fifo", "priority", "round_robin".
             byte_size (int): Number of bits per byte.
             enable_reset (bool): Whether to generate reset logic or not. Right now this only affects the main memory module (disabling it there is necessary for generating BRAM during synthesis) but no other modules because otherwise there is a simulation mismatch.
-            address_width (int): Address width including the byte offset bits.
+            address_width (int): Address width. Note that addresses do not include a byte offset.
             memory_config (MemoryConfig): Configuration for the main memory.
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
         """

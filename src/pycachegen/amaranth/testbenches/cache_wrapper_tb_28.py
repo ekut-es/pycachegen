@@ -19,8 +19,8 @@ def test():
             data_width=16,
             read_latency=10,
             write_latency=15,
-            min_address=84,
-            max_address=98,
+            min_address=42,
+            max_address=49,
         ),
     )
 

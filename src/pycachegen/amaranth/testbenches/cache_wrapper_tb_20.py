@@ -43,7 +43,7 @@ def test():
             read_latency=10,
             write_latency=15,
             min_address=0,
-            max_address=64,
+            max_address=4,
         ),
     )
 
