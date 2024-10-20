@@ -1,7 +1,7 @@
 from math import ceil
 from enum import Enum
 from amaranth import *
-from amaranth.lib import wiring, data, coding
+from amaranth.lib import wiring, data
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
@@ -9,6 +9,7 @@ from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.amaranth.memory_bus import MemoryBusSignature
 from pycachegen.amaranth.cache_address import CacheAddressLayout
 from pycachegen.amaranth.replacement_policy import ReplacementPolicy
+from pycachegen.amaranth.elaborate_utils import one_hot_encode
 
 
 class States(Enum):
@@ -102,10 +103,7 @@ class Cache(wiring.Component):
         # purely for statistics: let the outside know if we had a hit
         m.d.comb += self.hit_o.eq(hit_vector.any())
         # one hot encode the vector into this signal
-        hit_index = Signal(range(self.config.NUM_WAYS))
-        m.submodules.hit_index_encoder = hit_index_encoder = coding.Encoder(hit_vector.shape().width)
-        m.d.comb += hit_index_encoder.i.eq(hit_vector)
-        m.d.comb += hit_index.eq(hit_index_encoder.o)
+        hit_index = one_hot_encode(m, hit_vector)
         # a view for convenient access to the tag/index/word offset bits
         fe_address_view = data.View(self.address_layout, self.fe.address)
         # counter for counting which word of the be read data to write to the
