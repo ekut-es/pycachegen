@@ -3,7 +3,11 @@ from .tb_utils import (
     run_bench,
 )
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
+from pycachegen.cache_config_validation import (
+    CacheConfig,
+    MemoryConfig,
+    ReplacementPolicies,
+)
 
 
 # Testbench for testing the plru_tree replacement policy
@@ -19,9 +23,7 @@ def test():
                 data_width=16,
                 num_ways=4,
                 num_sets=2,
-                replacement_policy="plru_tree",
-                hit_latency=10,
-                miss_latency=15,
+                replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_through=True,
                 write_allocate=False,
                 block_size=1,

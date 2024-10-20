@@ -14,9 +14,9 @@ class MainMemory(wiring.Component):
             {
                 "fe": In(
                     MemoryBusSignature(
-                        address_width=config.ADDRESS_WIDTH,
-                        data_width=config.DATA_WIDTH,
-                        bytes_per_word=config.BYTES_PER_WORD,
+                        address_width=config.address_width,
+                        data_width=config.data_width,
+                        bytes_per_word=config.bytes_per_word,
                     )
                 )
             }
@@ -32,22 +32,22 @@ class MainMemory(wiring.Component):
         request_type = Signal(1)
         # counter for counting the execution time of a request
         latency_counter = Signal(
-            range(max(self.config.READ_LATENCY, self.config.WRITE_LATENCY))
+            range(max(self.config.read_latency, self.config.write_latency))
         )
         # align address for Amaranth Memory with specified memory range
         aligned_address = Signal(
-            range(0, self.config.MAX_ADDRESS - self.config.MIN_ADDRESS)
+            range(0, self.config.max_address - self.config.min_address)
         )
-        m.d.comb += aligned_address.eq(self.fe.address - self.config.MIN_ADDRESS)
+        m.d.comb += aligned_address.eq(self.fe.address - self.config.min_address)
 
         # Create data memory
         m.submodules.data_memory = data_memory = Memory(
-            shape=unsigned(self.config.DATA_WIDTH),
-            depth=(self.config.MAX_ADDRESS - self.config.MIN_ADDRESS),
+            shape=unsigned(self.config.data_width),
+            depth=(self.config.max_address - self.config.min_address),
             init=[],
         )
 
-        write_port = data_memory.write_port(granularity=self.config.BYTE_SIZE)
+        write_port = data_memory.write_port(granularity=self.config.byte_size)
         m.d.comb += write_port.addr.eq(aligned_address)
         m.d.comb += write_port.data.eq(self.fe.write_data)
 
@@ -58,8 +58,8 @@ class MainMemory(wiring.Component):
         with m.If(~processing_request):
             with m.If(
                 self.fe.request_valid
-                & (self.fe.address >= self.config.MIN_ADDRESS)
-                & (self.fe.address < self.config.MAX_ADDRESS)
+                & (self.fe.address >= self.config.min_address)
+                & (self.fe.address < self.config.max_address)
             ):
                 # Buffer inputs
                 m.d.sync += processing_request.eq(1)
@@ -81,11 +81,11 @@ class MainMemory(wiring.Component):
             with m.If(
                 (
                     (request_type == 0)
-                    & (latency_counter == self.config.READ_LATENCY - 1)
+                    & (latency_counter == self.config.read_latency - 1)
                 )
                 | (
                     (request_type == 1)
-                    & (latency_counter == self.config.WRITE_LATENCY - 1)
+                    & (latency_counter == self.config.write_latency - 1)
                 )
             ):
                 # Reset internal registers

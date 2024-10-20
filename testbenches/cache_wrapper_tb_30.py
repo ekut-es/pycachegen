@@ -3,7 +3,11 @@ from .tb_utils import (
     run_bench,
 )
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
+from pycachegen.cache_config_validation import (
+    CacheConfig,
+    MemoryConfig,
+    ReplacementPolicies,
+)
 
 
 # Testbench for testing the LRU replacement policy.
@@ -19,9 +23,7 @@ def test():
                 data_width=16,
                 num_ways=4,
                 num_sets=2,
-                replacement_policy="lru",
-                hit_latency=0,
-                miss_latency=0,
+                replacement_policy=ReplacementPolicies.LRU,
                 write_through=False,
                 write_allocate=True,
                 block_size=1,

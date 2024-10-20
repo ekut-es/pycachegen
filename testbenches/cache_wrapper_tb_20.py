@@ -3,7 +3,11 @@ from .tb_utils import (
     run_bench,
 )
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
+from pycachegen.cache_config_validation import (
+    CacheConfig,
+    MemoryConfig,
+    ReplacementPolicies,
+)
 
 
 # Testbench for testing different data widths with a block size of 1.
@@ -19,9 +23,7 @@ def test():
                 data_width=8,
                 num_ways=1,
                 num_sets=4,
-                replacement_policy="plru_tree",
-                hit_latency=10,
-                miss_latency=15,
+                replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_through=False,
                 write_allocate=True,
                 block_size=1,
@@ -30,9 +32,7 @@ def test():
                 data_width=64,
                 num_ways=1,
                 num_sets=2,
-                replacement_policy="plru_tree",
-                hit_latency=10,
-                miss_latency=15,
+                replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_through=False,
                 write_allocate=True,
                 block_size=1,

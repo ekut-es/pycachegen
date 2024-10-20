@@ -1,7 +1,13 @@
+from enum import Enum
 from math import floor, ceil
 from amaranth.utils import exact_log2, ceil_log2
 
-REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru", "lru")
+
+class ReplacementPolicies(Enum):
+    FIFO = "fifo"
+    PLRU_TREE = "plru_tree"
+    PLRU_MRU = "plru_mru"
+    LRU = "lru"
 
 
 class ConfigurationError(ValueError):
@@ -34,20 +40,6 @@ def assert_is_power_of_two(i: int, name: str) -> None:
     """
     if not is_power_of_two(i):
         raise ConfigurationError(f"{name} needs to be a power of two.")
-
-
-def assert_replacement_policy_is_valid(name: str, valid_policies: list[str]) -> None:
-    """Throw an error if the string is not a valid replacement policy.
-
-    Args:
-        name (str): name to be checked
-        valid_policies (list[str]): list of all valid replacement policies
-
-    Raises:
-        ConfigurationError: Error that gets thrown if the replacement policy is invalid
-    """
-    if name not in valid_policies:
-        raise ConfigurationError(f"Replacement Policy must be one of {valid_policies}")
 
 
 def assert_same_address_space(dw1: int, aw1: int, dw2: int, aw2: int) -> None:
@@ -173,9 +165,7 @@ class CacheConfig:
         data_width: int,
         num_ways: int,
         num_sets: int,
-        replacement_policy: str,
-        hit_latency: int,
-        miss_latency: int,
+        replacement_policy: ReplacementPolicies,
         write_through: bool,
         write_allocate: bool,
         block_size: int,
@@ -186,22 +176,18 @@ class CacheConfig:
             data_width (int): Width of one data word in bits.
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
-            replacement_policy (str): Can be either "fifo", "plru_mru" or "plru_tree"
-            hit_latency (int): hit latency of the cache (in addition to any time the lower memory might need). Can be 0 so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
-            miss_latency (int): miss latency of the cache (in addition to any time the lower memory might need). Can be 0 so that the cache will not stall artificially. Otherwise needs to match or be greater than the caches minimum worst case latency.
+            replacement_policy (ReplacementPolicies): The replacement policy to use.
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
         """
-        self.DATA_WIDTH = data_width
-        self.NUM_WAYS = num_ways
-        self.NUM_SETS = num_sets
-        self.REPLACEMENT_POLICY = replacement_policy
-        self.HIT_LATENCY = hit_latency
-        self.MISS_LATENCY = miss_latency
-        self.WRITE_THROUGH = write_through
-        self.WRITE_ALLOCATE = write_allocate
-        self.BLOCK_SIZE = block_size
+        self.data_width = data_width
+        self.num_ways = num_ways
+        self.num_sets = num_sets
+        self.replacement_policy = replacement_policy
+        self.write_through = write_through
+        self.write_allocate = write_allocate
+        self.block_size = block_size
 
 
 class InternalCacheConfig:
@@ -212,7 +198,6 @@ class InternalCacheConfig:
         be_data_width: int,
         be_address_width: int,
         byte_size: int,
-        prefix: str,
         enable_reset: bool,
     ) -> None:
         """Class for validating cache configs in a cache hierarchy and for passing on all needed
@@ -224,47 +209,51 @@ class InternalCacheConfig:
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
-            prefix (str): A prefix to use for the module name.
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
-        assert_data_width_valid(cache_config.DATA_WIDTH, byte_size)
+        assert_data_width_valid(cache_config.data_width, byte_size)
         assert_data_width_valid(
             be_data_width, byte_size
         )  # technically this is checked in the BE config too
-        assert_is_power_of_two(cache_config.NUM_WAYS, "num_ways")
-        assert_is_power_of_two(cache_config.NUM_SETS, "num_sets")
-        assert_is_power_of_two(cache_config.BLOCK_SIZE, "block_size")
-        assert_replacement_policy_is_valid(
-            cache_config.REPLACEMENT_POLICY, REPLACEMENT_POLICIES
-        )
+        assert_is_power_of_two(cache_config.num_ways, "num_ways")
+        assert_is_power_of_two(cache_config.num_sets, "num_sets")
+        assert_is_power_of_two(cache_config.block_size, "block_size")
         assert_same_address_space(
-            dw1=cache_config.DATA_WIDTH,
+            dw1=cache_config.data_width,
             aw1=address_width,
             dw2=be_data_width,
             aw2=be_address_width,
         )
         assert_address_config_valid(
             address_width=address_width,
-            num_sets=cache_config.NUM_SETS,
-            num_ways=cache_config.NUM_WAYS,
-            block_size=cache_config.BLOCK_SIZE,
+            num_sets=cache_config.num_sets,
+            num_ways=cache_config.num_ways,
+            block_size=cache_config.block_size,
         )
-        assert_be_data_width_valid(cache_config.DATA_WIDTH, be_data_width)
-        self.DATA_WIDTH = cache_config.DATA_WIDTH
-        self.ADDRESS_WIDTH = address_width
-        self.NUM_WAYS = cache_config.NUM_WAYS
-        self.NUM_SETS = cache_config.NUM_SETS
-        self.REPLACEMENT_POLICY = cache_config.REPLACEMENT_POLICY
-        self.HIT_LATENCY = cache_config.HIT_LATENCY
-        self.MISS_LATENCY = cache_config.MISS_LATENCY
-        self.WRITE_BACK = not cache_config.WRITE_THROUGH
-        self.WRITE_ALLOCATE = cache_config.WRITE_ALLOCATE
-        self.BLOCK_SIZE = cache_config.BLOCK_SIZE
-        self.BE_DATA_WIDTH = be_data_width
-        self.BE_ADDRESS_WIDTH = be_address_width
-        self.BYTE_SIZE = byte_size
-        self.PREFIX = prefix
-        self.ENABLE_RESET = enable_reset
+        assert_be_data_width_valid(cache_config.data_width, be_data_width)
+        self.data_width = cache_config.data_width
+        self.address_width = address_width
+        self.num_ways = cache_config.num_ways
+        self.num_sets = cache_config.num_sets
+        self.replacement_policy = cache_config.replacement_policy
+        self.write_back = not cache_config.write_through
+        self.write_allocate = cache_config.write_allocate
+        self.block_size = cache_config.block_size
+        self.be_data_width = be_data_width
+        self.be_address_width = be_address_width
+        self.byte_size = byte_size
+        self.enable_reset = enable_reset
+        self.bytes_per_word = cache_config.data_width // byte_size
+        self.be_bytes_per_word = be_data_width // byte_size
+        self.index_width = exact_log2(cache_config.num_sets)
+        self.word_offset_width = exact_log2(cache_config.block_size)
+        self.tag_width = address_width - self.index_width - self.word_offset_width
+        # how many times bigger the be words are compared to ours
+        self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
+        # the words read from the BE cache can be bigger than our own words so
+        # we might be able to extract multiple words from that single word. This
+        # variable specifies how many times we can do that per BE word.
+        self.read_block_wc = min(self.be_byte_multiplier, cache_config.block_size)
 
 
 class MemoryConfig:
@@ -285,11 +274,11 @@ class MemoryConfig:
             min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
             max_address (int): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset.
         """
-        self.DATA_WIDTH = data_width
-        self.READ_LATENCY = read_latency
-        self.WRITE_LATENCY = write_latency
-        self.MIN_ADDRESS = min_address
-        self.MAX_ADDRESS = max_address
+        self.data_width = data_width
+        self.read_latency = read_latency
+        self.write_latency = write_latency
+        self.min_address = min_address
+        self.max_address = max_address
 
 
 class InternalMemoryConfig:
@@ -308,22 +297,22 @@ class InternalMemoryConfig:
             byte_size (int): Number of bits per byte.
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
-        assert_greater_equal(memory_config.READ_LATENCY, 2, "read_latency")
-        assert_greater_equal(memory_config.WRITE_LATENCY, 2, "write_latency")
-        assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
+        assert_greater_equal(memory_config.read_latency, 2, "read_latency")
+        assert_greater_equal(memory_config.write_latency, 2, "write_latency")
+        assert_data_width_valid(memory_config.data_width, byte_size)
 
         assert_address_range_valid(
-            memory_config.MIN_ADDRESS,
-            memory_config.MAX_ADDRESS,
+            memory_config.min_address,
+            memory_config.max_address,
             address_width,
         )
 
-        self.DATA_WIDTH = memory_config.DATA_WIDTH
-        self.ADDRESS_WIDTH = address_width
-        self.READ_LATENCY = memory_config.READ_LATENCY
-        self.WRITE_LATENCY = memory_config.WRITE_LATENCY
-        self.BYTE_SIZE = byte_size
-        self.MIN_ADDRESS = memory_config.MIN_ADDRESS
-        self.MAX_ADDRESS = memory_config.MAX_ADDRESS
-        self.ENABLE_RESET = enable_reset
-        self.BYTES_PER_WORD = memory_config.DATA_WIDTH // byte_size
+        self.data_width = memory_config.data_width
+        self.address_width = address_width
+        self.read_latency = memory_config.read_latency
+        self.write_latency = memory_config.write_latency
+        self.byte_size = byte_size
+        self.min_address = memory_config.min_address
+        self.max_address = memory_config.max_address
+        self.enable_reset = enable_reset
+        self.bytes_per_word = memory_config.data_width // byte_size

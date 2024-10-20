@@ -2,16 +2,19 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
+from pycachegen.cache_config_validation import ReplacementPolicies
 
 
 class ReplacementPolicy(wiring.Component):
-    def __init__(self, num_ways: int, num_sets: int, policy: str) -> None:
+    def __init__(
+        self, num_ways: int, num_sets: int, policy: ReplacementPolicies
+    ) -> None:
         """Replacement policy generator.
 
         Args:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2 and (for now) at least 2.
-            policy (str): Can be either "fifo", "plru_mru", "plru_tree" or "lru".
+            policy (ReplacementPolicies): The policy to use.
         """
         self.num_ways = num_ways
         self.num_sets = num_sets
@@ -32,7 +35,7 @@ class ReplacementPolicy(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        if self.policy == "fifo":
+        if self.policy == ReplacementPolicies.FIFO:
             # Array of the way indices that were accessed last for each set
             next_replacement_regs = Array(
                 [Signal(range(self.num_ways)) for _ in range(self.num_sets)]
@@ -43,7 +46,7 @@ class ReplacementPolicy(wiring.Component):
                 )
 
             m.d.comb += self.next_replacement_o.eq(next_replacement_regs[self.set_i])
-        elif self.policy == "plru_tree":
+        elif self.policy == ReplacementPolicies.PLRU_TREE:
             # Array of the tree bits. Store one tree per set.
             # Imagine that the leaves of a tree are the blocks, so there are num_ways leaves per tree.
             # We only need to store one bit for each node above the leaves (so num_ways-1 bits) since
@@ -104,7 +107,7 @@ class ReplacementPolicy(wiring.Component):
                 m.d.comb += self.next_replacement_o[self.num_ways_width - 1 - i].eq(
                     plru_bits[self.set_i].bit_select(total_bit_index, 1)
                 )
-        elif self.policy == "plru_mru":
+        elif self.policy == ReplacementPolicies.PLRU_MRU:
             mru_bits = Array([Signal(self.num_ways) for _ in range(self.num_sets)])
 
             # Update the mru bits when a way gets accessed
@@ -126,7 +129,7 @@ class ReplacementPolicy(wiring.Component):
             for i in reversed(range(self.num_ways)):
                 with m.If(~mru_bits[self.set_i][i]):
                     m.d.comb += self.next_replacement_o.eq(i)
-        elif self.policy == "lru":
+        elif self.policy == ReplacementPolicies.LRU:
             # for each set, create num_ways fields that indicate the age of the field
             # initialize the ages so that way 0 has the highest age
             lru_fields = Array(

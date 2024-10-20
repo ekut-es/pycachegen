@@ -1,6 +1,10 @@
 from amaranth.back import verilog
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import CacheConfig, MemoryConfig
+from pycachegen.cache_config_validation import (
+    CacheConfig,
+    MemoryConfig,
+    ReplacementPolicies,
+)
 
 cache_wrapper = CacheWrapper(
     num_ports=1,
@@ -13,16 +17,14 @@ cache_wrapper = CacheWrapper(
             data_width=16,
             num_ways=4,
             num_sets=16,
-            replacement_policy="fifo",
-            hit_latency=10,
-            miss_latency=15,
+            replacement_policy=ReplacementPolicies.FIFO,
             write_through=True,
             write_allocate=False,
             block_size=1,
         )
     ],
     memory_config=MemoryConfig(
-        data_width=16, read_latency=10, write_latency=15, min_address=0, max_address=512
+        data_width=16, read_latency=10, write_latency=15, min_address=0, max_address=256
     ),
 )
 
