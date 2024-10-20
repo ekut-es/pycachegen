@@ -1,7 +1,7 @@
-from math import log2
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 from pycachegen.cache_config_validation import (
     MemoryConfig,
     CacheConfig,
@@ -53,15 +53,15 @@ class CacheWrapper(wiring.Component):
         self.CACHE_CONFIGS: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
-            cache_address_width = self.FE_ADDRESS_WIDTH - int(
-                log2(config.DATA_WIDTH // self.FE_DATA_WIDTH)
+            cache_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
+                config.DATA_WIDTH // self.FE_DATA_WIDTH
             )
             if i < len(cache_configs) - 1:
                 be_data_width = cache_configs[i + 1].DATA_WIDTH
             else:
                 be_data_width = memory_config.DATA_WIDTH
-            be_address_width = self.FE_ADDRESS_WIDTH - int(
-                log2(be_data_width // self.FE_DATA_WIDTH)
+            be_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
+                be_data_width // self.FE_DATA_WIDTH
             )
             self.CACHE_CONFIGS.append(
                 InternalCacheConfig(
@@ -76,8 +76,8 @@ class CacheWrapper(wiring.Component):
             )
 
         # create internal memory config
-        memory_address_width = self.FE_ADDRESS_WIDTH - int(
-            log2(memory_config.DATA_WIDTH // self.FE_DATA_WIDTH)
+        memory_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
+            memory_config.DATA_WIDTH // self.FE_DATA_WIDTH
         )
         self.MEMORY_CONFIG = InternalMemoryConfig(
             memory_config=memory_config,
@@ -93,7 +93,7 @@ class CacheWrapper(wiring.Component):
         #     self.L1_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
         #     self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
         self.FE_BYTES_PER_WORD = self.FE_DATA_WIDTH // self.BYTE_SIZE
-        # self.FE_BYTE_OFFSET_WIDTH = int(log2(self.FE_BYTES_PER_WORD))
+        # self.FE_BYTE_OFFSET_WIDTH = exact_log2(self.FE_BYTES_PER_WORD)
 
         super().__init__(
             {

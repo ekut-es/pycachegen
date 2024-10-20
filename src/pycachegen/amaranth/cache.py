@@ -1,9 +1,10 @@
-from math import log2, ceil
+from math import ceil
 from enum import Enum
 from amaranth import *
 from amaranth.lib import wiring, data, coding
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.amaranth.memory_bus import MemoryBusSignature
 from pycachegen.amaranth.cache_address import CacheAddressLayout
@@ -30,8 +31,8 @@ class Cache(wiring.Component):
         self.config = config
         self.bytes_per_word = config.DATA_WIDTH // config.BYTE_SIZE
         self.be_bytes_per_word = config.BE_DATA_WIDTH // config.BYTE_SIZE
-        self.index_width = int(log2(config.NUM_SETS))
-        self.word_offset_width = int(log2(config.BLOCK_SIZE))
+        self.index_width = exact_log2(config.NUM_SETS)
+        self.word_offset_width = exact_log2(config.BLOCK_SIZE)
         self.tag_width = (
             config.ADDRESS_WIDTH - self.index_width - self.word_offset_width
         )

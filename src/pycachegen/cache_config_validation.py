@@ -1,4 +1,5 @@
-from math import log2, floor, ceil
+from math import floor, ceil
+from amaranth.utils import exact_log2, ceil_log2
 
 REPLACEMENT_POLICIES = ("fifo", "plru_tree", "plru_mru", "lru")
 
@@ -98,7 +99,7 @@ def assert_address_config_valid(
         ConfigurationError: Error that gets thrown if the configuration is invalid.
     """
     # Check that there are enough address bits for the sets and the block size
-    bits_required = int(log2(num_sets)) + int(log2(block_size))
+    bits_required = exact_log2(num_sets) + exact_log2(block_size)
     if bits_required > address_width:
         raise ConfigurationError(
             f"The number of sets and the block size require {bits_required} bits in the address, but the address is only {address_width} bits wide"
@@ -106,7 +107,7 @@ def assert_address_config_valid(
 
     # Check that there are not more ways than data words that would be stored in one set
     tag_width = address_width - bits_required
-    if int(log2(num_ways)) > tag_width:
+    if exact_log2(num_ways) > tag_width:
         raise ConfigurationError(
             f"The tag is only {tag_width} bits wide but the cache has {num_ways} ways, so there are more ways than data words that would be stored in the same set"
         )
@@ -158,16 +159,17 @@ def assert_address_range_valid(
         raise ConfigurationError(
             f"min_address ({min_address}) needs to be smaller than the max_address ({max_address})"
         )
-    bits_needed = ceil(log2(max_address))
+    bits_needed = ceil_log2(max_address)
     if bits_needed > address_width:
         raise ConfigurationError(
             f"max_address is {max_address} and needs at least {bits_needed} address bits, "
             + f"but the address is only {address_width} bits wide"
         )
 
+
 class CacheConfig:
     def __init__(
-            self,
+        self,
         data_width: int,
         num_ways: int,
         num_sets: int,
@@ -201,6 +203,7 @@ class CacheConfig:
         self.WRITE_ALLOCATE = write_allocate
         self.BLOCK_SIZE = block_size
 
+
 class InternalCacheConfig:
     def __init__(
         self,
@@ -210,13 +213,13 @@ class InternalCacheConfig:
         be_address_width: int,
         byte_size: int,
         prefix: str,
-        enable_reset: bool
+        enable_reset: bool,
     ) -> None:
         """Class for validating cache configs in a cache hierarchy and for passing on all needed
         arguments to a cache.
 
         Args:
-            
+
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
@@ -225,13 +228,20 @@ class InternalCacheConfig:
             enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         assert_data_width_valid(cache_config.DATA_WIDTH, byte_size)
-        assert_data_width_valid(be_data_width, byte_size) # technically this is checked in the BE config too
+        assert_data_width_valid(
+            be_data_width, byte_size
+        )  # technically this is checked in the BE config too
         assert_is_power_of_two(cache_config.NUM_WAYS, "num_ways")
         assert_is_power_of_two(cache_config.NUM_SETS, "num_sets")
         assert_is_power_of_two(cache_config.BLOCK_SIZE, "block_size")
-        assert_replacement_policy_is_valid(cache_config.REPLACEMENT_POLICY, REPLACEMENT_POLICIES)
+        assert_replacement_policy_is_valid(
+            cache_config.REPLACEMENT_POLICY, REPLACEMENT_POLICIES
+        )
         assert_same_address_space(
-            dw1=cache_config.DATA_WIDTH, aw1=address_width, dw2=be_data_width, aw2=be_address_width
+            dw1=cache_config.DATA_WIDTH,
+            aw1=address_width,
+            dw2=be_data_width,
+            aw2=be_address_width,
         )
         assert_address_config_valid(
             address_width=address_width,
@@ -239,7 +249,7 @@ class InternalCacheConfig:
             num_ways=cache_config.NUM_WAYS,
             block_size=cache_config.BLOCK_SIZE,
         )
-        assert_be_data_width_valid(cache_config.DATA_WIDTH, be_data_width)        
+        assert_be_data_width_valid(cache_config.DATA_WIDTH, be_data_width)
         self.DATA_WIDTH = cache_config.DATA_WIDTH
         self.ADDRESS_WIDTH = address_width
         self.NUM_WAYS = cache_config.NUM_WAYS
@@ -255,6 +265,7 @@ class InternalCacheConfig:
         self.BYTE_SIZE = byte_size
         self.PREFIX = prefix
         self.ENABLE_RESET = enable_reset
+
 
 class MemoryConfig:
     def __init__(
@@ -280,13 +291,14 @@ class MemoryConfig:
         self.MIN_ADDRESS = min_address
         self.MAX_ADDRESS = max_address
 
+
 class InternalMemoryConfig:
     def __init__(
         self,
         memory_config: MemoryConfig,
         address_width: int,
         byte_size: int,
-        enable_reset: bool
+        enable_reset: bool,
     ) -> None:
         """Class for validating memory configs in a cache hierarchy and for passing on all needed
         arguments to a memory.
@@ -300,9 +312,13 @@ class InternalMemoryConfig:
         assert_greater_equal(memory_config.WRITE_LATENCY, 2, "write_latency")
         assert_data_width_valid(memory_config.DATA_WIDTH, byte_size)
 
-        byte_offset_width = int(log2(memory_config.DATA_WIDTH / byte_size))
+        byte_offset_width = exact_log2(memory_config.DATA_WIDTH // byte_size)
 
-        assert_address_range_valid(memory_config.MIN_ADDRESS, memory_config.MAX_ADDRESS, address_width + byte_offset_width)
+        assert_address_range_valid(
+            memory_config.MIN_ADDRESS,
+            memory_config.MAX_ADDRESS,
+            address_width + byte_offset_width,
+        )
 
         self.DATA_WIDTH = memory_config.DATA_WIDTH
         self.ADDRESS_WIDTH = address_width
