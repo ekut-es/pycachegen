@@ -40,14 +40,23 @@ class CacheWrapperBenchHelper:
         await ctx.tick().repeat(count)
 
     async def read(self, ctx, address: int, data_expected: int, hit_expected: bool):
+        # send request
         print(f"{self._get_timestamp()}: R addr {self._addr_to_str(address)}")
         ctx.set(self._dut.fe.address, address)
         ctx.set(self._dut.fe.write_strobe, 0)
         ctx.set(self._dut.fe.request_valid, 1)
+        # invalidate request
         await self._tick(ctx)
         ctx.set(self._dut.fe.request_valid, 0)
+        # wait until the response is there
         while not ctx.get(self._dut.fe.read_data_valid):
             await self._tick(ctx)
+        assert ctx.get(self._dut.fe.read_data) == data_expected
+        assert ctx.get(self._dut.hit_o) == hit_expected
+        # wait until the port gets ready again
+        while not ctx.get(self._dut.fe.port_ready):
+            await self._tick(ctx)
+        # check that the read data is still the same
         assert ctx.get(self._dut.fe.read_data) == data_expected
         assert ctx.get(self._dut.hit_o) == hit_expected
 

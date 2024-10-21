@@ -10,7 +10,7 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing multiple bytes per word
+# Testbench for testing multiple words per block
 def test():
     dut = CacheWrapper(
         num_ports=1,
