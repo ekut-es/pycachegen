@@ -93,33 +93,35 @@ class Cache(wiring.Component):
         # data_mem next.
         be_read_data_word_counter = Signal(range(self.config.read_block_wc))
         # the full index for pulling a word out of a be word
-        be_read_data_total_word_offset = Signal(self.config.address_width - self.config.be_address_width)
-        # if self.config.block_size == 1:
-        #     # block size == 1 -> the bits we cut off from the be buffer address are the index
-        #     m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address.as_value()[: -self.config.be_address_width])
-        # elif self.config.address_width - self.config.be_address_width <= self.config.word_offset_width:
-        #     # one block is exactly one be word or needs multiple be words -> the counter is the index
-        #     m.d.comb += be_read_data_total_word_offset.eq(be_buffer_address.word_offset + be_read_data_word_counter)
-        # elif self.config.address_width - self.config.be_address_width > self.config.word_offset_width:
-        #     # one be word is as big as two or more of our blocks -> take the bits we cut off + the counter as index
-        #     m.d.comb += be_read_data_total_word_offset.eq(
-        #         Cat(
-        #             (be_buffer_address.word_offset + be_read_data_word_counter)[:self.config.word_offset_width],
-        #             be_buffer_address.as_value()[self.config.word_offset_width : -self.config.be_address_width]
-        #             )
-        #         )
-        # just add the cut off bits and the word counter bits together
-        m.d.comb += be_read_data_total_word_offset.eq(
-            Cat(
-                (be_buffer_address.word_offset + be_read_data_word_counter)[:self.config.word_offset_width],
-                be_buffer_address.index,
-                be_buffer_address.tag
-            )
-        )
-        # m.d.comb += be_read_data_total_word_offset.eq(
-        #     be_buffer_address.as_value()[: -self.config.be_address_width]
-        #     + be_read_data_word_counter
-        # )
+        addr_width_difference = self.config.address_width - self.config.be_address_width
+        # when the be address width is smaller than our own, this signal contains the bits that get cut off
+        be_address_cut_off_bits = Signal(unsigned(addr_width_difference))
+        m.d.comb += be_address_cut_off_bits.eq(be_buffer_address)
+        # in the send_mem_request_wait state we might take multiple words out of the be read data and write
+        # them to the cache. this signal contains the bits onto which we have to add the counter for this
+        # procedure. The higher bits of cut_off_bits must not be changed - we need the overflow to happen
+        # within iteration_bits, so that we don't accidentally jump into the next block if one be word
+        # spans multiple of our blocks.
+        be_address_iteration_bits = Signal(range(self.config.read_block_wc))
+        m.d.comb += be_address_iteration_bits.eq(be_address_cut_off_bits)
+        # now add the counter to those bits. as stated above, we need the overflow to happen within the
+        # iteration_bits. We then concatenate the higher bits from cut_off_bits with the result.
+        # This signal specifies the index of the word to extract from the be read data.
+        be_address_incremented_cut_off_bits = Signal(unsigned(addr_width_difference))
+        m.d.comb += be_address_incremented_cut_off_bits.eq(Cat(
+            (be_address_iteration_bits + be_read_data_word_counter)[:len(be_address_iteration_bits)],
+            be_address_cut_off_bits[len(be_address_iteration_bits):]
+        ))
+        # now construct the incremented be buffer address - therefore we need to change out the
+        # lower bits with the incremented_cut_off_bits. This address can be used for addressing
+        # the internal data memories so we know where to write the word we extracted from the be
+        # read data to.
+        incremented_be_buffer_address = Signal(unsigned(self.config.address_width))
+        m.d.comb += incremented_be_buffer_address.eq(Cat(
+            be_address_incremented_cut_off_bits,
+            be_buffer_address.as_value()[addr_width_difference:]
+        ))
+
         # counter for the READ BLOCK state that indicates how many words have been read so far
         read_block_word_offset = Signal(self.config.word_offset_width)
         # index of the set to be flushed next
@@ -341,16 +343,8 @@ class Cache(wiring.Component):
                             # Else increse the counter
                             m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
                         # Now do the actual writing the be read data into the block in the data_mem
-                        # for the address, take the word offset of the original request into account and add our word counter offset to that (+ append the index)
-                        # but consider that one block can be bigger than one be word so when adding the word offset and the word counter together we need to apply
-                        # overflow within the width of the counter.
-                        data_mem_address = Cat(
-                            (be_read_data_word_counter + be_buffer_address.word_offset)[:exact_log2(self.config.read_block_wc)],
-                            be_buffer_address.word_offset[exact_log2(self.config.read_block_wc):],
-                            be_buffer_address.index
-                        )
-                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(data_mem_address)
-                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_read_data_total_word_offset, self.config.data_width))
+                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(incremented_be_buffer_address)
+                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
                         m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
                         with m.If(
                             (be_read_data_word_counter == 0)
@@ -361,7 +355,7 @@ class Cache(wiring.Component):
                             # and the requets was for the be word containing the word requested by the fe (be_buffer_address.word_offset == fe_buffer_address.word_offset)
                             # then hand out the data now
                             m.d.sync += fe_read_data_select_buffer.eq(1)
-                            m.d.sync += fe_read_data_buffer.eq(self.be.read_data.word_select(be_read_data_total_word_offset, self.config.data_width))
+                            m.d.sync += fe_read_data_buffer.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
                             m.d.sync += self.fe.read_data_valid.eq(1)
             with m.Case(States.READ_BLOCK):
                 # Prepare a memory read request
