@@ -20,7 +20,7 @@ class States(Enum):
     READ_BLOCK = 4
     READ_BLOCK_DONE = 5
     SEND_MEM_REQUEST = 6
-    SEND_MEM_REQUEST_WAIT = 7
+    WRITE_BE_READ_DATA_TO_CACHE = 7
     FLUSH_CACHE = 8
     FLUSH_BACKEND = 9
     FLUSH_CACHE_BLOCK = 10
@@ -323,40 +323,39 @@ class Cache(wiring.Component):
                 # Wait for the lower memory to become ready
                 with m.If(self.be.port_ready):
                     # Send request to lower memory
-                    m.d.sync += state.eq(States.SEND_MEM_REQUEST_WAIT)
                     m.d.comb += self.be.request_valid.eq(1)
-            with m.Case(States.SEND_MEM_REQUEST_WAIT):
-                with m.If(be_buffer_write_strobe.any() | self.be.read_data_valid): # FIXME This doesn't make much sense anymore without the write_done signal
-                    # The last request was "processed" (write request was accepted, read request got answered)
                     with m.If(be_buffer_write_strobe.any()):
-                        # Write - go to the next state
+                        # If it is a write, go to the next state
                         m.d.sync += state.eq(send_mem_request_next_state)
                     with m.Else():
-                        with m.If(self.config.read_block_wc == 1):
-                            # We only need to read one word, go to the next state
-                            m.d.sync += state.eq(send_mem_request_next_state)
-                        with m.Elif(be_read_data_word_counter == self.config.read_block_wc - 1):
-                            # If we're done reading all words into the block, go to the next state
-                            m.d.sync += state.eq(send_mem_request_next_state)
-                            m.d.sync += be_read_data_word_counter.eq(0)
-                        with m.Else():
-                            # Else increse the counter
-                            m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
-                        # Now do the actual writing the be read data into the block in the data_mem
-                        m.d.comb += data_mem[next_block_replacement][1].addr.eq(incremented_be_buffer_address)
-                        m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
-                        m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
-                        with m.If(
-                            (be_read_data_word_counter == 0)
-                            & (~fe_buffer_write_strobe.any())
-                            & (be_buffer_address.word_offset == fe_buffer_address.word_offset)
-                        ):
-                            # If we're seeing this word for the first time (be_read_data_word_counter == 0) and the fe request was a read request
-                            # and the requets was for the be word containing the word requested by the fe (be_buffer_address.word_offset == fe_buffer_address.word_offset)
-                            # then hand out the data now
-                            m.d.sync += fe_read_data_select_buffer.eq(1)
-                            m.d.sync += fe_read_data_buffer.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
-                            m.d.sync += self.fe.read_data_valid.eq(1)
+                        # In case of a read, we have to write the be read data to the cache first
+                        m.d.sync += state.eq(States.WRITE_BE_READ_DATA_TO_CACHE)
+            with m.Case(States.WRITE_BE_READ_DATA_TO_CACHE):
+                with m.If(self.be.read_data_valid):
+                    # The read request was processed, now write the data to the cache
+                    m.d.comb += data_mem[next_block_replacement][1].addr.eq(incremented_be_buffer_address)
+                    m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
+                    m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
+                    # Determine if we should hand out the read data to the fe
+                    with m.If(
+                        (be_read_data_word_counter == 0)
+                        & (~fe_buffer_write_strobe.any())
+                        & (be_buffer_address.word_offset == fe_buffer_address.word_offset)
+                    ):
+                        # If we're seeing this word for the first time (be_read_data_word_counter == 0) and the fe request was a read request
+                        # and the requets was for the be word containing the word requested by the fe (be_buffer_address.word_offset == fe_buffer_address.word_offset)
+                        # then hand out the data now
+                        m.d.sync += fe_read_data_select_buffer.eq(1)
+                        m.d.sync += fe_read_data_buffer.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
+                        m.d.sync += self.fe.read_data_valid.eq(1)
+                    # Now determine the next state
+                    with m.If(be_read_data_word_counter == self.config.read_block_wc - 1):
+                        # If we're done reading all words into the block, go to the next state
+                        m.d.sync += state.eq(send_mem_request_next_state)
+                        m.d.sync += be_read_data_word_counter.eq(0)
+                    with m.Else():
+                        # Else increase the counter
+                        m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
             with m.Case(States.READ_BLOCK):
                 # Prepare a memory read request
                 # Critical word first: Start at the word that was requested
