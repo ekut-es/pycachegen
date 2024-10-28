@@ -254,6 +254,7 @@ class InternalCacheConfig:
         # we might be able to extract multiple words from that single word. This
         # variable specifies how many times we can do that per BE word.
         self.read_block_wc = min(self.be_byte_multiplier, cache_config.block_size)
+        self.read_block_wc_width = exact_log2(self.read_block_wc)
 
 
 class MemoryConfig:

@@ -200,47 +200,44 @@ class Cache(wiring.Component):
             m.d.sync += state.eq(States.SEND_MEM_REQUEST)
             m.d.sync += send_mem_request_next_state.eq(next_state)
 
-        ###
-        read_block_wc_width = exact_log2(self.config.read_block_wc)
-        write_block_to_buffer = Signal()
-        write_block_to_buffer_address = Signal(self.address_layout)
-        write_block_to_buffer_counter = Signal(self.config.read_block_wc)
-        write_block_to_buffer_word_offset = Signal(self.config.word_offset_width)
-        write_block_to_buffer_incremented_address = Signal(self.address_layout)
-        m.d.comb += write_block_to_buffer_incremented_address.as_value().eq(write_block_to_buffer_address)
-        m.d.comb += write_block_to_buffer_incremented_address.word_offset.eq(
+        ### Evict operation reads one block of the internal data_mem and writes it to a buffer.
+        # Enable signal to start the operation. Will get disabled once it's done.
+        evict_block_enable = Signal()
+        # The address of the block to write to the buffer
+        evict_block_address = Signal(self.address_layout)
+        # Counts how many cycles have passed since starting the operation
+        evict_block_counter = Signal(range(self.config.block_size + 1))
+        # Construct the address the same way that the read block operation does so that we
+        # evict the blocks in the same order they get overwritten
+        evict_block_incremented_address = Signal(self.address_layout)
+        m.d.comb += evict_block_incremented_address.as_value().eq(evict_block_address)
+        m.d.comb += evict_block_incremented_address.word_offset.eq(
             Cat(
-                (write_block_to_buffer_address.word_offset + write_block_to_buffer_counter)[:read_block_wc_width],
-                (write_block_to_buffer_address.word_offset + write_block_to_buffer_word_offset)[addr_width_difference:]
+                (evict_block_address.word_offset + evict_block_counter)[:self.config.read_block_wc_width],
+                (evict_block_address.word_offset[self.config.read_block_wc_width:] + evict_block_counter[self.config.read_block_wc_width:])
             )
         )
-        write_block_to_buffer_previous_incremented_address = Signal(self.address_layout)
-        write_block_to_buffer_total_counter = Signal(range(self.config.block_size + 1))
+        # remember the previous word offset so we know in which slot of the buffer the read data belongs
+        evict_block_previous_word_offset = Signal(self.config.word_offset_width)
 
-        with m.If(write_block_to_buffer):
-            with m.If(write_block_to_buffer_total_counter < self.config.block_size):
+        with m.If(evict_block_enable):
+            with m.If(evict_block_counter < self.config.block_size):
                 # Send read request to data_mem
-                m.d.comb += data_mem[next_block_replacement][0].addr.eq(write_block_to_buffer_incremented_address)
+                m.d.comb += data_mem[next_block_replacement][0].addr.eq(evict_block_incremented_address)
                 m.d.comb += data_mem[next_block_replacement][0].en.eq(1)
                 # Store the address we just sent a request to
-                m.d.sync += write_block_to_buffer_previous_incremented_address.as_value().eq(write_block_to_buffer_incremented_address)
+                m.d.sync += evict_block_previous_word_offset.eq(evict_block_incremented_address.word_offset)
                 # Increment the total counter
-                m.d.sync += write_block_to_buffer_counter.eq(write_block_to_buffer_counter + 1)
-                m.d.sync += write_block_to_buffer_total_counter.eq(write_block_to_buffer_total_counter + 1)
-                with m.If(write_block_to_buffer_counter == self.config.read_block_wc - 1):
-                    # We're done with the current be word, continue with the next one
-                    m.d.sync += write_block_to_buffer_word_offset.eq(write_block_to_buffer_word_offset + self.config.read_block_wc)
+                m.d.sync += evict_block_counter.eq(evict_block_counter + 1)
 
-            with m.If(write_block_to_buffer_total_counter > 0):
+            with m.If(evict_block_counter > 0):
                 # Write the previously requested word to the buffer
-                m.d.sync += write_back_data[write_block_to_buffer_previous_incremented_address.word_offset].eq(data_mem[next_block_replacement][0].data)
+                m.d.sync += write_back_data[evict_block_previous_word_offset].eq(data_mem[next_block_replacement][0].data)
 
-            with m.If(write_block_to_buffer_total_counter == self.config.block_size):
+            with m.If(evict_block_counter == self.config.block_size):
                 # We're done, reset everything.
-                m.d.sync += write_block_to_buffer.eq(0)
-                m.d.sync += write_block_to_buffer_total_counter.eq(0)
-                m.d.sync += write_block_to_buffer_counter.eq(0)
-                m.d.sync += write_block_to_buffer_word_offset.eq(0)
+                m.d.sync += evict_block_enable.eq(0)
+                m.d.sync += evict_block_counter.eq(0)
         ###
 
         with m.Switch(state):
@@ -340,8 +337,8 @@ class Cache(wiring.Component):
                                     )
                                 )
                                 # Write data_mem block to be replaced into a buffer should we need a write back
-                                m.d.sync += write_block_to_buffer.eq(1)
-                                m.d.sync += write_block_to_buffer_address.as_value().eq(fe_buffer_address)
+                                m.d.sync += evict_block_enable.eq(1)
+                                m.d.sync += evict_block_address.as_value().eq(fe_buffer_address)
                                 # Prepare things for the Write Back State should we transition to it
                                 m.d.sync += write_back_data_from_buffer.eq(1)
                                 m.d.sync += write_back_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
@@ -395,8 +392,8 @@ class Cache(wiring.Component):
                                 )
                             )
                             # Write data_mem block to be replaced into a buffer should we need a write back
-                            m.d.sync += write_block_to_buffer.eq(1)
-                            m.d.sync += write_block_to_buffer_address.as_value().eq(fe_buffer_address)
+                            m.d.sync += evict_block_enable.eq(1)
+                            m.d.sync += evict_block_address.as_value().eq(fe_buffer_address)
                             # Prepare things for the Write Back State should we transition to it
                             m.d.sync += write_back_data_from_buffer.eq(1)
                             m.d.sync += write_back_next_state.eq(States.READY)
