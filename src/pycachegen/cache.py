@@ -57,6 +57,38 @@ class Cache(wiring.Component):
     # fmt: off
     def elaborate(self, platform) -> Module:
         m = Module()
+
+        ## Create valid, dirty, tag, data memories - one per way
+        # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
+        # data memory contains values that represent whole blocks (potentially multiple words!)
+        valid_mem = Array([Array([Signal(name=f"valid_mem_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
+        dirty_mem = Array([Array([Signal(name=f"dirty_mem_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
+        tag_mem = Array()
+        data_mem = Array()
+        for i in range(self.config.num_ways):
+            new_tag_mem = Memory(shape=unsigned(self.config.tag_width), depth=self.config.num_sets, init=[])
+            m.submodules[f"tag_mem_{i}"] = new_tag_mem
+            tag_mem.append((new_tag_mem.read_port(), new_tag_mem.write_port()))
+
+            new_data_mem = Memory(
+                shape=unsigned(self.config.data_width), depth=self.config.num_sets*self.config.block_size, init=[]
+            )
+            m.submodules[f"data_mem_{i}"] = new_data_mem
+            data_mem.append(
+                (
+                    new_data_mem.read_port(),
+                    new_data_mem.write_port(granularity=self.config.byte_size),
+                )
+            )
+            # disable data_mem.read_port.en by default so that the read data gets preserved even when the address changes
+            # thats necessary because the read data might only be needed after several cycles
+            m.d.comb += data_mem[-1][0].en.eq(0)
+
+        ## replacement policy things
+        # block to be replaced next for the set of the current fe_buffer_address
+        next_block_replacement = Signal(range(self.config.num_ways))
+        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.num_ways, num_sets = self.config.num_sets, policy = self.config.replacement_policy)
+
         ## frontend input buffers
         fe_buffer_address = Signal(self.address_layout
         )
@@ -79,8 +111,6 @@ class Cache(wiring.Component):
         ## internal registers
         # FSM state
         state = Signal(States)
-        # FSM state that will be taken after the SEND_MEM_REQUEST state
-        send_mem_request_next_state = Signal(States)
         # one bit per way to indicate a hit in that way
         hit_vector = Signal(unsigned(self.config.num_ways))
         # purely for statistics: let the outside know if we had a hit
@@ -89,88 +119,13 @@ class Cache(wiring.Component):
         hit_index = one_hot_encode(m, hit_vector)
         # a view for convenient access to the tag/index/word offset bits
         fe_address_view = data.View(self.address_layout, self.fe.address)
-        # counter for counting which word of the be read data to write to the
-        # data_mem next.
-        be_read_data_word_counter = Signal(range(self.config.read_block_wc))
-        # the full index for pulling a word out of a be word
-        addr_width_difference = self.config.address_width - self.config.be_address_width
-        # when the be address width is smaller than our own, this signal contains the bits that get cut off
-        be_address_cut_off_bits = Signal(unsigned(addr_width_difference))
-        m.d.comb += be_address_cut_off_bits.eq(be_buffer_address)
-        # in the send_mem_request_wait state we might take multiple words out of the be read data and write
-        # them to the cache. this signal contains the bits onto which we have to add the counter for this
-        # procedure. The higher bits of cut_off_bits must not be changed - we need the overflow to happen
-        # within iteration_bits, so that we don't accidentally jump into the next block if one be word
-        # spans multiple of our blocks.
-        be_address_iteration_bits = Signal(range(self.config.read_block_wc))
-        m.d.comb += be_address_iteration_bits.eq(be_address_cut_off_bits)
-        # now add the counter to those bits. as stated above, we need the overflow to happen within the
-        # iteration_bits. We then concatenate the higher bits from cut_off_bits with the result.
-        # This signal specifies the index of the word to extract from the be read data.
-        be_address_incremented_cut_off_bits = Signal(unsigned(addr_width_difference))
-        m.d.comb += be_address_incremented_cut_off_bits.eq(Cat(
-            (be_address_iteration_bits + be_read_data_word_counter)[:len(be_address_iteration_bits)],
-            be_address_cut_off_bits[len(be_address_iteration_bits):]
-        ))
-        # now construct the incremented be buffer address - therefore we need to change out the
-        # lower bits with the incremented_cut_off_bits. This address can be used for addressing
-        # the internal data memories so we know where to write the word we extracted from the be
-        # read data to.
-        incremented_be_buffer_address = Signal(unsigned(self.config.address_width))
-        m.d.comb += incremented_be_buffer_address.eq(Cat(
-            be_address_incremented_cut_off_bits,
-            be_buffer_address.as_value()[addr_width_difference:]
-        ))
-        # read block operation puts data to be written back in this buffer
-        write_back_data = Array([Signal(unsigned(self.config.data_width), name=f"write_back_data_{i}") for i in range(self.config.block_size)])
-
-        # counter for the READ BLOCK state that indicates how many words have been read so far
-        read_block_word_offset = Signal(self.config.word_offset_width)
-        # index of the set to be flushed next
-        flush_set_index = Signal(self.config.index_width)
-        # index of the block that is currently being flushed
-        flush_block_index = Signal(range(self.config.num_ways))
-        # whether we already told the backend to flush itself
-        be_flush_requested = Signal()
         # Output port ready status based on current state
         m.d.comb += self.fe.port_ready.eq(state == States.READY)
-
-        ## replacement policy things
-        # block to be replaced next for the set of the current fe_buffer_address
-        next_block_replacement = Signal(range(self.config.num_ways))
-        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.num_ways, num_sets = self.config.num_sets, policy = self.config.replacement_policy)
-
-        # Create valid, dirty, tag, data memories - one per way
-        # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
-        # data memory contains values that represent whole blocks (potentially multiple words!)
-        valid_mem = Array([Array([Signal(name=f"valid_mem_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
-        dirty_mem = Array([Array([Signal(name=f"dirty_mem_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
-        tag_mem = Array()
-        data_mem = Array()
-        for i in range(self.config.num_ways):
-            new_tag_mem = Memory(shape=unsigned(self.config.tag_width), depth=self.config.num_sets, init=[])
-            m.submodules[f"tag_mem_{i}"] = new_tag_mem
-            tag_mem.append((new_tag_mem.read_port(), new_tag_mem.write_port()))
-
-            new_data_mem = Memory(
-                shape=unsigned(self.config.data_width), depth=self.config.num_sets*self.config.block_size, init=[]
-            )
-            m.submodules[f"data_mem_{i}"] = new_data_mem
-            data_mem.append(
-                (
-                    new_data_mem.read_port(),
-                    new_data_mem.write_port(granularity=self.config.byte_size),
-                )
-            )
-            # disable data_mem.read_port.en by default so that the read data
-            # gets preserved even when the address changes
-            # thats necessary because the read data might only be needed
-            # after several cycles
-            m.d.comb += data_mem[-1][0].en.eq(0)
-
+        # Whether to hand the data in the buffer out or the data from a data mem
+        fe_read_data_select_buffer = Signal()
         # Index of the data_mem that contains the data requested by the frontend
         read_data_mem_select = Signal(range(self.config.num_ways))
-        fe_read_data_select_buffer = Signal()
+        # Buffer that contains the data requested by the frontend
         fe_read_data_buffer = Signal(unsigned(self.config.data_width))
         # Use that index to assign the correct read data to the fe port
         with m.If(~fe_read_data_select_buffer):
@@ -178,29 +133,56 @@ class Cache(wiring.Component):
         with m.Else():
             m.d.comb += self.fe.read_data.eq(fe_read_data_buffer)
 
-        ## things for write back
-        # address and way to identify the block to be written back
-        write_back_address = Signal(self.address_layout)
-        write_back_way = Signal(range(self.config.num_ways))
-        # state to take after the WRITE_BACK state
-        write_back_next_state = Signal(States)
-        # source of the data to write back. 0: from data mem (read needs to be initiated before entering this state), 1: from write back buffer
-        write_back_data_from_buffer = Signal()
+        ## States.SEND_MEM_REQUEST / States.WRITE_BE_READ_DATA_TO_CACHE
+        # FSM state that will be taken after the SEND_MEM_REQUEST state (or after WRITE_BE_READ_DATA_TO_CACHE)
+        send_mem_request_next_state = Signal(States)
 
+        ## States.WRITE_BE_READ_DATA_TO_CACHE
+        # counter for counting which word of the be read data to write to the data_mem next.
+        be_read_data_word_counter = Signal(range(self.config.read_block_wc))
+        # We need to increment the address based on the counter. But we need to consider that the overflow
+        # has to happen within the lower bits that specify the index of the our-size-word within the be size word
+        # (this index is then stored in the be_address_incremented_cut_off_bits signal)
+        # The READ_BLOCK State will then increment the other word_offset bits for jumping into the next be word.
+        incremented_be_buffer_address = Signal(unsigned(self.config.address_width))
+        m.d.comb += incremented_be_buffer_address.eq(Cat(
+            (be_buffer_address.word_offset + be_read_data_word_counter)[:self.config.read_block_wc_width],
+            be_buffer_address.as_value()[self.config.read_block_wc_width:]
+        ))
+        addr_width_difference = self.config.address_width - self.config.be_address_width
+        # This signal specifies the index of the word to extract from the be read data.
+        be_address_incremented_cut_off_bits = Signal(unsigned(addr_width_difference))
+        m.d.comb += be_address_incremented_cut_off_bits.eq(incremented_be_buffer_address)
+
+        ## States.READ_BLOCK
+        # counter for the READ BLOCK state that indicates how many words have been read so far
+        read_block_word_offset = Signal(self.config.word_offset_width)
         # state that read block should take next
         read_block_next_state = Signal(States)
 
-        def send_fe_buffer_request_to_lower_mem(next_state: States):
-            """Uses the request stored in the fe buffers to send a request
-            to the lower memory. Goes to the SEND_MEM_REQUEST state to do so.
-            """
-            m.d.sync += be_buffer_address.eq(fe_buffer_address)
-            m.d.sync += be_buffer_write_data.eq(fe_buffer_write_data)
-            m.d.sync += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
-            m.d.sync += state.eq(States.SEND_MEM_REQUEST)
-            m.d.sync += send_mem_request_next_state.eq(next_state)
+        ## States.FLUSH_CACHE / States.FLUSH_CACHE_BLOCK / States.FLUSH_BACKEND
+        # index of the set to be flushed next
+        flush_set_index = Signal(self.config.index_width)
+        # index of the block that is currently being flushed
+        flush_block_index = Signal(range(self.config.num_ways))
+        # whether we already told the backend to flush itself
+        be_flush_requested = Signal()
 
-        ### Evict operation reads one block of the internal data_mem and writes it to a buffer.
+        ## States.WRITE_BACK_BLOCk
+        # address and way to identify the block to be written back
+        write_back_address = Signal(self.address_layout)
+        # source of the data to write back.
+        # 0: from data mem (read needs to be initiated before entering this state. way needs to be specified in next signal),
+        # 1: from write back buffer
+        write_back_data_from_buffer = Signal()
+        # data memory way that contains the data to be written back
+        write_back_way = Signal(range(self.config.num_ways))
+        # state to take after the WRITE_BACK state
+        write_back_next_state = Signal(States)
+
+        ## Evict operation reads one block of the internal data_mem and writes it to a buffer.
+        # evict block operation puts data to be written back in this buffer
+        evicted_block_buffer = Array([Signal(unsigned(self.config.data_width), name=f"write_back_data_{i}") for i in range(self.config.block_size)])
         # Enable signal to start the operation. Will get disabled once it's done.
         evict_block_enable = Signal()
         # The address of the block to write to the buffer
@@ -232,13 +214,22 @@ class Cache(wiring.Component):
 
             with m.If(evict_block_counter > 0):
                 # Write the previously requested word to the buffer
-                m.d.sync += write_back_data[evict_block_previous_word_offset].eq(data_mem[next_block_replacement][0].data)
+                m.d.sync += evicted_block_buffer[evict_block_previous_word_offset].eq(data_mem[next_block_replacement][0].data)
 
             with m.If(evict_block_counter == self.config.block_size):
                 # We're done, reset everything.
                 m.d.sync += evict_block_enable.eq(0)
                 m.d.sync += evict_block_counter.eq(0)
-        ###
+
+        def send_fe_buffer_request_to_lower_mem(next_state: States):
+            """Uses the request stored in the fe buffers to send a request
+            to the lower memory. Goes to the SEND_MEM_REQUEST state to do so.
+            """
+            m.d.sync += be_buffer_address.eq(fe_buffer_address)
+            m.d.sync += be_buffer_write_data.eq(fe_buffer_write_data)
+            m.d.sync += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
+            m.d.sync += state.eq(States.SEND_MEM_REQUEST)
+            m.d.sync += send_mem_request_next_state.eq(next_state)
 
         with m.Switch(state):
             with m.Case(States.READY):
@@ -411,7 +402,7 @@ class Cache(wiring.Component):
                 m.d.sync += be_buffer_write_strobe.eq(-1)
                 with m.If(write_back_data_from_buffer):
                     # take the data from the buffer
-                    m.d.sync += be_buffer_write_data.eq(write_back_data[write_back_address.word_offset])
+                    m.d.sync += be_buffer_write_data.eq(evicted_block_buffer[write_back_address.word_offset])
                 with m.Else():
                     # take the data from the data memory
                     m.d.sync += be_buffer_write_data.eq(data_mem[write_back_way][0].data)
