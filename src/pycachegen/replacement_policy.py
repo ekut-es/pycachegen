@@ -40,6 +40,7 @@ class ReplacementPolicy(wiring.Component):
             next_replacement_regs = Array(
                 [Signal(range(self.num_ways)) for _ in range(self.num_sets)]
             )
+            # Update the policy state if a block gets replaced
             with m.If(self.replace_i):
                 m.d.sync += next_replacement_regs[self.set_i].eq(
                     next_replacement_regs[self.set_i] + 1
