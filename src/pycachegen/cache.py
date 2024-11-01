@@ -260,14 +260,7 @@ class Cache(wiring.Component):
                     # purely for statistics: let the outside know if we had a hit
                     m.d.sync += self.hit_o.eq(hit_vector.any())
 
-                    # we might need the data from the data/tag mems
-                    # so read from all of them
-                    for i in range(self.config.num_ways):
-                        m.d.comb += data_mem[i][0].en.eq(1)
-                        m.d.comb += data_mem[i][0].addr.eq(self.fe.address)
-                        m.d.comb += tag_mem[i][0].addr.eq(fe_address_view.index)
-
-                    # buffer the next way to be replaced for this set (shall we need to do that)
+                    # query replacement policy and buffer the next way to be replaced for this set
                     m.d.comb += replacement_policy.set_i.eq(fe_address_view.index)
                     m.d.sync += next_block_replacement.eq(replacement_policy.next_replacement_o)
                     with m.If(hit_vector.any()):
@@ -437,13 +430,6 @@ class Cache(wiring.Component):
                     m.d.comb += data_mem[next_block_replacement][1].addr.eq(incremented_be_buffer_address)
                     m.d.comb += data_mem[next_block_replacement][1].en.eq(-1)
                     m.d.comb += data_mem[next_block_replacement][1].data.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
-                    # with m.If(fe_buffer_write_strobe.any() & (incremented_be_buffer_address[:self.config.word_offset_width] == fe_buffer_address.word_offset)):
-                    #     # We're reading in the word to which the frontend wants to write -> merge the data
-                    #     for i in range(self.config.bytes_per_word):
-                    #         # For each byte, check whether the write strobe is set and if that is the case overwrite the write data to the data mem
-                    #         with m.If(fe_buffer_write_strobe[i]):
-                    #             m.d.comb += data_mem[next_block_replacement][1].data.word_select(i, self.config.byte_size)
-
                     # Determine if we should hand out the read data to the fe
                     with m.If(
                         (be_read_data_word_counter == 0)
