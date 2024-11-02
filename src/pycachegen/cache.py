@@ -65,7 +65,7 @@ class Cache(wiring.Component):
         ## replacement policy things
         # block to be replaced next for the set of the current fe_buffer_address
         next_block_replacement = Signal(range(self.config.num_ways))
-        m.submodules.replacement_policy = replacement_policy = ReplacementPolicy(num_ways = self.config.num_ways, num_sets = self.config.num_sets, policy = self.config.replacement_policy)
+        m.submodules.repl_pol = repl_pol = ReplacementPolicy(num_ways = self.config.num_ways, num_sets = self.config.num_sets, policy = self.config.replacement_policy)
 
         ## frontend input buffers
         fe_buffer_address = Signal(self.address_layout
@@ -239,13 +239,12 @@ class Cache(wiring.Component):
                     # purely for statistics: let the outside know if we had a hit
                     m.d.sync += self.hit_o.eq(hit_vector.any())
                     # query replacement policy and buffer the next way to be replaced for this set
-                    m.d.comb += replacement_policy.set_i.eq(fe_address_view.index)
-                    m.d.sync += next_block_replacement.eq(replacement_policy.next_replacement_o)
+                    way_to_replace = repl_pol.get_way_to_replace(fe_address_view.index, m)
+                    m.d.sync += next_block_replacement.eq(way_to_replace)
                     with m.If(hit_vector.any()):
                         # We have a hit
                         # update the replacement policy state
-                        m.d.comb += replacement_policy.access_i.eq(1)
-                        m.d.comb += replacement_policy.way_i.eq(hit_index)
+                        repl_pol.access(fe_address_view.index, hit_index, m)
                         with m.If(self.fe.write_strobe.any()):
                             # write data to cache
                             memories.init_data_mem_write(hit_index, self.fe.address, self.fe.write_data, self.fe.write_strobe)
@@ -271,15 +270,13 @@ class Cache(wiring.Component):
                         with m.Else():
                             # In all other cases, we have to replace a block
                             # Update valid/dirty/tag memories
-                            m.d.sync += valid_bits[replacement_policy.next_replacement_o][fe_address_view.index].eq(1)
-                            memories.init_tag_mem_write(replacement_policy.next_replacement_o, fe_address_view.index, fe_address_view.tag)
+                            m.d.sync += valid_bits[way_to_replace][fe_address_view.index].eq(1)
+                            memories.init_tag_mem_write(way_to_replace, fe_address_view.index, fe_address_view.tag)
                             if self.config.write_back:
                                 # If it is a write request, mark the block dirty; else clear the dirty bit
-                                m.d.sync += dirty_bits[replacement_policy.next_replacement_o][fe_address_view.index].eq(self.fe.write_strobe.any())
+                                m.d.sync += dirty_bits[way_to_replace][fe_address_view.index].eq(self.fe.write_strobe.any())
                             # update the replacement policy
-                            m.d.comb += replacement_policy.access_i.eq(1)
-                            m.d.comb += replacement_policy.replace_i.eq(1)
-                            m.d.comb += replacement_policy.way_i.eq(replacement_policy.next_replacement_o)
+                            repl_pol.replace(fe_address_view.index, m)
                             with m.If(self.fe.write_strobe.any()):
                                 # Handle write
                                 with m.If((~self.fe.write_strobe.all()) | (self.config.block_size > 1)):
@@ -288,7 +285,7 @@ class Cache(wiring.Component):
                                     m.d.sync += state.eq(States.READ_BLOCK)
                                     m.d.sync += read_block_next_state.eq(
                                         Mux(
-                                            self.config.write_back & dirty_bits[replacement_policy.next_replacement_o][fe_address_view.index],
+                                            self.config.write_back & dirty_bits[way_to_replace][fe_address_view.index],
                                             States.WRITE_BACK_BLOCK,
                                             States.EXECUTE_FE_WRITE_REQUEST
                                         )
@@ -304,7 +301,7 @@ class Cache(wiring.Component):
                                         Cat(
                                             C(0, unsigned(self.config.word_offset_width)),
                                             fe_address_view.index,
-                                            memories.tag_mem_rp[replacement_policy.next_replacement_o].data
+                                            memories.tag_mem_rp[way_to_replace].data
                                         )
                                     )
                                 with m.Else():
@@ -313,22 +310,22 @@ class Cache(wiring.Component):
                                     # TODO Think about whether writing data to the cache and optionally sending the write request
                                     # to the lower mem should only happen inside the execute fe write req state, in a function, or
                                     # if it should stay messy like this
-                                    memories.init_data_mem_write(replacement_policy.next_replacement_o, self.fe.address, self.fe.write_data, self.fe.write_strobe)
+                                    memories.init_data_mem_write(way_to_replace, self.fe.address, self.fe.write_data, self.fe.write_strobe)
                                     if self.config.write_back:
-                                        with m.If(dirty_bits[replacement_policy.next_replacement_o][fe_address_view.index]):
+                                        with m.If(dirty_bits[way_to_replace][fe_address_view.index]):
                                             # write back if dirty
                                             m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
                                             # Construct the correct address
                                             m.d.sync += write_back_address.index.eq(fe_address_view.index)
-                                            m.d.sync += write_back_address.tag.eq(memories.tag_mem_rp[replacement_policy.next_replacement_o].data)
+                                            m.d.sync += write_back_address.tag.eq(memories.tag_mem_rp[way_to_replace].data)
                                             m.d.sync += write_back_address.word_offset.eq(0)
-                                            m.d.sync += write_back_way.eq(replacement_policy.next_replacement_o)
+                                            m.d.sync += write_back_way.eq(way_to_replace)
                                             # Select data source and next state after write back
                                             m.d.sync += write_back_data_from_buffer.eq(0)
                                             m.d.sync += write_back_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
                                             # Query data mem so that the write back state can use its data
                                             # clear the word offset so that the actual first word gets read.
-                                            memories.init_data_mem_read(replacement_policy.next_replacement_o, Cat(C(0, unsigned(self.config.word_offset_width)), fe_address_view.index))
+                                            memories.init_data_mem_read(way_to_replace, Cat(C(0, unsigned(self.config.word_offset_width)), fe_address_view.index))
                                         with m.Else():
                                             # We're done if the block is not dirty
                                             m.d.sync += state.eq(States.READY)
@@ -340,7 +337,7 @@ class Cache(wiring.Component):
                                 m.d.sync += state.eq(States.READ_BLOCK)
                                 m.d.sync += read_block_next_state.eq(
                                     Mux(
-                                        self.config.write_back & dirty_bits[replacement_policy.next_replacement_o][fe_address_view.index],
+                                        self.config.write_back & dirty_bits[way_to_replace][fe_address_view.index],
                                         States.WRITE_BACK_BLOCK,
                                         States.READY
                                     )
@@ -356,7 +353,7 @@ class Cache(wiring.Component):
                                     Cat(
                                         C(0, unsigned(self.config.word_offset_width)),
                                         fe_address_view.index,
-                                        memories.tag_mem_rp[replacement_policy.next_replacement_o].data
+                                        memories.tag_mem_rp[way_to_replace].data
                                     )
                                 )
             with m.Case(States.WRITE_BACK_BLOCK):

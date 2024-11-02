@@ -32,6 +32,43 @@ class ReplacementPolicy(wiring.Component):
 
         super().__init__(io_ports)
 
+    def access(self, accessed_set, accessed_way, m):
+        """Perform an access.
+
+        Args:
+            accessed_set: The set to access.
+            accessed_way: The way to access.
+            m: The module from which to perform the access.
+        """
+        m.d.comb += self.access_i.eq(1)
+        m.d.comb += self.set_i.eq(accessed_set)
+        m.d.comb += self.way_i.eq(accessed_way)
+
+    def replace(self, accessed_set, m):
+        """Replace a way.
+
+        Args:
+            accessed_set: The set in which a replacement should happen.
+            m: The module from which to perform the replacement operation.
+        """
+        m.d.comb += self.access_i.eq(1)
+        m.d.comb += self.replace_i.eq(1)
+        m.d.comb += self.set_i.eq(accessed_set)
+        m.d.comb += self.way_i.eq(self.next_replacement_o)
+
+    def get_way_to_replace(self, accessed_set, m) -> Signal:
+        """Get the way that should be replaced next for a set.
+
+        Args:
+            accessed_set: The set to query.
+            m: The module from which to perform the lookup.
+
+        Returns:
+            Signal: The way to replace.
+        """
+        m.d.comb += self.set_i.eq(accessed_set)
+        return self.next_replacement_o
+
     def elaborate(self, platform) -> Module:
         m = Module()
 
