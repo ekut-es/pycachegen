@@ -7,7 +7,10 @@ from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusSignature
-from pycachegen.cache_address import CacheAddressLayout
+from pycachegen.cache_address import (
+    CacheAddressLayout,
+    get_blockwise_incremented_address,
+)
 from pycachegen.replacement_policy import ReplacementPolicy
 from pycachegen.elaborate_utils import one_hot_encode
 from pycachegen.cache_memories import CacheMemories
@@ -165,16 +168,10 @@ class Cache(wiring.Component):
         evict_block_address = Signal(self.address_layout)
         # Counts how many cycles have passed since starting the operation
         evict_block_counter = Signal(range(self.config.block_size + 1))
-        # Construct the address the same way that the read block operation does so that we
-        # evict the blocks in the same order they get overwritten
-        evict_block_incremented_address = Signal(self.address_layout)
-        m.d.comb += evict_block_incremented_address.as_value().eq(evict_block_address)
-        m.d.comb += evict_block_incremented_address.word_offset.eq(
-            Cat(
-                (evict_block_address.word_offset + evict_block_counter)[:self.config.read_block_wc_width],
-                (evict_block_address.word_offset[self.config.read_block_wc_width:] + evict_block_counter[self.config.read_block_wc_width:])
-            )
-        )
+        # Construct the address the same way that the read block operation does
+        # so that we evict the block before it gets overwritten by the read block operation
+        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, self.address_layout, evict_block_counter, m, self.config.read_block_wc_width)
+
         # remember the previous word offset so we know in which slot of the buffer the read data belongs
         evict_block_previous_word_offset = Signal(self.config.word_offset_width)
 
