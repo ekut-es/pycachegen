@@ -21,7 +21,7 @@ class CacheMemories:
         """
         self.m = m
         # Create one tag and data memory per way
-        # usage: valid_mem[way][index], tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
+        # usage: tag_mem[way][index], data_mem[way][Cat(word_offset, index)]
         # data memory contains values that represent whole blocks (potentially multiple words!)
         self.tag_mem_rp = Array()
         self.tag_mem_wp = Array()
