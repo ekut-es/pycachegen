@@ -216,6 +216,32 @@ class Cache(wiring.Component):
             m.d.sync += state.eq(States.SEND_MEM_REQUEST)
             m.d.sync += send_mem_request_next_state.eq(next_state)
 
+        def prepare_block_write_back(next_state: States):
+            """Prepare everything for writing back the block. To be replaced
+            by the frontend request. The transition to the write back block
+            state has to be performed manually.
+
+            This includes starting the evict operation and configurint the
+            registers for the write back operation.
+
+            Args:
+                next_state (States): State to transition to after write back.
+            """
+            # Write data_mem block to be replaced into a buffer should we need a write back
+            m.d.sync += evict_block_enable.eq(1)
+            m.d.sync += evict_block_address.as_value().eq(self.fe.address)
+            # Prepare things for the Write Back State should we transition to it
+            m.d.sync += write_back_data_from_buffer.eq(1)
+            m.d.sync += write_back_next_state.eq(next_state)
+            # construct the correct address (the address of the block to be replaced)
+            m.d.sync += write_back_address.as_value().eq(
+                Cat(
+                    C(0, unsigned(self.config.word_offset_width)),
+                    fe_address_view.index,
+                    memories.tag_mem_rp[way_to_replace].data
+                )
+            )
+
         with m.Switch(state):
             with m.Case(States.READY):
                 with m.If(self.fe.flush):
@@ -275,6 +301,8 @@ class Cache(wiring.Component):
                             if self.config.write_back:
                                 # If it is a write request, mark the block dirty; else clear the dirty bit
                                 m.d.sync += dirty_bits[way_to_replace][fe_address_view.index].eq(self.fe.write_strobe.any())
+                            # find out whether we need a write back operation
+                            write_back_needed = self.config.write_back & dirty_bits[way_to_replace][fe_address_view.index]
                             # update the replacement policy
                             repl_pol.replace(fe_address_view.index, m)
                             with m.If(self.fe.write_strobe.any()):
@@ -283,27 +311,11 @@ class Cache(wiring.Component):
                                     # partial write (doesn't overwrite the entire word or we just store multiple words per block)
                                     # -> we have to read in the block from the main memory first
                                     m.d.sync += state.eq(States.READ_BLOCK)
-                                    m.d.sync += read_block_next_state.eq(
-                                        Mux(
-                                            self.config.write_back & dirty_bits[way_to_replace][fe_address_view.index],
-                                            States.WRITE_BACK_BLOCK,
-                                            States.EXECUTE_FE_WRITE_REQUEST
-                                        )
-                                    )
-                                    # Write data_mem block to be replaced into a buffer should we need a write back
-                                    m.d.sync += evict_block_enable.eq(1)
-                                    m.d.sync += evict_block_address.as_value().eq(self.fe.address)
-                                    # Prepare things for the Write Back State should we transition to it
-                                    m.d.sync += write_back_data_from_buffer.eq(1)
-                                    m.d.sync += write_back_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
-                                    # construct the correct address (the address of the block to be replaced)
-                                    m.d.sync += write_back_address.as_value().eq(
-                                        Cat(
-                                            C(0, unsigned(self.config.word_offset_width)),
-                                            fe_address_view.index,
-                                            memories.tag_mem_rp[way_to_replace].data
-                                        )
-                                    )
+                                    with m.If(write_back_needed):
+                                        m.d.sync += read_block_next_state.eq(States.WRITE_BACK_BLOCK)
+                                        prepare_block_write_back(States.EXECUTE_FE_WRITE_REQUEST)
+                                    with m.Else():
+                                        m.d.sync += read_block_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
                                 with m.Else():
                                     # full write -> no read block operation needed
                                     # write data to cache DUPLICATE CODE
@@ -335,27 +347,11 @@ class Cache(wiring.Component):
                             with m.Else():
                                 # Handle read
                                 m.d.sync += state.eq(States.READ_BLOCK)
-                                m.d.sync += read_block_next_state.eq(
-                                    Mux(
-                                        self.config.write_back & dirty_bits[way_to_replace][fe_address_view.index],
-                                        States.WRITE_BACK_BLOCK,
-                                        States.READY
-                                    )
-                                )
-                                # Write data_mem block to be replaced into a buffer should we need a write back
-                                m.d.sync += evict_block_enable.eq(1)
-                                m.d.sync += evict_block_address.as_value().eq(self.fe.address)
-                                # Prepare things for the Write Back State should we transition to it
-                                m.d.sync += write_back_data_from_buffer.eq(1)
-                                m.d.sync += write_back_next_state.eq(States.READY)
-                                # construct the correct address (the address of the block to be replaced)
-                                m.d.sync += write_back_address.as_value().eq(
-                                    Cat(
-                                        C(0, unsigned(self.config.word_offset_width)),
-                                        fe_address_view.index,
-                                        memories.tag_mem_rp[way_to_replace].data
-                                    )
-                                )
+                                with m.If(write_back_needed):
+                                    m.d.sync += read_block_next_state.eq(States.WRITE_BACK_BLOCK)
+                                    prepare_block_write_back(States.READY)
+                                with m.Else():
+                                    m.d.sync += read_block_next_state.eq(States.READY)
             with m.Case(States.WRITE_BACK_BLOCK):
                 # Write back the block specified by the respective registers
                 m.d.sync += be_buffer_address.eq(write_back_address)
