@@ -10,9 +10,11 @@ class CacheAddressLayout(data.StructLayout):
             {"word_offset": word_offset_width, "index": index_width, "tag": tag_width}
         )
 
+    # def get_blockwise_incremented_address(self, )
+
 
 def get_blockwise_incremented_address(
-    address, layout, counter, m: Module, read_block_wc_width: int
+    address, counter, m: Module, read_block_wc_width: int
 ):
     """Increments the given address by the given counter.
     When adding the counter, overflow will first occur within the address bits that stay
@@ -24,7 +26,6 @@ def get_blockwise_incremented_address(
 
     Args:
         address (): The base address (fe).
-        layout (_type_): The layout of the fe address.
         counter (_type_): The counter to add to the address.
         m (Module): The module in which this operation should take place.
         read_block_wc_width (int): log2 of how many words should be extracted from one be word.
@@ -32,7 +33,7 @@ def get_blockwise_incremented_address(
     Returns:
         Signal: The incremented address.
     """
-    incremented_address = Signal(layout)
+    incremented_address = Signal(address.shape())
     m.d.comb += incremented_address.as_value().eq(address)
     m.d.comb += incremented_address.word_offset.eq(
         Cat(

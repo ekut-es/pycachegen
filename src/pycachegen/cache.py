@@ -119,17 +119,10 @@ class Cache(wiring.Component):
         ## States.WRITE_BE_READ_DATA_TO_CACHE
         # counter for counting which word of the be read data to write to the data_mem next.
         be_read_data_word_counter = Signal(range(self.config.read_block_wc))
-        # We need to increment the address based on the counter. But we need to consider that the overflow
-        # has to happen within the lower bits that specify the index of the our-size-word within the be size word
-        # (this index is then stored in the be_address_incremented_cut_off_bits signal)
-        # The READ_BLOCK State will then increment the other word_offset bits for jumping into the next be word.
-        incremented_be_buffer_address = Signal(unsigned(self.config.address_width))
-        m.d.comb += incremented_be_buffer_address.eq(Cat(
-            (be_buffer_address.word_offset + be_read_data_word_counter)[:self.config.read_block_wc_width],
-            be_buffer_address.as_value()[self.config.read_block_wc_width:]
-        ))
+        # construct the incremented address
+        incremented_be_buffer_address = get_blockwise_incremented_address(be_buffer_address, be_read_data_word_counter, m, self.config.read_block_wc_width)
         addr_width_difference = self.config.address_width - self.config.be_address_width
-        # This signal specifies the index of the word to extract from the be read data.
+        # This signal specifies the index of the word to extract from the be read data
         be_address_incremented_cut_off_bits = Signal(unsigned(addr_width_difference))
         m.d.comb += be_address_incremented_cut_off_bits.eq(incremented_be_buffer_address)
 
@@ -170,7 +163,7 @@ class Cache(wiring.Component):
         evict_block_counter = Signal(range(self.config.block_size + 1))
         # Construct the address the same way that the read block operation does
         # so that we evict the block before it gets overwritten by the read block operation
-        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, self.address_layout, evict_block_counter, m, self.config.read_block_wc_width)
+        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.read_block_wc_width)
 
         # remember the previous word offset so we know in which slot of the buffer the read data belongs
         evict_block_previous_word_offset = Signal(self.config.word_offset_width)
