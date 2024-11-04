@@ -255,6 +255,9 @@ class InternalCacheConfig:
         # variable specifies how many times we can do that per BE word.
         self.read_block_wc = min(self.be_byte_multiplier, cache_config.block_size)
         self.read_block_wc_width = exact_log2(self.read_block_wc)
+        self.read_block_requests_needed = cache_config.block_size // self.read_block_wc
+        # width difference between own and BE address
+        self.address_width_difference = address_width - be_address_width
 
 
 class MemoryConfig:

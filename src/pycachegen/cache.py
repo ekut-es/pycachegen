@@ -22,10 +22,9 @@ class States(Enum):
     READ_BLOCK = 2
     EXECUTE_FE_WRITE_REQUEST = 3
     SEND_MEM_REQUEST = 4
-    WRITE_BE_READ_DATA_TO_CACHE = 5
-    FLUSH_CACHE = 6
-    FLUSH_BACKEND = 7
-    FLUSH_CACHE_BLOCK = 8
+    FLUSH_CACHE = 5
+    FLUSH_BACKEND = 6
+    FLUSH_CACHE_BLOCK = 7
 
 
 class Cache(wiring.Component):
@@ -112,23 +111,19 @@ class Cache(wiring.Component):
         with m.Else():
             m.d.comb += self.fe.read_data.eq(fe_read_data_buffer)
 
-        ## States.SEND_MEM_REQUEST / States.WRITE_BE_READ_DATA_TO_CACHE
-        # FSM state that will be taken after the SEND_MEM_REQUEST state (or after WRITE_BE_READ_DATA_TO_CACHE)
-        send_mem_request_next_state = Signal(States)
-
-        ## States.WRITE_BE_READ_DATA_TO_CACHE
-        # counter for counting which word of the be read data to write to the data_mem next.
-        be_read_data_word_counter = Signal(range(self.config.read_block_wc))
-        # construct the incremented address
-        incremented_be_buffer_address = get_blockwise_incremented_address(be_buffer_address, be_read_data_word_counter, m, self.config.read_block_wc_width)
-        addr_width_difference = self.config.address_width - self.config.be_address_width
-        # This signal specifies the index of the word to extract from the be read data
-        be_address_incremented_cut_off_bits = Signal(unsigned(addr_width_difference))
-        m.d.comb += be_address_incremented_cut_off_bits.eq(incremented_be_buffer_address)
-
         ## States.READ_BLOCK
-        # counter for the READ BLOCK state that indicates how many words have been read so far
-        read_block_word_offset = Signal(self.config.word_offset_width)
+        # counter for how many read operations have been done so far
+        read_block_read_counter = Signal(range(self.config.read_block_requests_needed + 1))
+        # counter for how many words of the be read data have been written back so far
+        read_block_write_counter = Signal(self.config.read_block_wc_width)
+        # the address for which a read request was issued
+        read_block_previous_address = Signal(self.address_layout)
+        # the address for the next write action (previous address incremented by write counter)
+        read_block_write_address = Signal(self.address_layout)
+        m.d.comb += read_block_write_address.eq(get_blockwise_incremented_address(read_block_previous_address, read_block_write_counter, m, self.config.read_block_wc_width))
+        # the word to be written back next
+        read_block_write_data = Signal(self.config.data_width)
+        m.d.comb += read_block_write_data.eq(self.be.read_data.word_select(read_block_write_address.as_value()[:self.config.address_width_difference], self.config.data_width))
         # state that read block should take next
         read_block_next_state = Signal(States)
 
@@ -140,7 +135,7 @@ class Cache(wiring.Component):
         # whether we already told the backend to flush itself
         be_flush_requested = Signal()
 
-        ## States.WRITE_BACK_BLOCk
+        ## States.WRITE_BACK_BLOCK
         # address and way to identify the block to be written back
         write_back_address = Signal(self.address_layout)
         # source of the data to write back.
@@ -151,6 +146,10 @@ class Cache(wiring.Component):
         write_back_way = Signal(range(self.config.num_ways))
         # state to take after the WRITE_BACK state
         write_back_next_state = Signal(States)
+
+        ## States.SEND_MEM_REQUEST
+        # state to go to afterwards
+        send_mem_request_next_state = Signal(States)
 
         ## Evict operation reads one block of the internal data_mem and writes it to a buffer.
         # evict block operation puts data to be written back in this buffer
@@ -186,25 +185,31 @@ class Cache(wiring.Component):
                 m.d.sync += evict_block_enable.eq(0)
                 m.d.sync += evict_block_counter.eq(0)
 
-        def send_fe_buffer_request_to_lower_mem(next_state: States):
+        def send_fe_buffer_request_to_lower_mem(next_state):
             """Uses the request stored in the fe buffers to send a request
-            to the lower memory. Goes to the SEND_MEM_REQUEST state to do so.
+            to the lower memory.
             """
-            m.d.sync += be_buffer_address.eq(fe_buffer_address)
-            m.d.sync += be_buffer_write_data.eq(fe_buffer_write_data)
-            m.d.sync += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
-            m.d.sync += state.eq(States.SEND_MEM_REQUEST)
-            m.d.sync += send_mem_request_next_state.eq(next_state)
+            with m.If(self.be.port_ready):
+                m.d.comb += be_buffer_address.eq(fe_buffer_address)
+                m.d.comb += be_buffer_write_data.eq(fe_buffer_write_data)
+                m.d.comb += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
+                m.d.comb += self.be.request_valid.eq(1)
+                m.d.sync += state.eq(next_state)
+            with m.Else():
+                m.d.sync += state.eq(States.SEND_MEM_REQUEST)
+                m.d.sync += send_mem_request_next_state.eq(next_state)
 
-        def send_fe_request_to_lower_mem(next_state: States):
-            """Send the request from the fe to the lower memory. Goes to the
-            SEND_MEM_REQUEST state to do so.
-            """
-            m.d.sync += be_buffer_address.eq(self.fe.address)
-            m.d.sync += be_buffer_write_data.eq(self.fe.write_data)
-            m.d.sync += be_buffer_write_strobe.eq(self.fe.write_strobe)
-            m.d.sync += state.eq(States.SEND_MEM_REQUEST)
-            m.d.sync += send_mem_request_next_state.eq(next_state)
+        def send_fe_request_to_lower_mem(next_state):
+            """Send the request from the fe to the lower memory."""
+            with m.If(self.be.port_ready):
+                m.d.comb += be_buffer_address.eq(self.fe.address)
+                m.d.comb += be_buffer_write_data.eq(self.fe.write_data)
+                m.d.comb += be_buffer_write_strobe.eq(self.fe.write_strobe)
+                m.d.comb += self.be.request_valid.eq(1)
+                m.d.sync += state.eq(next_state)
+            with m.Else():
+                m.d.sync += state.eq(States.SEND_MEM_REQUEST)
+                m.d.sync += send_mem_request_next_state.eq(next_state)
 
         def prepare_block_write_back(next_state: States):
             """Prepare everything for writing back the block. To be replaced
@@ -270,7 +275,7 @@ class Cache(wiring.Component):
                                 m.d.sync += state.eq(States.READY)
                             else:
                                 # write to lower mem if write through
-                                send_fe_request_to_lower_mem(next_state=States.READY)
+                                send_fe_request_to_lower_mem(States.READY)
                         with m.Else():
                             # handle read
                             m.d.sync += state.eq(States.READY)
@@ -282,7 +287,7 @@ class Cache(wiring.Component):
                         # We have a miss
                         with m.If((not self.config.write_allocate) & self.fe.write_strobe.any()):
                             # write miss and write no-allocate -> only write to lower memory
-                            send_fe_request_to_lower_mem(next_state=States.READY)
+                            send_fe_request_to_lower_mem(States.READY)
                         with m.Else():
                             # In all other cases, we have to replace a block
                             # Update valid/dirty/tag memories
@@ -308,11 +313,6 @@ class Cache(wiring.Component):
                                         m.d.sync += read_block_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
                                 with m.Else():
                                     # full write -> no read block operation needed
-                                    # write data to cache DUPLICATE CODE
-                                    # TODO Think about whether writing data to the cache and optionally sending the write request
-                                    # to the lower mem should only happen inside the execute fe write req state, in a function, or
-                                    # if it should stay messy like this
-                                    memories.init_data_mem_write(way_to_replace, self.fe.address, self.fe.write_data, self.fe.write_strobe)
                                     if self.config.write_back:
                                         with m.If(dirty_bits[way_to_replace][fe_address_view.index]):
                                             # write back if dirty
@@ -324,16 +324,19 @@ class Cache(wiring.Component):
                                             m.d.sync += write_back_way.eq(way_to_replace)
                                             # Select data source and next state after write back
                                             m.d.sync += write_back_data_from_buffer.eq(0)
+                                            # the EXECUTE_FE_WRITE_REQUEST State will write the data to the cache
                                             m.d.sync += write_back_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST)
                                             # Query data mem so that the write back state can use its data
                                             # clear the word offset so that the actual first word gets read.
                                             memories.init_data_mem_read(way_to_replace, Cat(C(0, unsigned(self.config.word_offset_width)), fe_address_view.index))
                                         with m.Else():
-                                            # We're done if the block is not dirty
+                                            # Write the data to the cache and we're done if the block is not dirty
                                             m.d.sync += state.eq(States.READY)
+                                            memories.init_data_mem_write(way_to_replace, self.fe.address, self.fe.write_data, self.fe.write_strobe)
                                     else:
-                                        # write to lower mem if write through
-                                        send_fe_request_to_lower_mem(next_state=States.READY)
+                                        # write to cache and to lower mem if write through (write through + no-allocate was caught earlier)
+                                        send_fe_request_to_lower_mem(States.READY)
+                                        memories.init_data_mem_write(way_to_replace, self.fe.address, self.fe.write_data, self.fe.write_strobe)
                             with m.Else():
                                 # Handle read
                                 m.d.sync += state.eq(States.READ_BLOCK)
@@ -343,97 +346,87 @@ class Cache(wiring.Component):
                                 with m.Else():
                                     m.d.sync += read_block_next_state.eq(States.READY)
             with m.Case(States.WRITE_BACK_BLOCK):
-                # Write back the block specified by the respective registers
-                m.d.sync += be_buffer_address.eq(write_back_address)
-                m.d.sync += be_buffer_write_strobe.eq(-1)
-                with m.If(write_back_data_from_buffer):
-                    # take the data from the buffer
-                    m.d.sync += be_buffer_write_data.eq(evicted_block_buffer[write_back_address.word_offset])
-                with m.Else():
-                    # take the data from the data memory
-                    m.d.sync += be_buffer_write_data.eq(memories.data_mem_rp[write_back_way].data)
-                    # data_mem read needs to be initiated by previous state
-                    # -> we also need to initiate a new read
-                    memories.init_data_mem_read(write_back_way, write_back_address.as_value() + 1)
-                m.d.sync += state.eq(States.SEND_MEM_REQUEST)
-                # increment word offset of write back address
-                m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
-                with m.If(write_back_address.word_offset == (self.config.block_size - 1)):
-                    # This is the last word to write back -> proceed with the next state
-                    m.d.sync += send_mem_request_next_state.eq(write_back_next_state)
-                with m.Else():
-                    # We're not done yet, come back after mem request has finished
-                    m.d.sync += send_mem_request_next_state.eq(States.WRITE_BACK_BLOCK)
-            with m.Case(States.SEND_MEM_REQUEST):
-                # Wait for the lower memory to become ready
+                # wait for the BE to get ready
                 with m.If(self.be.port_ready):
-                    # Send request to lower memory
+                    # Write back the block specified by the respective registers
+                    m.d.comb += be_buffer_address.eq(write_back_address)
+                    m.d.comb += be_buffer_write_strobe.eq(-1)
                     m.d.comb += self.be.request_valid.eq(1)
-                    with m.If(be_buffer_write_strobe.any()):
-                        # If it is a write, go to the next state
-                        m.d.sync += state.eq(send_mem_request_next_state)
+                    with m.If(write_back_data_from_buffer):
+                        # take the data from the buffer
+                        m.d.comb += be_buffer_write_data.eq(evicted_block_buffer[write_back_address.word_offset])
                     with m.Else():
-                        # In case of a read, we have to write the be read data to the cache first
-                        m.d.sync += state.eq(States.WRITE_BE_READ_DATA_TO_CACHE)
-            with m.Case(States.WRITE_BE_READ_DATA_TO_CACHE):
-                # First wait for the memory to respond
-                with m.If(self.be.read_data_valid):
-                    # The read request was processed, now write the data to the cache
-                    memories.init_data_mem_write(
-                        next_block_replacement,
-                        incremented_be_buffer_address,
-                        self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width),
-                        -1
-                    )
-                    # Determine if we should hand out the read data to the fe
-                    with m.If(
-                        (be_read_data_word_counter == 0)
-                        & (~fe_buffer_write_strobe.any())
-                        & (be_buffer_address.word_offset == fe_buffer_address.word_offset)
-                    ):
-                        # If we're seeing this word for the first time (be_read_data_word_counter == 0) and the fe request was a read request
-                        # and the request was for the be word containing the word requested by the fe (be_buffer_address.word_offset == fe_buffer_address.word_offset)
-                        # then hand out the data now
-                        m.d.sync += fe_read_data_select_buffer.eq(1)
-                        m.d.sync += fe_read_data_buffer.eq(self.be.read_data.word_select(be_address_incremented_cut_off_bits, self.config.data_width))
-                        m.d.sync += self.fe.read_data_valid.eq(1)
-                    # Now determine the next state
-                    with m.If(be_read_data_word_counter == self.config.read_block_wc - 1):
-                        # If we're done reading all words into the block, go to the next state
-                        m.d.sync += state.eq(send_mem_request_next_state)
-                        m.d.sync += be_read_data_word_counter.eq(0)
-                    with m.Else():
-                        # Else increase the counter
-                        m.d.sync += be_read_data_word_counter.eq(be_read_data_word_counter + 1)
+                        # take the data from the data memory
+                        m.d.comb += be_buffer_write_data.eq(memories.data_mem_rp[write_back_way].data)
+                        # data_mem read needs to be initiated by previous state
+                        # -> we also need to initiate a new read
+                        memories.init_data_mem_read(write_back_way, write_back_address.as_value() + 1)
+                    # increment word offset of write back address
+                    m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
+                    with m.If(write_back_address.word_offset == (self.config.block_size - 1)):
+                        # This is the last word to write back -> proceed with the next state
+                        m.d.sync += state.eq(write_back_next_state)
             with m.Case(States.READ_BLOCK):
-                # Prepare a memory read request
-                # Critical word first: Start at the word that was requested
-                # So we can hand that out first if it was a read request
-                m.d.sync += be_buffer_address.eq(fe_buffer_address)
-                m.d.sync += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_word_offset)
-                m.d.sync += be_buffer_write_strobe.eq(0)
-                # increment word offset for the read block operation (shouldn't do anything bad if block_size == 1 or block_size == read_block_wc)
-                m.d.sync += read_block_word_offset.eq(read_block_word_offset + self.config.read_block_wc)
-                # determine the state that should be taken next or after the next send mem request operation
-                is_last_read_block_operation = read_block_word_offset == self.config.block_size - self.config.read_block_wc
-                # If it's not the last request needed, come back afterwards. Else go to the next state.
-                state_after_read_block = Mux(is_last_read_block_operation, read_block_next_state, States.READ_BLOCK)
-                # Send the memory request except for when its the address to which
-                # we want to write anyway AND write strobe is all ones AND we would not
-                # read any other byte from the word the BE would give is in this request (self.config.read_block_wc == 1)
-                with m.If(~(
+                # wait until the memory gets ready and (all words of previous request were written to the cache or this is the first request)
+                # and we have not already issued all needed requests
+                with m.If(
+                    self.be.port_ready
+                    & ((read_block_write_counter == (self.config.read_block_wc - 1)) | (read_block_read_counter == 0))
+                    & (read_block_read_counter < self.config.read_block_requests_needed)
+                ):
+                    # Issue a memory read request
+                    # Critical word first: Start at the word that was requested
+                    # So we can hand that out first if it was a read request
+                    m.d.comb += be_buffer_address.eq(fe_buffer_address)
+                    m.d.comb += be_buffer_write_strobe.eq(0)
+                    # construct the correct word offset and increment the word offset for the next request
+                    with m.If(
                             fe_buffer_write_strobe.all()
-                            & (read_block_word_offset == 0)
+                            & (read_block_read_counter == 0)
                             & (self.config.read_block_wc == 1)
-                        )
                     ):
-                    m.d.sync += state.eq(States.SEND_MEM_REQUEST)
-                    m.d.sync += send_mem_request_next_state.eq(state_after_read_block)
-                with m.Elif(is_last_read_block_operation):
-                    # If the memory request is not needed AND this the last word in the block,
-                    # then we can go to the next state. Else stay in this state and continue
-                    # with the next word (no state modification needed!)
-                    m.d.sync += state.eq(state_after_read_block)
+                        # If the fe completely overwrites all the words that we'd get from the current request, we can skip it.
+                        # (this is only the case if write strobe is all ones, we'd only get one word out of the request and
+                        # the current request targets the same word as the fe address)
+                        m.d.sync += read_block_read_counter.eq(read_block_read_counter + 2)
+                        m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + 1)
+                    with m.Else():
+                        # Else just increment the word offset by the amount of words we can retrieve from one be word
+                        m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
+                        m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_read_counter * self.config.read_block_wc)
+                    m.d.comb += self.be.request_valid.eq(1)
+                    # store the address so that we still have it when writing the words to the cache
+                    m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())
+
+                with m.If(self.be.port_ready & (read_block_read_counter != 0)):
+                    # A read request was processed, write the data to the cache
+                    memories.init_data_mem_write(
+                        way=next_block_replacement,
+                        addr=read_block_write_address,
+                        data=read_block_write_data,
+                        strobe=-1
+                    )
+                    # increment write counter
+                    m.d.sync += read_block_write_counter.eq(read_block_write_counter + 1)
+
+                    # determine if we should hand out the read data to the FE
+                    with m.If(
+                        (read_block_read_counter == 1) # it was the first read request to the BE
+                        & (~fe_buffer_write_strobe.any()) # the FE sent a read request
+                        & (read_block_write_counter == 0) # This is the first cycle after the read data is valid
+                    ):
+                        m.d.sync += fe_read_data_select_buffer.eq(1)
+                        m.d.sync += fe_read_data_buffer.eq(read_block_write_data)
+                        m.d.sync += self.fe.read_data_valid.eq(1)
+
+                    with m.If(
+                        (read_block_write_counter == (self.config.read_block_wc - 1))
+                        & (read_block_read_counter == self.config.read_block_requests_needed)
+                    ):
+                        # go to the next state if no more read requests are needed and if we've written all words of the last request to the cache
+                        m.d.sync += state.eq(read_block_next_state)
+                        # also reset the read counter (the write counter has appropriate width and doesn't need a reset)
+                        m.d.sync += read_block_read_counter.eq(0)
             with m.Case(States.EXECUTE_FE_WRITE_REQUEST):
                 # Handle write request - this state is used after write back/read block operations
                 # Write data to internal data_mem
@@ -444,6 +437,8 @@ class Cache(wiring.Component):
                 with m.Else():
                     # Send request to lower memory if write through
                     send_fe_buffer_request_to_lower_mem(States.READY)
+            with m.Case(States.SEND_MEM_REQUEST):
+                send_fe_buffer_request_to_lower_mem(send_mem_request_next_state)
             with m.Case(States.FLUSH_CACHE):
                 with m.If(self.config.write_back):
                     # Flush the cache

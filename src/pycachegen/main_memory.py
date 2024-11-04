@@ -48,11 +48,8 @@ class MainMemory(wiring.Component):
         )
 
         write_port = data_memory.write_port(granularity=self.config.byte_size)
-        m.d.comb += write_port.addr.eq(aligned_address)
-        m.d.comb += write_port.data.eq(self.fe.write_data)
 
         read_port = data_memory.read_port()
-        m.d.comb += read_port.addr.eq(aligned_address)
         m.d.comb += self.fe.read_data.eq(read_port.data)
 
         with m.If(~processing_request):
@@ -73,7 +70,10 @@ class MainMemory(wiring.Component):
 
                 # Initiate read/write
                 m.d.sync += write_port.en.eq(self.fe.write_strobe)
+                m.d.sync += write_port.addr.eq(aligned_address)
+                m.d.sync += write_port.data.eq(self.fe.write_data)
                 m.d.sync += read_port.en.eq(~self.fe.write_strobe.any())
+                m.d.sync += read_port.addr.eq(aligned_address)
         with m.Else():
             # clear enable on read/write ports
             m.d.sync += read_port.en.eq(0)
