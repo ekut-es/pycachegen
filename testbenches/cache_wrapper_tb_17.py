@@ -10,32 +10,24 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing two layers of caches
+# Testbench for testing that multiple words will be taken from the BE read data
+# without sending a new memory request for each word. Two BE words span one block.
 def test():
     dut = CacheWrapper(
         num_ports=1,
         arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
-        address_width=8,
+        address_width=6,
         cache_configs=[
             CacheConfig(
-                data_width=16,
-                num_ways=2,
-                num_sets=1,
-                replacement_policy=ReplacementPolicies.FIFO,
-                write_through=False,
-                write_allocate=True,
-                block_size=1,
-            ),
-            CacheConfig(
-                data_width=16,
-                num_ways=2,
+                data_width=8,
+                num_ways=1,
                 num_sets=2,
-                replacement_policy=ReplacementPolicies.FIFO,
-                write_through=False,
-                write_allocate=True,
-                block_size=1,
+                replacement_policy=ReplacementPolicies.PLRU_TREE,
+                write_through=True,
+                write_allocate=False,
+                block_size=4,
             ),
         ],
         memory_config=MemoryConfig(
@@ -43,34 +35,33 @@ def test():
             read_latency=10,
             write_latency=15,
             min_address=0,
-            max_address=256,
+            max_address=32,
         ),
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # write to both ways
-        await helper.write(ctx, 0, 0x1000, False)
-        await helper.write(ctx, 1, 0x1010, False)
+        # initialize some values
+        await helper.write(ctx, 0, 0x10, False)
+        await helper.write(ctx, 1, 0x11, False)
+        await helper.write(ctx, 2, 0x12, False)
+        await helper.write(ctx, 3, 0x13, False)
+        await helper.write(ctx, 4, 0x14, False)
+        await helper.write(ctx, 5, 0x15, False)
+        await helper.write(ctx, 6, 0x16, False)
+        await helper.write(ctx, 7, 0x17, False)
 
-        # check that the data is there
-        await helper.read(ctx, 0, 0x1000, True)
-        await helper.read(ctx, 1, 0x1010, True)
+        # read both sets but don't start with the first word
+        await helper.read(ctx, 2, 0x12, False)
+        await helper.read(ctx, 0, 0x10, True)
+        await helper.read(ctx, 1, 0x11, True)
+        await helper.read(ctx, 3, 0x13, True)
 
-        # replace both ways
-        await helper.write(ctx, 2, 0x1020, False)
-        await helper.write(ctx, 3, 0x1030, False)
-
-        # read 0 and 1 again - they should be in the L2 cache
-        await helper.read(ctx, 0, 0x1000, False)
-        await helper.read(ctx, 1, 0x1010, False)
-
-        # read 4 to replace addr 0 in both the l1 and l2 caches
-        await helper.read(ctx, 4, 0, False)
-
-        # read 0 (manually check that it isn't cached anywhere)
-        await helper.read(ctx, 0, 0x1000, False)
+        await helper.read(ctx, 7, 0x17, False)
+        await helper.read(ctx, 4, 0x14, True)
+        await helper.read(ctx, 5, 0x15, True)
+        await helper.read(ctx, 6, 0x16, True)
 
     run_bench(dut=dut, bench=bench)
 

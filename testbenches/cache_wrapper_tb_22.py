@@ -10,65 +10,77 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing weird data and address widths (8/16)
+# Testbench for testing the LRU replacement policy.
 def test():
     dut = CacheWrapper(
         num_ports=1,
         arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
-        address_width=16,
+        address_width=8,
         cache_configs=[
             CacheConfig(
-                data_width=8,
-                num_ways=2,
-                num_sets=4,
-                replacement_policy=ReplacementPolicies.PLRU_TREE,
+                data_width=16,
+                num_ways=4,
+                num_sets=2,
+                replacement_policy=ReplacementPolicies.LRU,
                 write_through=False,
                 write_allocate=True,
                 block_size=1,
             ),
         ],
         memory_config=MemoryConfig(
-            data_width=8,
+            data_width=16,
             read_latency=10,
             write_latency=15,
             min_address=0,
-            max_address=0x10000,
+            max_address=256,
         ),
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # initialize some values
-        await helper.write(ctx, 0, 0x10, False)
-        await helper.write(ctx, 1, 0x11, False)
-        await helper.write(ctx, 2, 0x12, False)
-        await helper.write(ctx, 3, 0x13, False)
-        await helper.write(ctx, 4, 0x14, False)
-        await helper.write(ctx, 5, 0x15, False)
-        await helper.write(ctx, 6, 0x16, False)
-        await helper.write(ctx, 7, 0x17, False)
+        # Fill set A
+        await helper.write(ctx, 0, 0x1000, False)
+        await helper.write(ctx, 2, 0x1020, False)
+        await helper.write(ctx, 4, 0x1040, False)
+        await helper.write(ctx, 6, 0x1060, False)
 
-        # read all values
-        await helper.read(ctx, 0, 0x10, True)
-        await helper.read(ctx, 1, 0x11, True)
-        await helper.read(ctx, 2, 0x12, True)
-        await helper.read(ctx, 3, 0x13, True)
-        await helper.read(ctx, 4, 0x14, True)
-        await helper.read(ctx, 5, 0x15, True)
-        await helper.read(ctx, 6, 0x16, True)
-        await helper.read(ctx, 7, 0x17, True)
+        # Fill set B
+        await helper.write(ctx, 1, 0x1010, False)
+        await helper.write(ctx, 3, 0x1030, False)
+        await helper.write(ctx, 5, 0x1050, False)
+        await helper.write(ctx, 7, 0x1070, False)
 
-        # write to 8 to cause a write back of 0
-        await helper.write(ctx, 8, 0x18, False)
+        # Test the LRU policy on set A
+        await helper.read(ctx, 4, 0x1040, True)
+        await helper.read(ctx, 0, 0x1000, True)
+        await helper.read(ctx, 8, 0, False)
+        await helper.read(ctx, 0xA, 0, False)
+        await helper.read(ctx, 2, 0x1020, False)
+        await helper.read(ctx, 6, 0x1060, False)
+        await helper.read(ctx, 4, 0x1040, False)
+        await helper.read(ctx, 0xA, 0, True)
+        await helper.read(ctx, 2, 0x1020, True)
+        await helper.read(ctx, 6, 0x1060, True)
+        await helper.read(ctx, 4, 0x1040, True)
+        await helper.read(ctx, 0, 0x1000, False)
+        await helper.read(ctx, 0xA, 0, False)
 
-        # read from 0 to see that it is no longer in the cache
-        await helper.read(ctx, 0, 0x10, False)
-        # check that 8 and 0 are now both in the cache
-        await helper.read(ctx, 8, 0x18, True)
-        await helper.read(ctx, 0, 0x10, True)
+        # Test set B
+        await helper.read(ctx, 1, 0x1010, True)
+        await helper.read(ctx, 9, 0, False)
+        await helper.read(ctx, 3, 0x1030, False)
+        await helper.read(ctx, 7, 0x1070, True)
+        await helper.read(ctx, 5, 0x1050, False)
+        await helper.read(ctx, 1, 0x1010, False)
+
+        # Test set A again
+        await helper.read(ctx, 4, 0x1040, True)
+        await helper.read(ctx, 0, 0x1000, True)
+        await helper.read(ctx, 6, 0x1060, True)
+        await helper.read(ctx, 2, 0x1020, False)
 
     run_bench(dut=dut, bench=bench)
 

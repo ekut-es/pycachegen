@@ -10,7 +10,7 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing the write back, write no-allocate policy
+# Testbench for testing the flush in a direct mapped cache
 def test():
     dut = CacheWrapper(
         num_ports=1,
@@ -21,11 +21,11 @@ def test():
         cache_configs=[
             CacheConfig(
                 data_width=16,
-                num_ways=2,
-                num_sets=2,
+                num_ways=1,
+                num_sets=4,
                 replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_through=False,
-                write_allocate=False,
+                write_allocate=True,
                 block_size=1,
             )
         ],
@@ -41,19 +41,20 @@ def test():
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # Check that write no-allocate works
+        # Write some data to the cache
         await helper.write(ctx, 0, 0x1000, False)
-        await helper.read(ctx, 0, 0x1000, False)
+        await helper.write(ctx, 1, 0x1010, False)
+        await helper.write(ctx, 2, 0x1020, False)
 
-        # get 2 into the cache, then write to it (should be a hit)
-        await helper.read(ctx, 2, 0, False)
-        await helper.write(ctx, 2, 0x1020, True)
+        # flush it
+        await helper.flush(ctx)
 
-        # check that 0 is also in the cache
+        # check that the data is still there
         await helper.read(ctx, 0, 0x1000, True)
+        await helper.read(ctx, 1, 0x1010, True)
+        await helper.read(ctx, 2, 0x1020, True)
 
-        # replace 2 and check that write back worked
-        await helper.read(ctx, 4, 0, False)
-        await helper.read(ctx, 2, 0x1020, False)
+        # manually check that this doesn't cause a write-back
+        await helper.write(ctx, 4, 0x1040, False)
 
     run_bench(dut=dut, bench=bench)

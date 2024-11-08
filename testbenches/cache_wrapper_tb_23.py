@@ -10,58 +10,56 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing that multiple words will be taken from the BE read data
-# without sending a new memory request for each word. Two BE words span one block.
+# Testbench for testing big block sizes
 def test():
     dut = CacheWrapper(
         num_ports=1,
         arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
-        address_width=6,
+        address_width=8,
         cache_configs=[
             CacheConfig(
-                data_width=8,
+                data_width=16,
                 num_ways=1,
-                num_sets=2,
-                replacement_policy=ReplacementPolicies.PLRU_TREE,
-                write_through=True,
-                write_allocate=False,
-                block_size=4,
+                num_sets=1,
+                replacement_policy=ReplacementPolicies.LRU,
+                write_through=False,
+                write_allocate=True,
+                block_size=16,
             ),
         ],
         memory_config=MemoryConfig(
-            data_width=16,
-            read_latency=10,
-            write_latency=15,
+            data_width=64,
+            read_latency=5,
+            write_latency=8,
             min_address=0,
-            max_address=32,
+            max_address=64,
         ),
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # initialize some values
-        await helper.write(ctx, 0, 0x10, False)
-        await helper.write(ctx, 1, 0x11, False)
-        await helper.write(ctx, 2, 0x12, False)
-        await helper.write(ctx, 3, 0x13, False)
-        await helper.write(ctx, 4, 0x14, False)
-        await helper.write(ctx, 5, 0x15, False)
-        await helper.write(ctx, 6, 0x16, False)
-        await helper.write(ctx, 7, 0x17, False)
+        # Write to some words
+        await helper.write(ctx, 7, 0x1070, False)
+        await helper.write(ctx, 1, 0x1010, True)
+        await helper.write(ctx, 0xF, 0x10F0, True)
 
-        # read both sets but don't start with the first word
-        await helper.read(ctx, 2, 0x12, False)
-        await helper.read(ctx, 0, 0x10, True)
-        await helper.read(ctx, 1, 0x11, True)
-        await helper.read(ctx, 3, 0x13, True)
+        # Write to 0x17 to cause a write back
+        await helper.write(ctx, 0x17, 0x1170, False)
+        await helper.read(ctx, 0x17, 0x1170, True)
+        await helper.read(ctx, 0x10, 0, True)
+        await helper.read(ctx, 0x1F, 0, True)
 
-        await helper.read(ctx, 7, 0x17, False)
-        await helper.read(ctx, 4, 0x14, True)
-        await helper.read(ctx, 5, 0x15, True)
-        await helper.read(ctx, 6, 0x16, True)
+        # check that everything got written back correctly
+        await helper.read(ctx, 0xF, 0x10F0, False)
+        await helper.read(ctx, 0x1, 0x1010, True)
+        await helper.read(ctx, 0x7, 0x1070, True)
+
+        # check that 0x17 also got writte back correctly
+        await helper.read(ctx, 0x17, 0x1170, False)
+        await helper.read(ctx, 0x17, 0x1170, True)
 
     run_bench(dut=dut, bench=bench)
 

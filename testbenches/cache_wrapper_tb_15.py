@@ -10,60 +10,58 @@ from pycachegen.cache_config_validation import (
 )
 
 
-# Testbench for testing the plru_mru replacement policy
+# Testbench for testing that multiple words will be taken from the BE read data
+# without sending a new memory request for each word. One BE word spans two blocks.
 def test():
     dut = CacheWrapper(
         num_ports=1,
         arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
-        address_width=8,
+        address_width=6,
         cache_configs=[
             CacheConfig(
-                data_width=16,
-                num_ways=4,
+                data_width=8,
+                num_ways=1,
                 num_sets=2,
-                replacement_policy=ReplacementPolicies.PLRU_MRU,
-                write_through=False,
-                write_allocate=True,
-                block_size=1,
-            )
+                replacement_policy=ReplacementPolicies.PLRU_TREE,
+                write_through=True,
+                write_allocate=False,
+                block_size=4,
+            ),
         ],
         memory_config=MemoryConfig(
-            data_width=16,
+            data_width=64,
             read_latency=10,
             write_latency=15,
             min_address=0,
-            max_address=256,
+            max_address=8,
         ),
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # write to all ways
-        await helper.write(ctx, 0, 0x1000, False)
-        await helper.write(ctx, 2, 0x1020, False)
-        await helper.write(ctx, 4, 0x1040, False)
-        await helper.write(ctx, 6, 0x1060, False)
+        # initialize some values
+        await helper.write(ctx, 0, 0x10, False)
+        await helper.write(ctx, 1, 0x11, False)
+        await helper.write(ctx, 2, 0x12, False)
+        await helper.write(ctx, 3, 0x13, False)
+        await helper.write(ctx, 4, 0x14, False)
+        await helper.write(ctx, 5, 0x15, False)
+        await helper.write(ctx, 6, 0x16, False)
+        await helper.write(ctx, 7, 0x17, False)
 
-        # access way 0
-        await helper.read(ctx, 0, 0x1000, True)
+        # read both sets but don't start with the first word
+        await helper.read(ctx, 2, 0x12, False)
+        await helper.read(ctx, 0, 0x10, True)
+        await helper.read(ctx, 1, 0x11, True)
+        await helper.read(ctx, 3, 0x13, True)
 
-        # this should replace way 1 (addr 2)
-        await helper.write(ctx, 8, 0x1080, False)
-
-        # check that addr 2 got replaced
-        await helper.read(ctx, 2, 0x1020, False)
-
-        # check that now addr 4 got replaced
-        await helper.read(ctx, 4, 0x1040, False)
-
-        # check that all the data is still there
-        await helper.read(ctx, 4, 0x1040, True)
-        await helper.read(ctx, 8, 0x1080, True)
-        await helper.read(ctx, 2, 0x1020, True)
-        await helper.read(ctx, 6, 0x1060, True)
+        await helper.read(ctx, 7, 0x17, False)
+        await helper.read(ctx, 4, 0x14, True)
+        await helper.read(ctx, 5, 0x15, True)
+        await helper.read(ctx, 6, 0x16, True)
 
     run_bench(dut=dut, bench=bench)
 
