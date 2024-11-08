@@ -46,26 +46,27 @@ class CacheDelayModule(wiring.Component):
             # Increment ready counter if BE is ready
             with m.If(self.be.port_ready):
                 m.d.sync += ready_latency_counter.eq(ready_latency_counter + 1)
-
-            # Get ready again if ready counter has reached its limit
-            with m.If(
-                (self.hit_i & (ready_latency_counter == (self.hit_latency - 1)))
-                | (~self.hit_i & (ready_latency_counter == (self.miss_latency - 1)))
-            ):
-                m.d.sync += ready_latency_counter.eq(0)
-                m.d.sync += busy.eq(0)
+                # Get ready again if ready counter has reached its limit
+                with m.If(
+                    (self.hit_i & (ready_latency_counter == (self.hit_latency - 1)))
+                    | (~self.hit_i & (ready_latency_counter == (self.miss_latency - 1)))
+                ):
+                    m.d.sync += ready_latency_counter.eq(0)
+                    m.d.sync += busy.eq(0)
 
             # Increment read data counter if the BE read data is valid
             with m.If(self.be.read_data_valid):
                 m.d.sync += read_data_latency_counter.eq(read_data_latency_counter + 1)
-
-            # Hand out the read data if the read data counter has reached its limit
-            with m.If(
-                (self.hit_i & (read_data_latency_counter == (self.hit_latency - 1)))
-                | (~self.hit_i & (read_data_latency_counter == (self.miss_latency - 1)))
-            ):
-                m.d.sync += self.fe.read_data.eq(self.be.read_data)
-                m.d.sync += self.fe.read_data_valid.eq(self.be.read_data_valid)
+                # Hand out the read data if the read data counter has reached its limit
+                with m.If(
+                    (self.hit_i & (read_data_latency_counter == (self.hit_latency - 1)))
+                    | (
+                        ~self.hit_i
+                        & (read_data_latency_counter == (self.miss_latency - 1))
+                    )
+                ):
+                    m.d.sync += self.fe.read_data.eq(self.be.read_data)
+                    m.d.sync += self.fe.read_data_valid.eq(self.be.read_data_valid)
         with m.Else():
             # Forward requests to the BE
             m.d.comb += self.be.request_valid.eq(self.fe.request_valid)
@@ -87,3 +88,5 @@ class CacheDelayModule(wiring.Component):
                 # reset the counters (the read data counter might not be 0)
                 m.d.sync += ready_latency_counter.eq(0)
                 m.d.sync += read_data_latency_counter.eq(0)
+
+        return m

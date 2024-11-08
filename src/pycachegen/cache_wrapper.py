@@ -107,10 +107,10 @@ class CacheWrapper(wiring.Component):
         # create the actual caches
         memory_hierarchy = []
         for i, cache_config in enumerate(self.cache_configs):
-            cache = Cache(config=cache_config)
+            m.submodules[f"l{i+1}_cache"] = cache = Cache(config=cache_config)
             if cache_config.hit_latency or cache_config.miss_latency:
                 # Add a delay module if the delays aren't 0
-                delay_module = CacheDelayModule(
+                m.submodules[f"l{i+1}_delay"] = delay_module = CacheDelayModule(
                     bus_signature=cache_config.fe_signature,
                     hit_latency=cache_config.hit_latency,
                     miss_latency=cache_config.miss_latency,
@@ -119,7 +119,6 @@ class CacheWrapper(wiring.Component):
                 wiring.connect(delay_module.be, cache.fe)
                 m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
-            m.submodules[f"l{i+1}_cache"] = cache
 
         # connect the hit signal of the first cache to this modules hit port
         if len(memory_hierarchy):
