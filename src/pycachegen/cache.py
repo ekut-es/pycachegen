@@ -31,27 +31,11 @@ class Cache(wiring.Component):
     def __init__(self, config: InternalCacheConfig) -> None:
         self.config = config
 
-        self.fe_signature = MemoryBusSignature(
-            address_width=config.address_width,
-            data_width=config.data_width,
-            bytes_per_word=self.config.bytes_per_word,
-        )
-        self.be_signature = MemoryBusSignature(
-            address_width=config.be_address_width,
-            data_width=config.be_data_width,
-            bytes_per_word=self.config.be_bytes_per_word,
-        )
-        self.address_layout = CacheAddressLayout(
-            index_width=self.config.index_width,
-            tag_width=self.config.tag_width,
-            word_offset_width=self.config.word_offset_width,
-        )
-
         super().__init__(
             {
-                "fe": In(self.fe_signature),
+                "fe": In(self.config.fe_signature),
                 "hit_o": Out(1),
-                "be": Out(self.be_signature),
+                "be": Out(self.config.be_signature),
             }
         )
 
@@ -70,8 +54,7 @@ class Cache(wiring.Component):
         m.submodules.repl_pol = repl_pol = ReplacementPolicy(num_ways = self.config.num_ways, num_sets = self.config.num_sets, policy = self.config.replacement_policy)
 
         ## frontend input buffers
-        fe_buffer_address = Signal(self.address_layout
-        )
+        fe_buffer_address = Signal(self.config.address_layout)
         fe_buffer_write_data = Signal(self.config.data_width)
         fe_buffer_write_strobe = Signal(self.config.bytes_per_word)
 
@@ -81,7 +64,7 @@ class Cache(wiring.Component):
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(self.config.data_width))
         be_buffer_write_strobe = Signal(unsigned(self.config.bytes_per_word))
-        be_buffer_address = Signal(self.address_layout)
+        be_buffer_address = Signal(self.config.address_layout)
         m.d.comb += self.be.address.eq(be_buffer_address.as_value()[-self.config.be_address_width : ])
         m.d.comb += self.be.write_data.eq(0)
         m.d.comb += self.be.write_strobe.eq(0)
@@ -96,7 +79,7 @@ class Cache(wiring.Component):
         # one hot encode the vector into this signal
         hit_index = one_hot_encode(m, hit_vector)
         # a view for convenient access to the tag/index/word offset bits
-        fe_address_view = data.View(self.address_layout, self.fe.address)
+        fe_address_view = data.View(self.config.address_layout, self.fe.address)
         # Output port ready status based on current state
         m.d.comb += self.fe.port_ready.eq(state == States.READY)
         # Whether to hand the data in the buffer out or the data from a data mem
@@ -117,9 +100,9 @@ class Cache(wiring.Component):
         # counter for how many words of the be read data have been written back so far
         read_block_write_counter = Signal(self.config.read_block_wc_width)
         # the address for which a read request was issued
-        read_block_previous_address = Signal(self.address_layout)
+        read_block_previous_address = Signal(self.config.address_layout)
         # the address for the next write action (previous address incremented by write counter)
-        read_block_write_address = Signal(self.address_layout)
+        read_block_write_address = Signal(self.config.address_layout)
         m.d.comb += read_block_write_address.eq(get_blockwise_incremented_address(read_block_previous_address, read_block_write_counter, m, self.config.read_block_wc_width))
         # the word to be written back next
         read_block_write_data = Signal(self.config.data_width)
@@ -137,7 +120,7 @@ class Cache(wiring.Component):
 
         ## States.WRITE_BACK_BLOCK
         # address and way to identify the block to be written back
-        write_back_address = Signal(self.address_layout)
+        write_back_address = Signal(self.config.address_layout)
         # source of the data to write back.
         # 0: from data mem (read needs to be initiated before entering this state. way needs to be specified in next signal),
         # 1: from write back buffer
@@ -157,7 +140,7 @@ class Cache(wiring.Component):
         # Enable signal to start the operation. Will get disabled once it's done.
         evict_block_enable = Signal()
         # The address of the block to write to the buffer
-        evict_block_address = Signal(self.address_layout)
+        evict_block_address = Signal(self.config.address_layout)
         # Counts how many cycles have passed since starting the operation
         evict_block_counter = Signal(range(self.config.block_size + 1))
         # Construct the address the same way that the read block operation does

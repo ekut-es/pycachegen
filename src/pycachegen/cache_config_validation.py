@@ -1,6 +1,8 @@
 from enum import Enum
 from math import floor, ceil
 from amaranth.utils import exact_log2, ceil_log2
+from pycachegen.cache_address import CacheAddressLayout
+from pycachegen.memory_bus import MemoryBusSignature
 
 
 class ReplacementPolicies(Enum):
@@ -159,6 +161,13 @@ def assert_address_range_valid(
         )
 
 
+def assert_cache_latencies_valid(hit_latency: int, miss_latency: int) -> None:
+    if not (hit_latency ^ miss_latency):
+        raise ConfigurationError(
+            f"The hit and miss latencies must either both be 0 or greater than 0, but they are configured to be {hit_latency} and {miss_latency}"
+        )
+
+
 class CacheConfig:
     def __init__(
         self,
@@ -169,6 +178,8 @@ class CacheConfig:
         write_through: bool,
         write_allocate: bool,
         block_size: int,
+        hit_latency: int = 0,
+        miss_latency: int = 0,
     ) -> None:
         """Class for end users to create configurations for caches.
 
@@ -180,6 +191,8 @@ class CacheConfig:
             write_through (bool): Use write-through or write-back policy
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
+            hit_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a hit.
+            miss_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a miss.
         """
         self.data_width = data_width
         self.num_ways = num_ways
@@ -188,6 +201,8 @@ class CacheConfig:
         self.write_through = write_through
         self.write_allocate = write_allocate
         self.block_size = block_size
+        self.hit_latency = hit_latency
+        self.miss_latency = miss_latency
 
 
 class InternalCacheConfig:
@@ -239,6 +254,8 @@ class InternalCacheConfig:
         self.write_back = not cache_config.write_through
         self.write_allocate = cache_config.write_allocate
         self.block_size = cache_config.block_size
+        self.hit_latency = cache_config.hit_latency
+        self.miss_latency = cache_config.miss_latency
         self.be_data_width = be_data_width
         self.be_address_width = be_address_width
         self.byte_size = byte_size
@@ -258,6 +275,22 @@ class InternalCacheConfig:
         self.read_block_requests_needed = cache_config.block_size // self.read_block_wc
         # width difference between own and BE address
         self.address_width_difference = address_width - be_address_width
+
+        self.fe_signature = MemoryBusSignature(
+            address_width=self.address_width,
+            data_width=self.data_width,
+            bytes_per_word=self.bytes_per_word,
+        )
+        self.be_signature = MemoryBusSignature(
+            address_width=self.be_address_width,
+            data_width=self.be_data_width,
+            bytes_per_word=self.be_bytes_per_word,
+        )
+        self.address_layout = CacheAddressLayout(
+            index_width=self.index_width,
+            tag_width=self.tag_width,
+            word_offset_width=self.word_offset_width,
+        )
 
 
 class MemoryConfig:

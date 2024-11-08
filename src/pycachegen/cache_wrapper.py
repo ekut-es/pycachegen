@@ -11,6 +11,7 @@ from pycachegen.cache_config_validation import (
 from pycachegen.cache import Cache
 from pycachegen.main_memory import MainMemory
 from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.cache_delay_module import CacheDelayModule
 
 
 class CacheWrapper(wiring.Component):
@@ -37,70 +38,63 @@ class CacheWrapper(wiring.Component):
             memory_config (MemoryConfig): Configuration for the main memory.
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
         """
-        self.NUM_PORTS = num_ports
-        self.ARBITER_POLICY = arbiter_policy
-        self.BYTE_SIZE = byte_size
-        self.ENABLE_RESET = enable_reset
-        self.NUM_CACHES = len(cache_configs)
-        self.FE_ADDRESS_WIDTH = address_width
+        self.num_ports = num_ports
+        self.arbiter_policy = arbiter_policy
+        self.byte_size = byte_size
+        self.enable_reset = enable_reset
+        self.num_caches = len(cache_configs)
+        self.fe_address_width = address_width
 
-        if self.NUM_CACHES:
-            self.FE_DATA_WIDTH = cache_configs[0].data_width
+        if self.num_caches:
+            self.fe_data_width = cache_configs[0].data_width
         else:
-            self.FE_DATA_WIDTH = memory_config.data_width
+            self.fe_data_width = memory_config.data_width
+
+        self.fe_bytes_per_word = self.fe_data_width // self.byte_size
 
         # create internal cache configs
-        self.CACHE_CONFIGS: list[InternalCacheConfig] = []
+        self.cache_configs: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
-            cache_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
-                config.data_width // self.FE_DATA_WIDTH
+            cache_address_width = self.fe_address_width - exact_log2(
+                config.data_width // self.fe_data_width
             )
             if i < len(cache_configs) - 1:
                 be_data_width = cache_configs[i + 1].data_width
             else:
                 be_data_width = memory_config.data_width
-            be_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
-                be_data_width // self.FE_DATA_WIDTH
+            be_address_width = self.fe_address_width - exact_log2(
+                be_data_width // self.fe_data_width
             )
-            self.CACHE_CONFIGS.append(
+            self.cache_configs.append(
                 InternalCacheConfig(
                     cache_config=config,
                     address_width=cache_address_width,
                     be_data_width=be_data_width,
                     be_address_width=be_address_width,
-                    byte_size=self.BYTE_SIZE,
-                    enable_reset=self.ENABLE_RESET,
+                    byte_size=self.byte_size,
+                    enable_reset=self.enable_reset,
                 )
             )
 
         # create internal memory config
-        memory_address_width = self.FE_ADDRESS_WIDTH - exact_log2(
-            memory_config.data_width // self.FE_DATA_WIDTH
+        memory_address_width = self.fe_address_width - exact_log2(
+            memory_config.data_width // self.fe_data_width
         )
-        self.MEMORY_CONFIG = InternalMemoryConfig(
+        self.memory_config = InternalMemoryConfig(
             memory_config=memory_config,
             address_width=memory_address_width,
-            byte_size=self.BYTE_SIZE,
-            enable_reset=self.ENABLE_RESET,
+            byte_size=self.byte_size,
+            enable_reset=self.enable_reset,
         )
-
-        # if self.NUM_CACHES > 0:
-        #     self.L1_ADDRESS_WIDTH = self.CACHE_CONFIGS[0].ADDRESS_WIDTH
-        #     self.FE_DATA_WIDTH = self.CACHE_CONFIGS[0].DATA_WIDTH
-        # else:
-        #     self.L1_ADDRESS_WIDTH = self.MEMORY_CONFIG.ADDRESS_WIDTH
-        #     self.FE_DATA_WIDTH = self.MEMORY_CONFIG.DATA_WIDTH
-        self.FE_BYTES_PER_WORD = self.FE_DATA_WIDTH // self.BYTE_SIZE
-        # self.FE_BYTE_OFFSET_WIDTH = exact_log2(self.FE_BYTES_PER_WORD)
 
         super().__init__(
             {
                 "fe": In(
                     MemoryBusSignature(
-                        address_width=self.FE_ADDRESS_WIDTH,
-                        data_width=self.FE_DATA_WIDTH,
-                        bytes_per_word=self.FE_BYTES_PER_WORD,
+                        address_width=self.fe_address_width,
+                        data_width=self.fe_data_width,
+                        bytes_per_word=self.fe_bytes_per_word,
                     )
                 ),
                 "hit_o": Out(1),
@@ -111,26 +105,36 @@ class CacheWrapper(wiring.Component):
         m = Module()
 
         # create the actual caches
-        caches = []
-        for i, cache_config in enumerate(self.CACHE_CONFIGS):
+        memory_hierarchy = []
+        for i, cache_config in enumerate(self.cache_configs):
             cache = Cache(config=cache_config)
-            caches.append(cache)
+            if cache_config.hit_latency or cache_config.miss_latency:
+                # Add a delay module if the delays aren't 0
+                delay_module = CacheDelayModule(
+                    bus_signature=cache_config.fe_signature,
+                    hit_latency=cache_config.hit_latency,
+                    miss_latency=cache_config.miss_latency,
+                )
+                memory_hierarchy.append(delay_module)
+                wiring.connect(delay_module.be, cache.fe)
+                m.d.comb += delay_module.hit_i.eq(cache.hit_o)
+            memory_hierarchy.append(cache)
             m.submodules[f"l{i+1}_cache"] = cache
 
         # connect the hit signal of the first cache to this modules hit port
-        if len(caches):
-            m.d.comb += self.hit_o.eq(caches[0].hit_o)
+        if len(memory_hierarchy):
+            m.d.comb += self.hit_o.eq(memory_hierarchy[0].hit_o)
 
         # create the main memory
-        m.submodules.main_memory = main_memory = MainMemory(config=self.MEMORY_CONFIG)
+        m.submodules.main_memory = main_memory = MainMemory(config=self.memory_config)
 
-        caches_and_memory = caches + [main_memory]
+        memory_hierarchy.append(main_memory)
 
         # connect first cache/memory to this modules fe
-        wiring.connect(m, wiring.flipped(self.fe), caches_and_memory[0].fe)
+        wiring.connect(m, wiring.flipped(self.fe), memory_hierarchy[0].fe)
 
         # connect the caches/memory with each other
-        for previous, current in zip(caches_and_memory, caches_and_memory[1:]):
+        for previous, current in zip(memory_hierarchy, memory_hierarchy[1:]):
             wiring.connect(m, previous.be, current.fe)
 
         return m

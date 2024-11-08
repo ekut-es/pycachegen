@@ -16,10 +16,10 @@ class CacheWrapperBenchHelper:
     def __init__(self, cache_wrapper: CacheWrapper):
         self._dut = cache_wrapper
         self._address_format_spec = (
-            "{:0=" + str(ceil(cache_wrapper.FE_ADDRESS_WIDTH / 4)) + "X}"
+            "{:0=" + str(ceil(cache_wrapper.fe_address_width / 4)) + "X}"
         )
         self._data_format_spec = (
-            "{:0=" + str(ceil(cache_wrapper.FE_DATA_WIDTH / 4)) + "X}"
+            "{:0=" + str(ceil(cache_wrapper.fe_data_width / 4)) + "X}"
         )
         self.elapsed_time = 0
         self.max_time = 1000
