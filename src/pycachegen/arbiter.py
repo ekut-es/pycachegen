@@ -149,8 +149,39 @@ class Arbiter(wiring.Component):
             m.d.sync += fe_buffers[grant_index]["request_valid"].eq(0)
 
         if self.arbitration_scheme == ArbitrationScheme.PRIORITY:
+            # Simply priority encode the request vector
+            # so that each port has a static priority
             for i in reversed(range(self.num_ports)):
                 with m.If(request_vector[i]):
                     m.d.comb += grant_index.eq(i)
+        elif self.arbitration_scheme == ArbitrationScheme.ROUND_ROBIN:
+            # Round robin scheme is basically a priority encoding where
+            # the port that sent the last request always has the lowest priority
+
+            # priority encode the normal request vector
+            request_vector_enc = Signal(range(self.num_ports))
+            for i in reversed(range(self.num_ports)):
+                with m.If(request_vector[i]):
+                    m.d.comb += request_vector_enc.eq(i)
+
+            # Create a replicate of the request vector but where the bits
+            # up to the previous request (inclusive) are zeroed
+            round_robin_mask = Signal(unsigned(self.num_ports))
+            m.d.comb += round_robin_mask.eq(~((1 << (previous_grant_index + 1)) - 1))
+            masked_request_vector = Signal(unsigned(self.num_ports))
+            m.d.comb += masked_request_vector.eq(request_vector & round_robin_mask)
+            # priority encode this masked vector as well
+            masked_request_vector_enc = Signal(range(self.num_ports))
+            for i in reversed(range(self.num_ports)):
+                with m.If(masked_request_vector[i]):
+                    m.d.comb += masked_request_vector_enc.eq(i)
+
+            # now determine the grant index
+            # if the masked request vector is 0, we may also consider masked bits
+            # else only consider the non-masked bits
+            with m.If(masked_request_vector == 0):
+                m.d.comb += grant_index.eq(request_vector_enc)
+            with m.Else():
+                m.d.comb += grant_index.eq(masked_request_vector_enc)
 
         return m
