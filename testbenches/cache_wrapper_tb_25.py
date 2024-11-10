@@ -15,7 +15,6 @@ def test():
     latency = 0
     dut = CacheWrapper(
         num_ports=1,
-        arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
         address_width=8,

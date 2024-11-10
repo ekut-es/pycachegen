@@ -42,58 +42,58 @@ class CacheWrapperBenchHelper:
     async def read(self, ctx, address: int, data_expected: int, hit_expected: bool):
         # send request
         print(f"{self._get_timestamp()}: R addr {self._addr_to_str(address)}")
-        ctx.set(self._dut.fe.address, address)
-        ctx.set(self._dut.fe.write_strobe, 0)
-        ctx.set(self._dut.fe.request_valid, 1)
+        ctx.set(self._dut.fe_0.address, address)
+        ctx.set(self._dut.fe_0.write_strobe, 0)
+        ctx.set(self._dut.fe_0.request_valid, 1)
         # invalidate request
         await self._tick(ctx)
-        ctx.set(self._dut.fe.request_valid, 0)
+        ctx.set(self._dut.fe_0.request_valid, 0)
         # wait until the response is there
-        while not ctx.get(self._dut.fe.read_data_valid):
+        while not ctx.get(self._dut.fe_0.read_data_valid):
             await self._tick(ctx)
-        assert ctx.get(self._dut.fe.read_data) == data_expected
-        assert ctx.get(self._dut.hit_o) == hit_expected
+        assert ctx.get(self._dut.fe_0.read_data) == data_expected
+        assert ctx.get(self._dut.hit_o_0) == hit_expected
         # wait until the port gets ready again
-        while not ctx.get(self._dut.fe.port_ready):
+        while not ctx.get(self._dut.fe_0.port_ready):
             await self._tick(ctx)
         # check that the read data is still the same
-        assert ctx.get(self._dut.fe.read_data) == data_expected
-        assert ctx.get(self._dut.hit_o) == hit_expected
+        assert ctx.get(self._dut.fe_0.read_data) == data_expected
+        assert ctx.get(self._dut.hit_o_0) == hit_expected
 
     async def assert_doesnt_start_read(self, ctx, address: int):
         print(f"{self._get_timestamp()}: R addr {self._addr_to_str(address)}")
-        ctx.set(self._dut.fe.address, address)
-        ctx.set(self._dut.fe.write_strobe, 0)
-        ctx.set(self._dut.fe.request_valid, 1)
+        ctx.set(self._dut.fe_0.address, address)
+        ctx.set(self._dut.fe_0.write_strobe, 0)
+        ctx.set(self._dut.fe_0.request_valid, 1)
         await self._tick(ctx)
-        ctx.set(self._dut.fe.request_valid, 0)
-        assert ctx.get(self._dut.fe.port_ready)
+        ctx.set(self._dut.fe_0.request_valid, 0)
+        assert ctx.get(self._dut.fe_0.port_ready)
 
     async def write(self, ctx, address: int, data: int, hit_expected: bool):
         print(
             f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}"
         )
-        ctx.set(self._dut.fe.address, address)
-        ctx.set(self._dut.fe.write_data, data)
-        ctx.set(self._dut.fe.write_strobe, -1)
-        ctx.set(self._dut.fe.request_valid, 1)
+        ctx.set(self._dut.fe_0.address, address)
+        ctx.set(self._dut.fe_0.write_data, data)
+        ctx.set(self._dut.fe_0.write_strobe, -1)
+        ctx.set(self._dut.fe_0.request_valid, 1)
         await self._tick(ctx)
-        ctx.set(self._dut.fe.request_valid, 0)
+        ctx.set(self._dut.fe_0.request_valid, 0)
         while not ctx.get(
-            self._dut.fe.port_ready
+            self._dut.fe_0.port_ready
         ):  # NOTE waiting for port ready might not always be desired
             await self._tick(ctx)
         assert not ctx.get(
-            self._dut.fe.read_data_valid
+            self._dut.fe_0.read_data_valid
         )  # Not that important but it should still happen and thus be checked
-        assert ctx.get(self._dut.hit_o) == hit_expected
+        assert ctx.get(self._dut.hit_o_0) == hit_expected
 
     async def flush(self, ctx):
         print(f"{self._get_timestamp()}: Flush")
-        ctx.set(self._dut.fe.flush, 1)
+        ctx.set(self._dut.fe_0.flush, 1)
         await self._tick(ctx)
-        ctx.set(self._dut.fe.flush, 0)
-        while not ctx.get(self._dut.fe.port_ready):
+        ctx.set(self._dut.fe_0.flush, 0)
+        while not ctx.get(self._dut.fe_0.port_ready):
             await self._tick(ctx)
 
 

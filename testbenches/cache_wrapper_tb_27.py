@@ -17,7 +17,6 @@ def test():
     miss_latency = 16
     dut = CacheWrapper(
         num_ports=1,
-        arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
         address_width=8,
@@ -47,18 +46,18 @@ def test():
 
     async def bench(ctx):
         # Create a read miss
-        ctx.set(dut.fe.request_valid, 1)
-        ctx.set(dut.fe.address, 0)
-        ctx.set(dut.fe.write_strobe, 0)
+        ctx.set(dut.fe_0.request_valid, 1)
+        ctx.set(dut.fe_0.address, 0)
+        ctx.set(dut.fe_0.write_strobe, 0)
 
         # wait until the read data is valid
-        while not ctx.get(dut.fe.read_data_valid):
+        while not ctx.get(dut.fe_0.read_data_valid):
             await ctx.tick()
 
         # check that the port is not yet ready
-        assert not ctx.get(dut.fe.port_ready)
+        assert not ctx.get(dut.fe_0.port_ready)
 
-        while not ctx.get(dut.fe.port_ready):
+        while not ctx.get(dut.fe_0.port_ready):
             await ctx.tick()
 
         # now do some other reads/writes (without timing checks)

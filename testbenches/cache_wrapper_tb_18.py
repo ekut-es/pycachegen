@@ -14,7 +14,6 @@ from pycachegen.cache_config_validation import (
 def test():
     dut = CacheWrapper(
         num_ports=1,
-        arbiter_policy="priority",
         byte_size=8,
         enable_reset=False,
         address_width=3,
