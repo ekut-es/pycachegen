@@ -1,3 +1,4 @@
+from pathlib import Path
 from amaranth.back import verilog
 from pycachegen.cache_wrapper import CacheWrapper
 from pycachegen.cache_config_validation import (
@@ -5,28 +6,29 @@ from pycachegen.cache_config_validation import (
     MemoryConfig,
     ReplacementPolicies,
 )
+from pycachegen.arbiter import ArbitrationScheme
 
 cache_wrapper = CacheWrapper(
     num_ports=1,
-    arbiter_policy="priority",
     byte_size=8,
-    enable_reset=False,
+    enable_reset=True,
     address_width=8,
     cache_configs=[
         CacheConfig(
-            data_width=16,
-            num_ways=4,
-            num_sets=16,
-            replacement_policy=ReplacementPolicies.FIFO,
+            data_width=32,
+            num_ways=2,
+            num_sets=8,
+            replacement_policy=ReplacementPolicies.PLRU_TREE,
             write_through=True,
             write_allocate=False,
-            block_size=1,
+            block_size=4,
         )
     ],
     memory_config=MemoryConfig(
-        data_width=16, read_latency=10, write_latency=15, min_address=0, max_address=256
+        data_width=32, read_latency=10, write_latency=15, min_address=0, max_address=256
     ),
 )
 
-with open("cache_wrapper.v", "w") as f:
-    f.write(verilog.convert(cache_wrapper, name="CacheWrapper"))
+Path("export").mkdir(parents=True, exist_ok=True)
+with open("export/cache_wrapper.v", "w") as f:
+    f.write(verilog.convert(cache_wrapper, name="CacheWrapper", emit_src=False))

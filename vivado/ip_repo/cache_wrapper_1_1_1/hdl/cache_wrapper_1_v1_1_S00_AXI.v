@@ -420,46 +420,37 @@
 	// Add user logic here
 
 	// input registers:
-	// slv_reg0: flush, rw_select, wdata_valid, addr_valid
-	// slv_reg1: addr
-	// slv_reg2: wdata
+	// slv_reg0: write_strobe, flush, request_valid
+	// slv_reg1: address
+	// slv_reg2: write_data
 	//
 	// output registers:
-	// slv_reg5: flush_done, hit, rdata_valid, w_done, p_ready
+	// slv_reg5: hit, rdata_valid, p_ready
 	// slv_reg6: rdata
 
+    // input wires
+    wire cache_rst;
+    assign cache_rst = 1'b0;
+
     // output wires
-    wire cache_read_data_valid;
-    wire cache_write_done;
     wire cache_port_ready;
+    wire cache_read_data_valid;
     wire cache_hit;
-    wire flush_done;
     wire[CACHE_DATA_WIDTH-1 : 0] cache_read_data;
-    wire cache_reset;
-    assign cache_reset = 0; // deactivate reset to allow BRAM synthesis
-
-    wire[1:0] write_strobe;
-    assign write_strobe = {2{slv_reg0[2]}};
-
-    wire request_valid;
-    assign request_valid = (slv_reg0[0] && (!slv_reg0[2] || slv_reg0[1]));
-
-    assign write_done = cache_port_ready;
 
     CacheWrapper
     CacheWrapper (
         .clk(S_AXI_ACLK),
-        .rst(cache_reset),
-        .fe__flush(slv_reg0[3]),
-        .fe__address(slv_reg1[CACHE_ADDRESS_WIDTH-1 : 0]), //FIXME
-        .fe__write_data(slv_reg2[CACHE_DATA_WIDTH-1 : 0]),
-        .fe__write_strobe(write_strobe),
-        .fe__request_valid(request_valid),
-        .fe__read_data_valid(cache_read_data_valid),
-        .fe__read_data(cache_read_data),
-        .fe__port_ready(cache_port_ready),
-        .fe__flush_done(flush_done),
-        .hit_o(cache_hit)
+        .rst(cache_rst),
+        .fe_0__request_valid(slv_reg0[0]),
+        .fe_0__flush(slv_reg0[1]),
+        .fe_0__write_strobe(slv_reg0[31:2]),
+        .fe_0__address(slv_reg1),
+        .fe_0__write_data(slv_reg2),
+        .fe_0__port_ready(cache_port_ready),
+        .fe_0__read_data_valid(cache_read_data_valid),
+        .hit_o_0(cache_hit),
+        .fe_0__read_data(cache_read_data)
     );
 
     always @( posedge S_AXI_ACLK ) begin
@@ -469,7 +460,7 @@
             slv_reg7 <= 0;
             slv_reg8 <= 0;
         end else begin
-            slv_reg5 <= {27'b0, flush_done, cache_hit, cache_read_data_valid, cache_write_done, cache_port_ready};
+            slv_reg5 <= {29'b0, cache_hit, cache_read_data_valid, cache_port_ready};
             slv_reg6 <= {{32-CACHE_DATA_WIDTH{1'b0}}, cache_read_data};
             slv_reg7 <= 0;
             slv_reg8 <= 0;

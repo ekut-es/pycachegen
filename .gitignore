@@ -165,6 +165,7 @@ cython_debug/
 # Verilator
 *.vcd
 vcd/
+export/
 
 # SystemC
 systemc-2.3.3
@@ -189,3 +190,4 @@ vivado/*/*.runs
 vivado/*/*.ip_user_files
 vivado/*/*.sim
 vivado/*/*.xsa
+*.xsa

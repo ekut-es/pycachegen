@@ -213,7 +213,6 @@ class InternalCacheConfig:
         be_data_width: int,
         be_address_width: int,
         byte_size: int,
-        enable_reset: bool,
     ) -> None:
         """Class for validating cache configs in a cache hierarchy and for passing on all needed
         arguments to a cache.
@@ -224,7 +223,6 @@ class InternalCacheConfig:
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
-            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         assert_data_width_valid(cache_config.data_width, byte_size)
         assert_data_width_valid(
@@ -259,7 +257,6 @@ class InternalCacheConfig:
         self.be_data_width = be_data_width
         self.be_address_width = be_address_width
         self.byte_size = byte_size
-        self.enable_reset = enable_reset
         self.bytes_per_word = cache_config.data_width // byte_size
         self.be_bytes_per_word = be_data_width // byte_size
         self.index_width = exact_log2(cache_config.num_sets)
@@ -324,7 +321,6 @@ class InternalMemoryConfig:
         memory_config: MemoryConfig,
         address_width: int,
         byte_size: int,
-        enable_reset: bool,
     ) -> None:
         """Class for validating memory configs in a cache hierarchy and for passing on all needed
         arguments to a memory.
@@ -332,7 +328,6 @@ class InternalMemoryConfig:
         Args:
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             byte_size (int): Number of bits per byte.
-            enable_reset (bool): Whether to generate reset logic or not. reset port will be generated nonetheless.
         """
         assert_greater_equal(memory_config.read_latency, 2, "read_latency")
         assert_greater_equal(memory_config.write_latency, 2, "write_latency")
@@ -351,5 +346,4 @@ class InternalMemoryConfig:
         self.byte_size = byte_size
         self.min_address = memory_config.min_address
         self.max_address = memory_config.max_address
-        self.enable_reset = enable_reset
         self.bytes_per_word = memory_config.data_width // byte_size

@@ -17,7 +17,6 @@ def test():
             ),
             address_width=3,
             byte_size=8,
-            enable_reset=True,
         )
     )
 
