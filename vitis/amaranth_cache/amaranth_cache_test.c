@@ -17,6 +17,8 @@
  *   ps7_uart    115200 (configured by bootrom/bsp)
  */
 
+#define WAIT_UNTIL_READY while((*axi_slave_hit_rdvalid_pready & 1) == 0)
+
 #include <stdio.h>
 #include "platform.h"
 #include "xil_printf.h"
@@ -36,39 +38,38 @@ int main()
     volatile Xuint32* axi_slave_hit_rdvalid_pready = axi_slave_base_addr_p + 5;
     volatile Xuint32* axi_slave_rdata = axi_slave_base_addr_p + 6;
 
+    WAIT_UNTIL_READY;
     xil_printf("\n\rWrite to address 2\n\r");
     *axi_slave_address = 2;
     *axi_slave_wdata = 0x12345678;
     *axi_slave_wstrobe_flush_reqvalid = 0b111101;
-    *axi_slave_wstrobe_flush_reqvalid = 0;
-//    for(int i = 0; i < 20; i++)
     xil_printf("hit/rdvalid/pready: 0x%x\n\r\n", *axi_slave_hit_rdvalid_pready);
 
+    WAIT_UNTIL_READY;
     xil_printf("Read from address 2\n\r");
     *axi_slave_address = 2;
     *axi_slave_wstrobe_flush_reqvalid = 0b000001;
-    *axi_slave_wstrobe_flush_reqvalid = 0;
     xil_printf("hit/rdvalid/pready: 0x%x\n\r", *axi_slave_hit_rdvalid_pready);
     xil_printf("rdata: 0x%x\n\r\n", *axi_slave_rdata);
 
+    WAIT_UNTIL_READY;
     xil_printf("Read from address 2\n\r");
     *axi_slave_address = 2;
     *axi_slave_wstrobe_flush_reqvalid = 0b000001;
-    *axi_slave_wstrobe_flush_reqvalid = 0;
     xil_printf("hit/rdvalid/pready: 0x%x\n\r", *axi_slave_hit_rdvalid_pready);
     xil_printf("rdata: 0x%x\n\r\n", *axi_slave_rdata);
 
+    WAIT_UNTIL_READY;
     xil_printf("Write to address 2\n\r");
     *axi_slave_address = 2;
     *axi_slave_wdata = 0x22;
     *axi_slave_wstrobe_flush_reqvalid = 0b000101;
-    *axi_slave_wstrobe_flush_reqvalid = 0;
     xil_printf("hit/rdvalid/pready: 0x%x\n\r\n", *axi_slave_hit_rdvalid_pready);
 
+    WAIT_UNTIL_READY;
     xil_printf("Read from address 2\n\r");
     *axi_slave_address = 2;
     *axi_slave_wstrobe_flush_reqvalid = 0b000001;
-    *axi_slave_wstrobe_flush_reqvalid = 0;
     xil_printf("hit/rdvalid/pready: 0x%x\n\r", *axi_slave_hit_rdvalid_pready);
     xil_printf("rdata: 0x%x\n\r\n", *axi_slave_rdata);
 

@@ -280,6 +280,12 @@
 	                    end
 	        endcase
 	      end
+        else begin
+          // reset the slv_reg0 if it is not being written to because
+          // it contains the request_valid signal and we don't want to
+          // send a request to the cache twice
+          slv_reg0 <= 0;
+        end
 	  end
 	end
 
