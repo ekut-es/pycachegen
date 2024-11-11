@@ -22,7 +22,7 @@
         "m01_couplers": {}
       },
       "rst_ps8_0_99M": "",
-      "cache_wrapper_1_0": ""
+      "amaranth_cache_wrapper_axi_slave": ""
     },
     "components": {
       "zynq_ultra_ps_e_0": {
@@ -1462,12 +1462,12 @@
         "xci_path": "ip/design_1_rst_ps8_0_99M_0/design_1_rst_ps8_0_99M_0.xci",
         "inst_hier_path": "rst_ps8_0_99M"
       },
-      "cache_wrapper_1_0": {
-        "vlnv": "user.org:user:cache_wrapper_1:1.1",
-        "ip_revision": "19",
+      "amaranth_cache_wrapper_axi_slave": {
+        "vlnv": "user.org:user:cache_wrapper:1.1",
+        "ip_revision": "4",
         "xci_name": "design_1_cache_wrapper_1_0_1",
         "xci_path": "ip/design_1_cache_wrapper_1_0_1/design_1_cache_wrapper_1_0_1.xci",
-        "inst_hier_path": "cache_wrapper_1_0",
+        "inst_hier_path": "amaranth_cache_wrapper_axi_slave",
         "parameters": {
           "CACHE_ADDRESS_WIDTH": {
             "value": "32"
@@ -1482,7 +1482,7 @@
       "ps8_0_axi_periph_M00_AXI": {
         "interface_ports": [
           "ps8_0_axi_periph/M00_AXI",
-          "cache_wrapper_1_0/S00_AXI"
+          "amaranth_cache_wrapper_axi_slave/S00_AXI"
         ]
       },
       "zynq_ultra_ps_e_0_M_AXI_HPM0_LPD": {
@@ -1500,7 +1500,7 @@
           "ps8_0_axi_periph/M00_ARESETN",
           "ps8_0_axi_periph/ARESETN",
           "ps8_0_axi_periph/M01_ARESETN",
-          "cache_wrapper_1_0/s00_axi_aresetn"
+          "amaranth_cache_wrapper_axi_slave/s00_axi_aresetn"
         ]
       },
       "zynq_ultra_ps_e_0_pl_clk0": {
@@ -1512,7 +1512,7 @@
           "ps8_0_axi_periph/M00_ACLK",
           "ps8_0_axi_periph/ACLK",
           "ps8_0_axi_periph/M01_ACLK",
-          "cache_wrapper_1_0/s00_axi_aclk"
+          "amaranth_cache_wrapper_axi_slave/s00_axi_aclk"
         ]
       },
       "zynq_ultra_ps_e_0_pl_resetn0": {
@@ -1528,7 +1528,7 @@
           "Data": {
             "segments": {
               "SEG_cache_wrapper_1_0_S00_AXI_reg": {
-                "address_block": "/cache_wrapper_1_0/S00_AXI/S00_AXI_reg",
+                "address_block": "/amaranth_cache_wrapper_axi_slave/S00_AXI/S00_AXI_reg",
                 "offset": "0x0080000000",
                 "range": "64K",
                 "offset_base_param": "C_S00_AXI_BASEADDR",

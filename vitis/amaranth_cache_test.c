@@ -30,7 +30,7 @@ int main()
 {
     init_platform();
 
-    volatile Xuint32* axi_slave_base_addr_p = (Xuint32*) XPAR_CACHE_WRAPPER_1_0_S00_AXI_BASEADDR;
+    volatile Xuint32* axi_slave_base_addr_p = (Xuint32*) XPAR_CACHE_WRAPPER_0_S00_AXI_BASEADDR;
 
     volatile Xuint32* axi_slave_wstrobe_flush_reqvalid = axi_slave_base_addr_p;
     volatile Xuint32* axi_slave_address = axi_slave_base_addr_p + 1;

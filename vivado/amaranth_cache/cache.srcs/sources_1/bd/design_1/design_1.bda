@@ -199,10 +199,10 @@
                 "MI": "M_AXI_HPM0_LPD",
                 "MS": "SEG_cache_wrapper_1_0_S00_AXI_reg",
                 "MV": "xilinx.com:ip:zynq_ultra_ps_e:3.5",
-                "SX": "/cache_wrapper_1_0",
+                "SX": "/amaranth_cache_wrapper_axi_slave",
                 "SI": "S00_AXI",
                 "SS": "S00_AXI_reg",
-                "SV": "user.org:user:cache_wrapper_1:1.1",
+                "SV": "user.org:user:cache_wrapper:1.1",
                 "TM": "both",
                 "TU": "register"
             }
