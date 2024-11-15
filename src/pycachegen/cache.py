@@ -143,6 +143,8 @@ class Cache(wiring.Component):
         evict_block_address = Signal(self.config.address_layout)
         # Counts how many cycles have passed since starting the operation
         evict_block_counter = Signal(range(self.config.block_size + 1))
+        # The way in which to evict a block
+        evict_block_way = Signal(range(self.config.num_ways))
         # Construct the address the same way that the read block operation does
         # so that we evict the block before it gets overwritten by the read block operation
         evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.be_word_multiplier_width)
@@ -153,7 +155,7 @@ class Cache(wiring.Component):
         with m.If(evict_block_enable):
             with m.If(evict_block_counter < self.config.block_size):
                 # Send read request to data_mem
-                memories.init_data_mem_read(next_block_replacement, evict_block_incremented_address)
+                memories.init_data_mem_read(evict_block_way, evict_block_incremented_address)
                 # Store the address we just sent a request to
                 m.d.sync += evict_block_previous_word_offset.eq(evict_block_incremented_address.word_offset)
                 # Increment the total counter
@@ -161,7 +163,7 @@ class Cache(wiring.Component):
 
             with m.If(evict_block_counter > 0):
                 # Write the previously requested word to the buffer
-                m.d.sync += evicted_block_buffer[evict_block_previous_word_offset].eq(memories.data_mem_rp[next_block_replacement].data)
+                m.d.sync += evicted_block_buffer[evict_block_previous_word_offset].eq(memories.data_mem_rp[evict_block_way].data)
 
             with m.If(evict_block_counter == self.config.block_size):
                 # We're done, reset everything.
@@ -199,8 +201,8 @@ class Cache(wiring.Component):
             by the frontend request. This includes starting the evict operation
             and configuring the registers for the write back operation. The
             transition to the write back block state has to be performed manually.
-
-
+            This function uses the repl_pol's current next_replacement_o, so the index
+            for the repl_pol must be set manually.
 
             Args:
                 next_state (States): State to transition to after write back.
@@ -208,6 +210,7 @@ class Cache(wiring.Component):
             # Write data_mem block to be replaced into a buffer should we need a write back
             m.d.sync += evict_block_enable.eq(1)
             m.d.sync += evict_block_address.as_value().eq(self.fe.address)
+            m.d.sync += evict_block_way.eq(repl_pol.next_replacement_o)
             # Prepare things for the Write Back State should we transition to it
             m.d.sync += write_back_data_from_buffer.eq(1)
             m.d.sync += write_back_next_state.eq(next_state)
@@ -216,7 +219,7 @@ class Cache(wiring.Component):
                 Cat(
                     C(0, unsigned(self.config.word_offset_width)),
                     fe_address_view.index,
-                    memories.tag_mem_rp[way_to_replace].data
+                    memories.tag_mem_rp[repl_pol.next_replacement_o].data
                 )
             )
 
@@ -330,10 +333,11 @@ class Cache(wiring.Component):
                                     m.d.sync += read_block_next_state.eq(States.READY)
             with m.Case(States.WRITE_BACK_BLOCK):
                 # wait for the BE to get ready
-                with m.If(self.be.port_ready):
+                # If we should take the data from the evict buffer then check that the evict block operation is done
+                # (it should always be done for normal write backs but might not be for flush write backs)
+                with m.If(self.be.port_ready & (~(write_back_data_from_buffer & evict_block_enable))):
                     # Write back the block specified by the respective registers
                     m.d.comb += be_buffer_address.eq(write_back_address)
-                    m.d.comb += be_buffer_write_strobe.eq(-1)
                     m.d.comb += self.be.request_valid.eq(1)
                     with m.If(write_back_data_from_buffer):
                         # take the data from the buffer
@@ -353,8 +357,9 @@ class Cache(wiring.Component):
                             # This is the last word to write back -> proceed with the next state
                             m.d.sync += state.eq(write_back_next_state)
                     with m.Else():
-                        # take the data from the data memory
+                        # take the data from the data memory and write it and the write strobe to the BE buffers
                         m.d.comb += be_buffer_write_data.eq(memories.data_mem_rp[write_back_way].data)
+                        m.d.comb += be_buffer_write_strobe.eq(-1)
                         # data_mem read needs to be initiated by previous state
                         # -> we also need to initiate a new read
                         memories.init_data_mem_read(write_back_way, write_back_address.as_value() + 1)
@@ -459,17 +464,19 @@ class Cache(wiring.Component):
                 next_state = Mux(is_last_block, States.FLUSH_BACKEND, States.FLUSH_CACHE)
 
                 with m.If(dirty_bits[flush_block_index][flush_set_index] & valid_bits[flush_block_index][flush_set_index]):
-                    # This block needs to be written back
-                    # prepare things for the write back state and transition into it
+                    # Start a evict block operation so that the write back state can take multiple words out of the evict data buffer
+                    m.d.sync += evict_block_enable.eq(1)
+                    m.d.sync += evict_block_address.tag.eq(memories.tag_mem_rp[flush_block_index].data)
+                    m.d.sync += evict_block_address.index.eq(flush_set_index)
+                    m.d.sync += evict_block_address.word_offset.eq(0)
+                    m.d.sync += evict_block_way.eq(flush_block_index)
+                    # Prepare things for the Write Back State
+                    m.d.sync += write_back_data_from_buffer.eq(1)
+                    m.d.sync += write_back_next_state.eq(next_state)
                     m.d.sync += write_back_address.tag.eq(memories.tag_mem_rp[flush_block_index].data)
                     m.d.sync += write_back_address.index.eq(flush_set_index)
                     m.d.sync += write_back_address.word_offset.eq(0)
-                    # tell the write back state which way to use
-                    m.d.sync += write_back_way.eq(flush_block_index)
-                    m.d.sync += write_back_data_from_buffer.eq(0)
-                    # query the data memory so the write back state can access the data. It'll do that on its own for the following words.
-                    memories.init_data_mem_read(flush_block_index, Cat(C(0, shape=unsigned(self.config.word_offset_width)), flush_set_index))
-                    # set the next states
+                    # transition to write back state (it will wait until the evict block operation is done)
                     m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
                     m.d.sync += write_back_next_state.eq(next_state)
                     # clear dirty bit
