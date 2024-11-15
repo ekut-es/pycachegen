@@ -76,7 +76,3 @@ def test():
         await helper.read(ctx, 0, 0x10, False)
 
     run_bench(dut=dut, bench=bench)
-
-
-if __name__ == "__main__":
-    test()

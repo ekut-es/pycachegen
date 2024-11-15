@@ -129,7 +129,3 @@ def test():
         assert ctx.get(dut.fe_2.read_data) == 0x1000
 
     run_bench(dut=dut, bench=bench)
-
-
-if __name__ == "__main__":
-    test()

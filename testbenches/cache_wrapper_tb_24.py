@@ -87,7 +87,3 @@ def test():
         assert helper.elapsed_time - elapsed_time == 4 * (1 + latency)
 
     run_bench(dut=dut, bench=bench)
-
-
-if __name__ == "__main__":
-    test()

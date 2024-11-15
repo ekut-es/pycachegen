@@ -88,7 +88,3 @@ def test():
         assert ctx.get(dut.fe_2.port_ready)
 
     run_bench(dut=dut, bench=bench)
-
-
-if __name__ == "__main__":
-    test()

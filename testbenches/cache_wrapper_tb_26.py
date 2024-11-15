@@ -96,7 +96,3 @@ def test():
         assert_elapsed_time(1 + hit_latency)
 
     run_bench(dut=dut, bench=bench)
-
-
-if __name__ == "__main__":
-    test()
