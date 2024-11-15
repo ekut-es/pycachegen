@@ -20,7 +20,6 @@ class CacheWrapper(wiring.Component):
         self,
         num_ports: int,
         byte_size: int,
-        enable_reset: bool,
         address_width: int,
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
@@ -33,7 +32,6 @@ class CacheWrapper(wiring.Component):
         Args:
             num_ports (int): Number of access ports.
             byte_size (int): Number of bits per byte.
-            enable_reset (bool): Whether to generate reset logic or not. This does not affect the power on reset, which is still needed.
             address_width (int): Address width. Note that addresses do not include a byte offset.
             memory_config (MemoryConfig): Configuration for the main memory.
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
@@ -42,7 +40,6 @@ class CacheWrapper(wiring.Component):
         self.num_ports = num_ports
         self.arbitration_scheme = arbitration_scheme
         self.byte_size = byte_size
-        self.enable_reset = enable_reset
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
 
@@ -103,9 +100,6 @@ class CacheWrapper(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
-
-        # optionally disable the reset for the entire sync domain
-        # m.domains.sync = ClockDomain(reset_less=(not self.enable_reset), local=True)
 
         # create an arbiter if necessary
         if self.num_ports > 1:

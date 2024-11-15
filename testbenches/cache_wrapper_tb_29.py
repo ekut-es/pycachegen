@@ -17,7 +17,6 @@ def test():
         num_ports=3,
         arbitration_scheme=ArbitrationScheme.PRIORITY,
         byte_size=8,
-        enable_reset=False,
         address_width=8,
         cache_configs=[
             CacheConfig(

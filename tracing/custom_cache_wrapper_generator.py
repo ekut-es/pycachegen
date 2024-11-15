@@ -6,12 +6,11 @@ from pycachegen import (
 )
 
 if __name__ == "__main__":
-    FILE_NAME = "custom_cache_wrapper.v" # path for output file (will be overridden by argv[1] if called with any arguments)
+    FILE_NAME = "custom_cache_wrapper.v"  # path for output file (will be overridden by argv[1] if called with any arguments)
     NUM_PORTS = 1
-    ARBITER_POLICY = "round_robin" # one of "fifo", "priority", "round_robin"
-    BYTE_SIZE = 8 # bits per byte
-    ENABLE_RESET = False # Disable for synthesis. Can be enabled for simulation.
-    ADDRESS_WIDTH = 15 # Addresses must include the byte offset bits
+    ARBITER_POLICY = "round_robin"  # one of "fifo", "priority", "round_robin"
+    BYTE_SIZE = 8  # bits per byte
+    ADDRESS_WIDTH = 15  # Addresses must include the byte offset bits
     # Put all your cache configurations here
     CACHE_CONFIGS = [
         CacheConfig(

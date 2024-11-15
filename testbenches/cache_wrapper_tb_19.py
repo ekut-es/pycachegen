@@ -15,7 +15,6 @@ def test():
     dut = CacheWrapper(
         num_ports=1,
         byte_size=13,
-        enable_reset=False,
         address_width=4,
         cache_configs=[
             CacheConfig(

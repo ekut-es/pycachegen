@@ -11,7 +11,6 @@ from pycachegen.arbiter import ArbitrationScheme
 cache_wrapper = CacheWrapper(
     num_ports=1,
     byte_size=8,
-    enable_reset=True,
     address_width=16,
     cache_configs=[
         CacheConfig(
