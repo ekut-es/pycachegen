@@ -23,7 +23,7 @@ class States(Enum):
     EXECUTE_FE_WRITE_REQUEST = 3
     SEND_MEM_REQUEST = 4
     FLUSH_CACHE = 5
-    FLUSH_CACHE_BLOCK = 6
+    FLUSH_BACKEND = 6
 
 
 class Cache(wiring.Component):
@@ -109,7 +109,7 @@ class Cache(wiring.Component):
         # state that read block should take next
         read_block_next_state = Signal(States)
 
-        ## States.FLUSH_CACHE / States.FLUSH_CACHE_BLOCK / States.FLUSH_BACKEND
+        ## States.FLUSH_CACHE / States.FLUSH_BACKEND
         # index of the set to be flushed next
         flush_set_index = Signal(self.config.index_width)
         # index of the block that is currently being flushed
@@ -339,7 +339,7 @@ class Cache(wiring.Component):
                     m.d.comb += be_buffer_address.eq(write_back_address)
                     m.d.comb += self.be.request_valid.eq(1)
                     with m.If(write_back_data_from_buffer):
-                        # take the data from the buffer
+                        # write back all the data in the evict buffer
                         # we can write multiple words at once if our block size is greater than 1 and
                         # if the BE data width allows it
                         m.d.comb += self.be.write_data.eq(
@@ -359,14 +359,7 @@ class Cache(wiring.Component):
                         # take the data from the data memory and write it and the write strobe to the BE buffers
                         m.d.comb += be_buffer_write_data.eq(memories.data_mem_rp[write_back_way].data)
                         m.d.comb += be_buffer_write_strobe.eq(-1)
-                        # data_mem read needs to be initiated by previous state
-                        # -> we also need to initiate a new read
-                        memories.init_data_mem_read(write_back_way, write_back_address.as_value() + 1)
-                        # increment word offset of write back address
-                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
-                        with m.If(write_back_address.word_offset == (self.config.block_size - 1)):
-                            # This is the last word to write back -> proceed with the next state
-                            m.d.sync += state.eq(write_back_next_state)
+                        m.d.sync += state.eq(write_back_next_state)
             with m.Case(States.READ_BLOCK):
                 # wait until the memory gets ready and (all words of previous request were written to the cache or this is the first request)
                 # and we have not already issued all needed requests
