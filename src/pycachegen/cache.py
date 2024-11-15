@@ -23,8 +23,7 @@ class States(Enum):
     EXECUTE_FE_WRITE_REQUEST = 3
     SEND_MEM_REQUEST = 4
     FLUSH_CACHE = 5
-    FLUSH_BACKEND = 6
-    FLUSH_CACHE_BLOCK = 7
+    FLUSH_CACHE_BLOCK = 6
 
 
 class Cache(wiring.Component):
@@ -442,48 +441,42 @@ class Cache(wiring.Component):
             with m.Case(States.SEND_MEM_REQUEST):
                 send_fe_buffer_request_to_lower_mem(send_mem_request_next_state)
             with m.Case(States.FLUSH_CACHE):
-                with m.If(self.config.write_back):
-                    # Flush the cache
-                    # query tag memory
-                    memories.init_tag_mem_read(flush_block_index, flush_set_index)
-                    # Go to a state that will check if this block needs to be flushed
-                    m.d.sync += state.eq(States.FLUSH_CACHE_BLOCK)
-                with m.Else():
-                    # flush the backend
+                with m.If(not self.config.write_back):
+                    # If write back is not used, simply flush the back end
                     m.d.sync += state.eq(States.FLUSH_BACKEND)
-                    m.d.comb += self.be.flush.eq(1)
-            with m.Case(States.FLUSH_CACHE_BLOCK):
-                # Increment set/block indices
-                m.d.sync += flush_set_index.eq(flush_set_index + 1)
-                with m.If(flush_set_index == self.config.num_sets - 1):
-                    m.d.sync += flush_block_index.eq(flush_block_index + 1)
-
-                # Is this the last set in the last block?
-                is_last_block = (flush_set_index == self.config.num_sets - 1) & (flush_block_index == self.config.num_ways - 1)
-                # Determine the next state/the next state after write back
-                next_state = Mux(is_last_block, States.FLUSH_BACKEND, States.FLUSH_CACHE)
-
-                with m.If(dirty_bits[flush_block_index][flush_set_index] & valid_bits[flush_block_index][flush_set_index]):
-                    # Start a evict block operation so that the write back state can take multiple words out of the evict data buffer
-                    m.d.sync += evict_block_enable.eq(1)
-                    m.d.sync += evict_block_address.tag.eq(memories.tag_mem_rp[flush_block_index].data)
-                    m.d.sync += evict_block_address.index.eq(flush_set_index)
-                    m.d.sync += evict_block_address.word_offset.eq(0)
-                    m.d.sync += evict_block_way.eq(flush_block_index)
-                    # Prepare things for the Write Back State
-                    m.d.sync += write_back_data_from_buffer.eq(1)
-                    m.d.sync += write_back_next_state.eq(next_state)
-                    m.d.sync += write_back_address.tag.eq(memories.tag_mem_rp[flush_block_index].data)
-                    m.d.sync += write_back_address.index.eq(flush_set_index)
-                    m.d.sync += write_back_address.word_offset.eq(0)
-                    # transition to write back state (it will wait until the evict block operation is done)
-                    m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
-                    m.d.sync += write_back_next_state.eq(next_state)
-                    # clear dirty bit
-                    m.d.sync += dirty_bits[flush_block_index][flush_set_index].eq(0)
                 with m.Else():
-                    # Block doesn't need to be written back
-                    m.d.sync += state.eq(next_state)
+                    # Increment set/block indices
+                    m.d.sync += flush_set_index.eq(flush_set_index + 1)
+                    with m.If(flush_set_index == self.config.num_sets - 1):
+                        m.d.sync += flush_block_index.eq(flush_block_index + 1)
+
+                    # Is this the last set in the last block?
+                    is_last_block = (flush_set_index == self.config.num_sets - 1) & (flush_block_index == self.config.num_ways - 1)
+                    # Determine the next state/the next state after write back
+                    next_state = Mux(is_last_block, States.FLUSH_BACKEND, States.FLUSH_CACHE)
+
+                    with m.If(dirty_bits[flush_block_index][flush_set_index] & valid_bits[flush_block_index][flush_set_index]):
+                        # read the tag of the block to write back
+                        memories.init_tag_mem_read(flush_block_index, flush_set_index)
+                        # Start a evict block operation so that the write back state can take multiple words out of the evict data buffer
+                        m.d.sync += evict_block_enable.eq(1)
+                        m.d.sync += evict_block_address.index.eq(flush_set_index) # tag is not needed for evict block
+                        m.d.sync += evict_block_address.word_offset.eq(0)
+                        m.d.sync += evict_block_way.eq(flush_block_index)
+                        # Prepare things for the Write Back State
+                        m.d.sync += write_back_data_from_buffer.eq(1)
+                        m.d.sync += write_back_next_state.eq(next_state)
+                        m.d.sync += write_back_address.tag.eq(memories.tag_mem_rp[flush_block_index].data)
+                        m.d.sync += write_back_address.index.eq(flush_set_index)
+                        m.d.sync += write_back_address.word_offset.eq(0)
+                        # transition to write back state (it will wait until the evict block operation is done)
+                        m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
+                        m.d.sync += write_back_next_state.eq(next_state)
+                        # clear dirty bit
+                        m.d.sync += dirty_bits[flush_block_index][flush_set_index].eq(0)
+                    with m.Else():
+                        # Block doesn't need to be written back
+                        m.d.sync += state.eq(next_state)
             with m.Case(States.FLUSH_BACKEND):
                 with m.If(self.be.port_ready):
                     with m.If(~be_flush_requested):
