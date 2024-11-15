@@ -98,12 +98,12 @@ class Cache(wiring.Component):
         # counter for how many read operations have been done so far
         read_block_read_counter = Signal(range(self.config.read_block_requests_needed + 1))
         # counter for how many words of the be read data have been written back so far
-        read_block_write_counter = Signal(self.config.read_block_wc_width)
+        read_block_write_counter = Signal(self.config.be_word_multiplier_width)
         # the address for which a read request was issued
         read_block_previous_address = Signal(self.config.address_layout)
         # the address for the next write action (previous address incremented by write counter)
         read_block_write_address = Signal(self.config.address_layout)
-        m.d.comb += read_block_write_address.eq(get_blockwise_incremented_address(read_block_previous_address, read_block_write_counter, m, self.config.read_block_wc_width))
+        m.d.comb += read_block_write_address.eq(get_blockwise_incremented_address(read_block_previous_address, read_block_write_counter, m, self.config.be_word_multiplier_width))
         # the word to be written back next
         read_block_write_data = Signal(self.config.data_width)
         m.d.comb += read_block_write_data.eq(self.be.read_data.word_select(read_block_write_address.as_value()[:self.config.address_width_difference], self.config.data_width))
@@ -145,7 +145,7 @@ class Cache(wiring.Component):
         evict_block_counter = Signal(range(self.config.block_size + 1))
         # Construct the address the same way that the read block operation does
         # so that we evict the block before it gets overwritten by the read block operation
-        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.read_block_wc_width)
+        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.be_word_multiplier_width)
 
         # remember the previous word offset so we know in which slot of the buffer the read data belongs
         evict_block_previous_word_offset = Signal(self.config.word_offset_width)
@@ -340,16 +340,16 @@ class Cache(wiring.Component):
                         # we can write multiple words at once if our block size is greater than 1 and
                         # if the BE data width allows it
                         m.d.comb += self.be.write_data.eq(
-                            Cat([evicted_block_buffer[write_back_address.word_offset + i] for i in range(self.config.read_block_wc)])
+                            Cat([evicted_block_buffer[write_back_address.word_offset + i] for i in range(self.config.be_word_multiplier)])
                             << (self.config.data_width * write_back_address.as_value()[:-self.config.be_address_width])
                         )
                         m.d.comb += self.be.write_strobe.eq(
-                            (2**(self.config.bytes_per_word * self.config.read_block_wc) - 1)
+                            (2**(self.config.bytes_per_word * self.config.be_word_multiplier) - 1)
                             << (self.config.bytes_per_word * write_back_address.as_value()[:-self.config.be_address_width])
                         )
                         # increment word offset of write back address
-                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + self.config.read_block_wc)
-                        with m.If(write_back_address.word_offset == (self.config.block_size - self.config.read_block_wc)):
+                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + self.config.be_word_multiplier)
+                        with m.If(write_back_address.word_offset == (self.config.block_size - self.config.be_word_multiplier)):
                             # This is the last word to write back -> proceed with the next state
                             m.d.sync += state.eq(write_back_next_state)
                     with m.Else():
@@ -368,7 +368,7 @@ class Cache(wiring.Component):
                 # and we have not already issued all needed requests
                 with m.If(
                     self.be.port_ready
-                    & ((read_block_write_counter == (self.config.read_block_wc - 1)) | (read_block_read_counter == 0))
+                    & ((read_block_write_counter == (self.config.be_word_multiplier - 1)) | (read_block_read_counter == 0))
                     & (read_block_read_counter < self.config.read_block_requests_needed)
                 ):
                     # Issue a memory read request
@@ -380,7 +380,7 @@ class Cache(wiring.Component):
                     with m.If(
                             fe_buffer_write_strobe.all()
                             & (read_block_read_counter == 0)
-                            & (self.config.read_block_wc == 1)
+                            & (self.config.be_word_multiplier == 1)
                     ):
                         # If the fe completely overwrites all the words that we'd get from the current request, we can skip it.
                         # (this is only the case if write strobe is all ones, we'd only get one word out of the request and
@@ -390,7 +390,7 @@ class Cache(wiring.Component):
                     with m.Else():
                         # Else just increment the word offset by the amount of words we can retrieve from one be word
                         m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
-                        m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_read_counter * self.config.read_block_wc)
+                        m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_read_counter * self.config.be_word_multiplier)
                     m.d.comb += self.be.request_valid.eq(1)
                     # store the address so that we still have it when writing the words to the cache
                     m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())
@@ -417,7 +417,7 @@ class Cache(wiring.Component):
                         m.d.sync += self.fe.read_data_valid.eq(1)
 
                     with m.If(
-                        (read_block_write_counter == (self.config.read_block_wc - 1))
+                        (read_block_write_counter == (self.config.be_word_multiplier - 1))
                         & (read_block_read_counter == self.config.read_block_requests_needed)
                     ):
                         # go to the next state if no more read requests are needed and if we've written all words of the last request to the cache

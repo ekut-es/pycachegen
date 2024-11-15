@@ -264,12 +264,15 @@ class InternalCacheConfig:
         self.tag_width = address_width - self.index_width - self.word_offset_width
         # how many times bigger the be words are compared to ours
         self.be_byte_multiplier = self.be_bytes_per_word // self.bytes_per_word
-        # the words read from the BE cache can be bigger than our own words so
-        # we might be able to extract multiple words from that single word. This
-        # variable specifies how many times we can do that per BE word.
-        self.read_block_wc = min(self.be_byte_multiplier, cache_config.block_size)
-        self.read_block_wc_width = exact_log2(self.read_block_wc)
-        self.read_block_requests_needed = cache_config.block_size // self.read_block_wc
+        # If the BE words are bigger than our own words and if we use a block size
+        # > 1, then we can use one request to the BE for multiple words (in the
+        # write back and read block operations).
+        # This variable specifies how many words of a block fit into one BE word
+        self.be_word_multiplier = min(self.be_byte_multiplier, cache_config.block_size)
+        self.be_word_multiplier_width = exact_log2(self.be_word_multiplier)
+        self.read_block_requests_needed = (
+            cache_config.block_size // self.be_word_multiplier
+        )
         # width difference between own and BE address
         self.address_width_difference = address_width - be_address_width
 
