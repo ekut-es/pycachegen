@@ -1,54 +1,57 @@
-# Generating Verilog Code
+# PyCacheGen
 
-Inside the `generators/` directory there are python files that can generate verilog source code. There are generators for a functional memory (based on the normal memory, but modified so that it can also hold data), for the cache and for a cache wrapper. There's also some generators for other modules that get instantiated within the named modules, so they're not relevant to the user.
+PyCacheGen is a python package for generating data caches written in the [Amaranth HDL](https://github.com/amaranth-lang/amaranth). It can also be converted to Verilog.
 
-The cache wrapper wraps the cache and the functional memory in one module. It can create linear cache architectures (so no two caches on the same level). It can also create an arbiter so that you can have multiple access ports. Creating caches is optional - the cache wrapper can also simply create a memory, optionally with an arbiter.
+## Feature overview
 
-## Creating Verilog Code for the testbenches
+- Configurable number of sets, block size, associativity, word width, address width, byte size
+- Supports write back and write through which can both be combined with write allocate and write no-allocate
+- Supports the LRU, tree-based PLRU and MRU based PLRU replacement policies
+- Read and write hits can be answered within one cycle
+- Uses critical word first for read misses
+- Caches with a block size greater than 1 can take advantage of bigger backend data widths
+- Offers priority and round robin arbiters for generating multiple memory ports
+- Offers a cache delay module for simulating slower caches
 
-There are many testbenches for different cache wrapper configurations. Go inside the `testbenches/` directory. There's a `CMakeLists.txt` that will call the `cache_wrapper_generator.py` to create verilog source files, put them in the `src/` directory and verilate them. Inside `tb/` there are several testbenches for different configurations of the cache wrapper. The `CMakeLists.txt` will create the necessary source files for all configurations and each test bench will use the correct one. Create a `build/` directory and change into it, then call `cmake -GNinja ..` and then `ninja`. Then you can execute the individual testbenches, or you can can call the bash script `../run_testbenches.sh` to execute all testbenches.
+## Installation
 
-## Creating Verilog Code for custom cache hierarchies
+The package can simply be installed using
 
-To actually generate Verilog files for custom cache hierarchies, go to the `custom/` folder. There you'll find a `custom_cache_wrapper_generator.py` where you can configure a cache/memory hierarchy and generate an output file. There's also a `CMakeLists.txt` that will call the python script just mentioned, verilate the verilog code and compile it with a testbench for executing memory traces. The section below shows how to create trace files. In the testbench, change the variables for things like the address and data width at the top of the file accordingly. You can then call the executable with the path to the binary trace file. As a second parameter you can specify the path to a file to which the total number of cycles needed will be written, which is useful for doing automated testing.
+    python -m pip install path/to/pycachegen
 
-# Memory traces
+To install it for development, run the following from within this repository:
 
-You can execute memory traces one the FPGA or in simulation. Both methods use binaries with an arbitrary number of trace instruction that use the following format:
+    python -m pip install -e .\[dev\]
 
-        +-------------------+-------+----------------------------------------------+-----------+
-        |       [w-1]       |       |               [d + a - 1 : a]                | [a-1 : 0] |
-        +-------------------+-------+----------------------------------------------+-----------+
-        | write: 1, read: 0 | empty | write data (ignored if write bit is not set) | address   |
-        +-------------------+-------+----------------------------------------------+-----------+
-        
-Where `w` is the width of the whole instruction, `d` is the width of the write data and `a` is the address width. `w` needs to be of the form `n*8` with `n>0` if used for simulation or `2^n*8` with `n>=0` if used for the FPGA. When used for the simulation, `a` and `d` can only be up to 32 bits wide (you'd just have to change the signal widths in the testbench otherwise).
+## Creating a Cache Wrapper
 
-The tracing testbench just reads this binary, but for executing it on the FPGA you'll need to convert it to a C header file so that it can be compiled into the executable. To do so, you can use `xxd -i <filename.bin> > <filename.h>`. You can then include it in the C/C++ program for the FPGA and then make sure that the program uses the correct data and length variables. If you named the binary `mem_trace.bin`, it will already be included correctly and also use the correct variables.
+The `CacheWrapper` class can generate a top level module containing an arbitrary number of caches in a linear hierarchy as well as a simple data memory. It also supports multiple ports using an arbiter. See the internal documentation of the `CacheWrapper`, `CacheConfig` and `MemoryConfig` classes for more information.
 
-# FPGA
+The cache wrapper has one memory interface (see section *Memory Interface*) per port. Each signal is prefixed with `fe_x__`, *x* being the respective port index. It also has one signal `hit_o_x` per port, indicating whether the request yielded a hit or a miss.
 
-The cache can also be synthesized and used on an FPGA. The vivado project files are inside `/vivado`. There's currently two projects:
+Note that multiple ports get generated using an arbiter. This arbiter includes input buffers, meaning that requests can be issued even while the cache is busy from a request of another port. The arbiter also includes output buffers, meaning that requests from other ports also won't affect outgoing signals of the other ports.
 
-- `cache` simply connects the cache's in and outputs to the registers of an AXI lite slave. You can edit the block design and use any cache wrapper verilog file you want, as long as the L1 cache has only one port (the other ports simply are not connected to anything) and as long as the address and data width of the L1 cache are not bigger than 32 bits, because thats how wide the AXI4 lite registers are. In software, you can then write to the registers of the AXI lite slave and the values will be passed onto the cache. The mappings of the registers to the cache ports are documented inside the AXI slave verilog file.
-- Then there's also the `bram_cache` project. It allows writing a trace to a BRAM that will then be processed by the cache. After executing the trace, the total execution time will be written to another BRAM. Note: If you get a critical warning about the bus interface property `AWUSER_WIDTH` or `MASTER_TYPE` not matching during synthesis (`[BD 41-237]`), don't worry, it doesn't matter.
+`src/pycachegen/export.py` shows an example on how to configure a `CacheWrapper`. It also shows how to generate the Verilog code for a module (this can be done similarly for other modules like the `Cache`).
 
-Inside `/vitis` directories with programs for the Vivado designs:
-- `cache` contains programs for the normal `cache` design without the tracing BRAMs. There are multiple programs because they are designed for different cache configurations (they match some of the testbench configurations - at least if you disable the reset).
-- `bram_cache` is made for the `bram_cache` design and allows you to write a trace into an array manually. It is designed for using small traces and verifying that they got executed correctly. It already contains one such trace.
-- `trace_file_bram_cache` is also made for the `bram_cache` design, but it is used for executing memory traces (see the section above). To synthesize a matching cache wrapper, you will, in addition to the general steps listed below, need to do a few things:
-    1. In the controller for the trace BRAM, set the data width you need (depends on your data and address width of course).
-    2. In the address editor, set the width of the address range for the trace BRAM so it fits all your instructions. Note that the addresses are BYTE addressed, so if you select 4k and your instructions are 4 byte wide then you can fit 1024 instructions.
-    3. Right click the cache wrapper AXI slave and select "Customize Block". Then enter the data and address width (log2 of the address range width) you just set. You also need to specify the address and data width (`a` and `d` in the above diagram) of the L1 cache so that it knows how to interpret the instructions.
+## Creating only a Cache
 
-To execute these programs on the FPGA, you will need to 
-1. synthesize and export the hardware into an `.xsa` file
-2. create a new project in Vitis
-3. copy the program files into that project
+Caches can also be created individually using the `Cache` class. It can be configured using the `pycachegen.cache_config_validation.InternalCacheConfig` class, which is created using the standard `CacheConfig` class as well as some additional parameters. These parameters usually get inferred by the configuration of the `CacheWrapper` class. Also note that the latency parameters of the `CacheConfig` class only get processed by the `CacheWrapper` class and don't do anything otherwise.
 
-To synthesize the setup you need,
-1. open the design in Vivado
-2. In the block design, right click the cache wrapper AXI slave and select "Edit in IP packager"
-3. In the sources list, right click the cache wrapper source file and select "Replace File...". Select the cache wrapper verilog file you need, then repackage the IP.
-4. Right click the cache wrapper AXI slave and select "Customize Block". Then enter your data and address width.
-5. synthesize, implement, generate bitstream and export the hardware including the bitstream.
+The `Cache` uses one front end and one back end memory interface, prefixed with `fe__` and `be__` respectively.
+
+## Memory Interface
+
+All modules share a common memory interface composed of the following signals:
+
+- `address` (In): The request address. Note that this address uses word addressing so it does not contain byte offset bits.
+- `write_data` (In): The data to be written.
+- `write_strobe` (In): If this signal is 0 it specifies a read request. Otherwise it specifies a write request. It contains one bit per byte of the write data so that each byte can be selected individually.
+- `request_valid` (In): Specifies whether the request is valid.
+- `flush` (In): Used request a write back of all data in the cache that is both valid and dirty. The flush action does not require the `request_valid` signal to be set. The cache will request a flush of the the level cache after it is done.
+- `read_data` (Out): The requested data.
+- `read_data_valid` (Out): Whether the `read_data` Signal holds valid data.
+- `port_ready` (Out): Whether the port is ready to accept a new request.
+
+## FPGA
+
+Synthesis of the cache has been tested on a Xilinx XCZU3EG-1SFVA625I on a Avnet UltraZed-3EG IO Carrier Card using Vivado 2023.2. The project files are located at `vivado/amaranth_cache`. It has a block design that instantiates the cache inside an AXI Lite slave that is connected to the programmable system (PS). There is also small program for testing the synthesized cache that runs on the PS. The program was tested using Vitis 2023.2 and it is located at `vitis/`.
