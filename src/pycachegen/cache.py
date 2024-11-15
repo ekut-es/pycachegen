@@ -136,7 +136,7 @@ class Cache(wiring.Component):
 
         ## Evict operation reads one block of the internal data_mem and writes it to a buffer.
         # evict block operation puts data to be written back in this buffer
-        evicted_block_buffer = Array([Signal(unsigned(self.config.data_width), name=f"write_back_data_{i}") for i in range(self.config.block_size)])
+        evicted_block_buffer = Array([Signal(unsigned(self.config.data_width), name=f"evicted_block_buffer_{i}") for i in range(self.config.block_size)])
         # Enable signal to start the operation. Will get disabled once it's done.
         evict_block_enable = Signal()
         # The address of the block to write to the buffer
@@ -195,12 +195,12 @@ class Cache(wiring.Component):
                 m.d.sync += send_mem_request_next_state.eq(next_state)
 
         def prepare_block_write_back(next_state: States):
-            """Prepare everything for writing back the block. To be replaced
-            by the frontend request. The transition to the write back block
-            state has to be performed manually.
+            """Prepare everything for writing back the block to be replaced
+            by the frontend request. This includes starting the evict operation
+            and configuring the registers for the write back operation. The
+            transition to the write back block state has to be performed manually.
 
-            This includes starting the evict operation and configurint the
-            registers for the write back operation.
+
 
             Args:
                 next_state (States): State to transition to after write back.
@@ -337,18 +337,32 @@ class Cache(wiring.Component):
                     m.d.comb += self.be.request_valid.eq(1)
                     with m.If(write_back_data_from_buffer):
                         # take the data from the buffer
-                        m.d.comb += be_buffer_write_data.eq(evicted_block_buffer[write_back_address.word_offset])
+                        # we can write multiple words at once if our block size is greater than 1 and
+                        # if the BE data width allows it
+                        m.d.comb += self.be.write_data.eq(
+                            Cat([evicted_block_buffer[write_back_address.word_offset + i] for i in range(self.config.read_block_wc)])
+                            << (self.config.data_width * write_back_address.as_value()[:-self.config.be_address_width])
+                        )
+                        m.d.comb += self.be.write_strobe.eq(
+                            (2**(self.config.bytes_per_word * self.config.read_block_wc) - 1)
+                            << (self.config.bytes_per_word * write_back_address.as_value()[:-self.config.be_address_width])
+                        )
+                        # increment word offset of write back address
+                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + self.config.read_block_wc)
+                        with m.If(write_back_address.word_offset == (self.config.block_size - self.config.read_block_wc)):
+                            # This is the last word to write back -> proceed with the next state
+                            m.d.sync += state.eq(write_back_next_state)
                     with m.Else():
                         # take the data from the data memory
                         m.d.comb += be_buffer_write_data.eq(memories.data_mem_rp[write_back_way].data)
                         # data_mem read needs to be initiated by previous state
                         # -> we also need to initiate a new read
                         memories.init_data_mem_read(write_back_way, write_back_address.as_value() + 1)
-                    # increment word offset of write back address
-                    m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
-                    with m.If(write_back_address.word_offset == (self.config.block_size - 1)):
-                        # This is the last word to write back -> proceed with the next state
-                        m.d.sync += state.eq(write_back_next_state)
+                        # increment word offset of write back address
+                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + 1)
+                        with m.If(write_back_address.word_offset == (self.config.block_size - 1)):
+                            # This is the last word to write back -> proceed with the next state
+                            m.d.sync += state.eq(write_back_next_state)
             with m.Case(States.READ_BLOCK):
                 # wait until the memory gets ready and (all words of previous request were written to the cache or this is the first request)
                 # and we have not already issued all needed requests
