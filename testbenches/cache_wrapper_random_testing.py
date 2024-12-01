@@ -10,12 +10,24 @@ def random_test(dut: CacheWrapper) -> None:
         hits = 0
         memory_dict = dict()
         data_width_ratio = dut.memory_config.data_width // dut.fe_data_width
+        block_size = dut.cache_configs[0].block_size
+        rand_interval_size = max(1, block_size // 3)
+        min_address = dut.memory_config.min_address * data_width_ratio
+        max_address = dut.memory_config.max_address * data_width_ratio
+        address = 0
         while True:
             # generate a random request
-            address = random.randrange(
-                dut.memory_config.min_address * data_width_ratio,
-                dut.memory_config.max_address * data_width_ratio,
-            )
+            if random.random() < 0.05:
+                # jump to a completely random address
+                address = random.randrange(
+                    min_address,
+                    max_address,
+                )
+            else:
+                # jump to a nearby address
+                address = (
+                    address + random.randrange(-rand_interval_size, rand_interval_size)
+                ) % max_address
             write_strobe = (
                 0 if random.random() < 0.5 else (2 ** (dut.fe_bytes_per_word) - 1)
             )
