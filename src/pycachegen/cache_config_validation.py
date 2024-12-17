@@ -180,6 +180,7 @@ class CacheConfig:
         block_size: int,
         hit_latency: int = 0,
         miss_latency: int = 0,
+        data_memory_module: str = "",
     ) -> None:
         """Class for end users to create configurations for caches.
 
@@ -193,6 +194,7 @@ class CacheConfig:
             block_size (int): Number of words per block. Must be a power of 2.
             hit_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a hit.
             miss_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a miss.
+            data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be created if this value is an empty string.
         """
         self.data_width = data_width
         self.num_ways = num_ways
@@ -203,6 +205,7 @@ class CacheConfig:
         self.block_size = block_size
         self.hit_latency = hit_latency
         self.miss_latency = miss_latency
+        self.data_memory_module = data_memory_module
 
 
 class InternalCacheConfig:
@@ -291,6 +294,7 @@ class InternalCacheConfig:
             tag_width=self.tag_width,
             word_offset_width=self.word_offset_width,
         )
+        self.data_memory_module = cache_config.data_memory_module
 
 
 class MemoryConfig:

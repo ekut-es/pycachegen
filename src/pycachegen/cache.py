@@ -46,8 +46,8 @@ class Cache(wiring.Component):
         # Create valid and dirty bits as well as tag and data stores
         valid_bits = Array([Array([Signal(name=f"valid_bits_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
         dirty_bits = Array([Array([Signal(name=f"dirty_bits_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
-        tag_store = TagStore(self.config)
-        data_store = DataStore(self.config)
+        m.submodules.tag_store = tag_store = TagStore(self.config, m)
+        m.submodules.data_store = data_store = DataStore(self.config, m)
 
         ## replacement policy things
         # block to be replaced next for the set of the current fe_buffer_address
@@ -146,7 +146,8 @@ class Cache(wiring.Component):
         evict_block_way = Signal(range(self.config.num_ways))
         # Construct the address the same way that the read block operation does
         # so that we evict the block before it gets overwritten by the read block operation
-        evict_block_incremented_address = get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.be_word_multiplier_width)
+        evict_block_incremented_address = Signal(self.config.address_layout)
+        m.d.comb += evict_block_incremented_address.eq(get_blockwise_incremented_address(evict_block_address, evict_block_counter, m, self.config.be_word_multiplier_width))
 
         # remember the previous word offset so we know in which slot of the buffer the read data belongs
         evict_block_previous_word_offset = Signal(self.config.word_offset_width)
@@ -219,7 +220,7 @@ class Cache(wiring.Component):
                 Cat(
                     C(0, unsigned(self.config.word_offset_width)),
                     fe_address_view.index,
-                    tag_store.get_read_data(repl_pol.next_replacement_o)
+                    tag_store.read_data[repl_pol.next_replacement_o]
                 )
             )
 
@@ -236,11 +237,11 @@ class Cache(wiring.Component):
                     m.d.sync += fe_buffer_address.eq(self.fe.address)
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
                     m.d.sync += fe_buffer_write_data.eq(self.fe.write_data)
-                    # query tag memories and check whether we have a hit in any way
+                    # query tag store and check whether we have a hit in any way
                     tag_store.init_read(fe_address_view.index)
                     for i in range(self.config.num_ways):
                         m.d.comb += hit_vector[i].eq(
-                            (tag_store.get_read_data(i) == fe_address_view.tag)
+                            (tag_store.read_data[i] == fe_address_view.tag)
                             & valid_bits[i][fe_address_view.index]
                         )
                     # purely for statistics: let the outside know if we had a hit
@@ -275,7 +276,7 @@ class Cache(wiring.Component):
                             send_fe_request_to_lower_mem(States.READY)
                         with m.Else():
                             # In all other cases, we have to replace a block
-                            # Update valid/dirty/tag memories
+                            # Update valid/dirty/tag
                             m.d.sync += valid_bits[way_to_replace][fe_address_view.index].eq(1)
                             tag_store.init_write(way_to_replace, fe_address_view.index, fe_address_view.tag)
                             if self.config.write_back:
@@ -304,7 +305,7 @@ class Cache(wiring.Component):
                                             m.d.sync += state.eq(States.WRITE_BACK_BLOCK)
                                             # Construct the correct address
                                             m.d.sync += write_back_address.index.eq(fe_address_view.index)
-                                            m.d.sync += write_back_address.tag.eq(tag_store.get_read_data(way_to_replace))
+                                            m.d.sync += write_back_address.tag.eq(tag_store.read_data[way_to_replace])
                                             m.d.sync += write_back_address.word_offset.eq(0)
                                             m.d.sync += write_back_way.eq(way_to_replace)
                                             # Select data source and next state after write back
@@ -398,7 +399,7 @@ class Cache(wiring.Component):
                         way=next_block_replacement,
                         addr=read_block_write_address,
                         data=read_block_write_data,
-                        strobe=-1
+                        byte_strobe=-1
                     )
                     # increment write counter
                     m.d.sync += read_block_write_counter.eq(read_block_write_counter + 1)
@@ -459,7 +460,7 @@ class Cache(wiring.Component):
                         # Prepare things for the Write Back State
                         m.d.sync += write_back_data_from_buffer.eq(1)
                         m.d.sync += write_back_next_state.eq(next_state)
-                        m.d.sync += write_back_address.tag.eq(tag_store.get_read_data(flush_block_index))
+                        m.d.sync += write_back_address.tag.eq(tag_store.read_data[flush_block_index])
                         m.d.sync += write_back_address.index.eq(flush_set_index)
                         m.d.sync += write_back_address.word_offset.eq(0)
                         # transition to write back state (it will wait until the evict block operation is done)
