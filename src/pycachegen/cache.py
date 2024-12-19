@@ -46,7 +46,7 @@ class Cache(wiring.Component):
         # Create valid and dirty bits as well as tag and data stores
         valid_bits = Array([Array([Signal(name=f"valid_bits_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
         dirty_bits = Array([Array([Signal(name=f"dirty_bits_{way_idx}_{set_idx}") for set_idx in range(self.config.num_sets)]) for way_idx in range(self.config.num_ways)])
-        m.submodules.tag_store = tag_store = TagStore(self.config, m)
+        m.submodules.tag_store = tag_store = TagStore(self.config)
         m.submodules.data_store = data_store = DataStore(self.config, m)
 
         ## replacement policy things
@@ -238,7 +238,7 @@ class Cache(wiring.Component):
                     m.d.sync += fe_buffer_write_strobe.eq(self.fe.write_strobe)
                     m.d.sync += fe_buffer_write_data.eq(self.fe.write_data)
                     # query tag store and check whether we have a hit in any way
-                    tag_store.init_read(fe_address_view.index)
+                    m.d.comb += tag_store.index.eq(fe_address_view.index)
                     for i in range(self.config.num_ways):
                         m.d.comb += hit_vector[i].eq(
                             (tag_store.read_data[i] == fe_address_view.tag)
@@ -278,7 +278,10 @@ class Cache(wiring.Component):
                             # In all other cases, we have to replace a block
                             # Update valid/dirty/tag
                             m.d.sync += valid_bits[way_to_replace][fe_address_view.index].eq(1)
-                            tag_store.init_write(way_to_replace, fe_address_view.index, fe_address_view.tag)
+                            # tag store index is already set correctly
+                            m.d.comb += tag_store.write_valid.eq(1)
+                            m.d.comb += tag_store.write_data.eq(fe_address_view.tag)
+                            m.d.comb += tag_store.write_way.eq(way_to_replace)
                             if self.config.write_back:
                                 # If it is a write request, mark the block dirty; else clear the dirty bit
                                 m.d.sync += dirty_bits[way_to_replace][fe_address_view.index].eq(self.fe.write_strobe.any())
@@ -451,7 +454,7 @@ class Cache(wiring.Component):
 
                     with m.If(dirty_bits[flush_block_index][flush_set_index] & valid_bits[flush_block_index][flush_set_index]):
                         # read the tag of the block to write back
-                        tag_store.init_read(flush_set_index)
+                        m.d.comb += tag_store.index.eq(flush_set_index)
                         # Start a evict block operation so that the write back state can take multiple words out of the evict data buffer
                         m.d.sync += evict_block_enable.eq(1)
                         m.d.sync += evict_block_address.index.eq(flush_set_index) # tag is not needed for evict block

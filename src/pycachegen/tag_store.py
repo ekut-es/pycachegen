@@ -8,18 +8,15 @@ from pycachegen.cache_config_validation import InternalCacheConfig
 
 
 class TagStore(wiring.Component):
-    def __init__(self, config: InternalCacheConfig, m: Module):
-        """Module for storing the tags of the cache. Provides methods
-        for creating requests from the specified module `m`.
+    def __init__(self, config: InternalCacheConfig):
+        """Module for storing the tags of the cache.
 
         Args:
             config (InternalCacheConfig): Config of the cache.
-            m (Module): The module instantiating this module.
         """
         self.num_ways = config.num_ways
         self.depth = config.num_sets
         self.data_width = config.tag_width
-        self.m = m
 
         # Create read_data signals for each tag store
         self.read_data = Array([Signal(self.data_width) for _ in range(self.num_ways)])
@@ -34,27 +31,6 @@ class TagStore(wiring.Component):
         }
 
         super().__init__(ports)
-
-    def init_read(self, index):
-        """Initiate read from m.d.comb.
-
-        Args:
-            index: The set index which should be accessed.
-        """
-        self.m.d.comb += self.index.eq(index)
-
-    def init_write(self, way, index, data):
-        """Initiate write from m.d.comb.
-
-        Args:
-            way: The way to access.
-            index: The set index which should be accessed.
-            data: The tag to write to the memory.
-        """
-        self.m.d.comb += self.write_valid.eq(1)
-        self.m.d.comb += self.write_data.eq(data)
-        self.m.d.comb += self.write_way.eq(way)
-        self.m.d.comb += self.index.eq(index)
 
     def elaborate(self, platform):
         m = Module()
