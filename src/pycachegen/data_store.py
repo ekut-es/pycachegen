@@ -92,7 +92,7 @@ class DataStore(wiring.Component):
                 i_read_request_valid=self.read_request_valid,
                 i_read_address=total_read_address,
                 o_read_data=self.read_data,
-                i_write_request_valid=self.read_request_valid,
+                i_write_request_valid=self.write_request_valid,
                 i_write_address=total_write_address,
                 i_write_data=self.write_data,
                 i_bit_strobe=bit_strobe,
