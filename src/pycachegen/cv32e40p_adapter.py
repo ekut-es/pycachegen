@@ -6,32 +6,64 @@ from amaranth.lib.wiring import In, Out
 
 from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusInterface
+from pycachegen import Cache
+
+
+class CV32E40PMemoryBusSignature(wiring.Signature):
+    def __init__(
+        self,
+        # address_width: int, data_width: int, bytes_per_word: int
+    ):
+        # self.address_width = address_width
+        # self.data_width = data_width
+        # self.bytes_per_word = bytes_per_word
+        super().__init__(
+            [
+                ("req", Out(1)),
+                ("gnt", In(1)),
+                ("rvalid", In(1)),
+                ("we", Out(1)),
+                ("be", Out(4)),
+                ("addr", Out(32)),
+                ("wdata", Out(32)),
+                ("rdata", In(32)),
+            ]
+        )
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, CV32E40PMemoryBusSignature)
+            # and self.address_width == other.address_width
+            # and self.data_width == other.data_width
+            # and self.bytes_per_word == other.bytes_per_word
+        )
+
+    def __repr__(self):
+        return f"CV32E40PMemoryBusSignature()"  # {self.address_width}, {self.data_width}, {self.bytes_per_word})"
 
 
 class AdapterState(Enum):
     READY = 0
     WAIT = 1
 
+
 class CV32E40PAdapter(wiring.Component):
-    def __init__(self, cache_config: InternalCacheConfig):
+    def __init__(self, cache: Cache):
+        self.cache_config = cache.config
+        self.cache = cache
         super().__init__(
             {
-                # Core <-> Adapter
-                "req_i": In(1),
-                "gnt_o": Out(1),
-                "rvalid_o": Out(1),
-                "we_i": In(1),
-                "be_i": In(4),
-                "addr_i": In(32),
-                "wdata_i": In(32),
-                "rdata_o": Out(32),
-                # Adapter <-> Cache
-                "cache_if": Out(cache_config.fe_signature),
+                # Core <-> Adapter <-> Cache
+                "core_if": In(CV32E40PMemoryBusSignature()),
+                # Cache <-> Adapter <-> Main Memory
+                "memory_if": Out(CV32E40PMemoryBusSignature())
             }
         )
 
     def elaborate(self, platform):
         m = Module()
+
+        m.submodules.cache = cache = self.cache
 
         state = Signal(AdapterState)
 
@@ -41,6 +73,12 @@ class CV32E40PAdapter(wiring.Component):
 
         TODO: Herausfinden, ob die LSU im Core oder außerhalb sitzt. Die LSU handelt z.B. misaligned
         accesses, was der Cache nicht kann.
+
+        TODO: Parametrisierbarkeit
+
+        TODO: Memory ranges checken; es sollen nicht (32-n) bit tags gespeichert werden müssen
+
+        TODO: Add support for multi layer cache hierarchies
 
         Der OBI PULP Adapter hört die Request vom Memory und die rvalid und gnt vom memory mit
         und entscheidet, wann eine request an den memory weitergegeben werden darf:
@@ -56,28 +94,35 @@ class CV32E40PAdapter(wiring.Component):
         Core kommt. Anderfalls liegt eine Anfrage vor, die der memory gegranted hat, und der Zustand wird nicht
         gewechselt.
         """
-
+        ## Connect cache.fe
+        core_if = self.core_if
         # gnt and cache ready signal are basically the same
-        m.d.comb += self.gnt_o.eq(self.cache_if.port_ready)
+        m.d.comb += core_if.gnt.eq(cache.fe.port_ready)
         # forward request
-        m.d.comb += self.cache_if.request_valid.eq(self.req_i)
-        # rvalid_o must be set when the cache_if.read_data is valid or when the cache
+        m.d.comb += cache.fe.request_valid.eq(core_if.req)
+        # rvalid must be set when the cache_fe.read_data is valid or when the cache
         # has executed the write (? - it is needed to end the response phase but I'm not sure
-        # at what point rvalid_o should be set when executing a write)
-        # TODO: Is it okay for rvalid_o to be set to 1 because of the last request and to then
+        # at what point rvalid should be set when executing a write)
+        # TODO: Is it okay for rvalid to be set to 1 because of the last request and to then
         # be set to 0 in the cycle after the address phase or would the manager think that
         # his request got answered in 1 cycle (I think it is okay)
         # The cache resets read_data_valid after starting a new request, so this should work
-        m.d.comb += self.rvalid_o.eq(self.cache_if.read_data_valid | self.cache_if.port_ready)
+        m.d.comb += core_if.rvalid.eq(cache.fe.read_data_valid | cache.fe.port_ready)
         # cache can only do byte writes but not byte reads. write_strobe == 0 means read.
-        m.d.comb += self.cache_if.write_strobe.eq(Mux(self.we_i, self.be_i, 0))
-        m.d.comb += self.cache_if.address.eq(self.addr_i)
-        m.d.comb += self.cache_if.write_data.eq(self.wdata_i)
-        # handing out the full word regardless of be_i should be fine (? TODO)
-        m.d.comb += self.rdata_o.eq(self.cache_if.read_data)
+        m.d.comb += cache.fe.write_strobe.eq(Mux(core_if.we, core_if.be, 0))
+        m.d.comb += cache.fe.address.eq(core_if.addr[2:])  # TODO
+        m.d.comb += cache.fe.write_data.eq(core_if.wdata)
+        # handing out the full word regardless of be should be fine (? TODO)
+        m.d.comb += core_if.rdata.eq(cache.fe.read_data)
 
-        # with m.If(state == AdapterState.READY):
-        #     with m.If(self.req_i & self.cache_if.port_ready):
-        #         m.d.comb += self.gnt_o.eq(1)
+        ## Connect cache.be
+        mem_if = self.memory_if
+        m.d.comb += cache.be.port_ready.eq(mem_if.gnt)
+        m.d.comb += mem_if.req.eq(cache.be.request_valid)
+        m.d.comb += cache.be.read_data_valid.eq(mem_if.rvalid)
+        m.d.comb += mem_if.be.eq(Mux(cache.be.write_strobe.any(), cache.be.write_strobe, -1))
+        m.d.comb += mem_if.addr.eq(Cat(C(0, unsigned(2)), cache.be.address))
+        m.d.comb += mem_if.wdata.eq(cache.be.write_data)
+        m.d.comb += cache.be.read_data.eq(mem_if.rdata)
 
         return m
