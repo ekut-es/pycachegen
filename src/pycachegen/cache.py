@@ -174,11 +174,11 @@ class Cache(wiring.Component):
             """Uses the request stored in the fe buffers to send a request
             to the lower memory.
             """
+            m.d.comb += self.be.request_valid.eq(1)
+            m.d.comb += be_buffer_address.eq(fe_buffer_address)
+            m.d.comb += be_buffer_write_data.eq(fe_buffer_write_data)
+            m.d.comb += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
             with m.If(self.be.port_ready):
-                m.d.comb += be_buffer_address.eq(fe_buffer_address)
-                m.d.comb += be_buffer_write_data.eq(fe_buffer_write_data)
-                m.d.comb += be_buffer_write_strobe.eq(fe_buffer_write_strobe)
-                m.d.comb += self.be.request_valid.eq(1)
                 m.d.sync += state.eq(next_state)
             with m.Else():
                 m.d.sync += state.eq(States.SEND_MEM_REQUEST)
@@ -186,11 +186,11 @@ class Cache(wiring.Component):
 
         def send_fe_request_to_lower_mem(next_state):
             """Send the request from the fe to the lower memory."""
+            m.d.comb += self.be.request_valid.eq(1)
+            m.d.comb += be_buffer_address.eq(self.fe.address)
+            m.d.comb += be_buffer_write_data.eq(self.fe.write_data)
+            m.d.comb += be_buffer_write_strobe.eq(self.fe.write_strobe)
             with m.If(self.be.port_ready):
-                m.d.comb += be_buffer_address.eq(self.fe.address)
-                m.d.comb += be_buffer_write_data.eq(self.fe.write_data)
-                m.d.comb += be_buffer_write_strobe.eq(self.fe.write_strobe)
-                m.d.comb += self.be.request_valid.eq(1)
                 m.d.sync += state.eq(next_state)
             with m.Else():
                 m.d.sync += state.eq(States.SEND_MEM_REQUEST)
@@ -338,10 +338,10 @@ class Cache(wiring.Component):
                 # wait for the BE to get ready
                 # If we should take the data from the evict buffer then check that the evict block operation is done
                 # (it should always be done for normal write backs but might not be for flush write backs)
-                with m.If(self.be.port_ready & (~(write_back_data_from_buffer & evict_block_enable))):
+                with m.If((~(write_back_data_from_buffer & evict_block_enable))):
                     # Write back the block specified by the respective registers
-                    m.d.comb += be_buffer_address.eq(write_back_address)
                     m.d.comb += self.be.request_valid.eq(1)
+                    m.d.comb += be_buffer_address.eq(write_back_address)
                     with m.If(write_back_data_from_buffer):
                         # write back all the data in the evict buffer
                         # we can write multiple words at once if our block size is greater than 1 and
@@ -354,29 +354,32 @@ class Cache(wiring.Component):
                             (2**(self.config.bytes_per_word * self.config.be_word_multiplier) - 1)
                             << (self.config.bytes_per_word * write_back_address.as_value()[:-self.config.be_address_width])
                         )
-                        # increment word offset of write back address
-                        m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + self.config.be_word_multiplier)
-                        with m.If(write_back_address.word_offset == (self.config.block_size - self.config.be_word_multiplier)):
-                            # This is the last word to write back -> proceed with the next state
-                            m.d.sync += state.eq(write_back_next_state)
                     with m.Else():
                         # take the data from the data store and write it and the write strobe to the BE buffers
                         m.d.comb += be_buffer_write_data.eq(data_store.read_data)
                         m.d.comb += be_buffer_write_strobe.eq(-1)
-                        m.d.sync += state.eq(write_back_next_state)
+                    with m.If(self.be.port_ready):
+                        with m.If(write_back_data_from_buffer):
+                            # increment word offset of write back address
+                            m.d.sync += write_back_address.word_offset.eq(write_back_address.word_offset + self.config.be_word_multiplier)
+                            with m.If(write_back_address.word_offset == (self.config.block_size - self.config.be_word_multiplier)):
+                                # This is the last word to write back -> proceed with the next state
+                                m.d.sync += state.eq(write_back_next_state)
+                        with m.Else():
+                            m.d.sync += state.eq(write_back_next_state)
             with m.Case(States.READ_BLOCK):
                 # wait until the memory gets ready and (all words of previous request were written to the cache or this is the first request)
                 # and we have not already issued all needed requests
                 with m.If(
-                    self.be.port_ready
-                    & ((read_block_write_counter == (self.config.be_word_multiplier - 1)) | (read_block_read_counter == 0))
+                    ((read_block_write_counter == (self.config.be_word_multiplier - 1)) | (read_block_read_counter == 0))
                     & (read_block_read_counter < self.config.read_block_requests_needed)
                 ):
                     # Issue a memory read request
                     # Critical word first: Start at the word that was requested
                     # So we can hand that out first if it was a read request
-                    m.d.comb += be_buffer_address.eq(fe_buffer_address)
+                    m.d.comb += self.be.request_valid.eq(1)
                     m.d.comb += be_buffer_write_strobe.eq(0)
+                    m.d.comb += be_buffer_address.eq(fe_buffer_address)
                     # construct the correct word offset and increment the word offset for the next request
                     with m.If(
                             fe_buffer_write_strobe.all()
@@ -386,17 +389,20 @@ class Cache(wiring.Component):
                         # If the fe completely overwrites all the words that we'd get from the current request, we can skip it.
                         # (this is only the case if write strobe is all ones, we'd only get one word out of the request and
                         # the current request targets the same word as the fe address)
-                        m.d.sync += read_block_read_counter.eq(read_block_read_counter + 2)
+                        with m.If(self.be.port_ready):
+                            m.d.sync += read_block_read_counter.eq(read_block_read_counter + 2)
                         m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + 1)
                     with m.Else():
                         # Else just increment the word offset by the amount of words we can retrieve from one be word
-                        m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
+                        with m.If(self.be.port_ready):
+                            m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
                         m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_read_counter * self.config.be_word_multiplier)
-                    m.d.comb += self.be.request_valid.eq(1)
-                    # store the address so that we still have it when writing the words to the cache
-                    m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())
+                        
+                    with m.If(self.be.port_ready):
+                        # store the address so that we still have it when writing the words to the cache
+                        m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())
 
-                with m.If(self.be.port_ready & (read_block_read_counter != 0)):
+                with m.If(self.be.read_data_valid & (read_block_read_counter != 0)):
                     # A read request was processed, write the data to the cache
                     data_store.init_write(
                         way=next_block_replacement,
@@ -475,9 +481,10 @@ class Cache(wiring.Component):
                         # Block doesn't need to be written back
                         m.d.sync += state.eq(next_state)
             with m.Case(States.FLUSH_BACKEND):
+                # TODO Make flush not rely on readiness of port since a request-grant based memory does not work like that
                 with m.If(self.be.port_ready):
                     with m.If(~be_flush_requested):
-                        # Send flush signal to be once it gets ready
+                        # Send flush signal to BE once it gets ready
                         m.d.comb += self.be.flush.eq(1)
                         m.d.sync += be_flush_requested.eq(1)
                     with m.Else():
