@@ -182,3 +182,68 @@ class CV32E40PAdapter(wiring.Component):
         m.d.comb += mem_if.wdata.eq(cache.be.write_data)
 
         return m
+    
+class SwitchState(Enum):
+    IDLE = 0
+    WAIT_FOR_CACHE_RESPONSE = 1
+    WAIT_FOR_CACHE_READY = 2
+    WAIT_FOR_MEMORY_RESPONSE = 3
+    
+class CacheSwitch(wiring.Component):
+    def __init__(self, cache: Cache):
+        self.cache_config = cache.config
+        self.cache = cache
+        super().__init__(
+            {
+                "core_if": In(CV32E40PMemoryBusSignature()),
+                "memory_if": Out(CV32E40PMemoryBusSignature())
+            }
+        )
+
+    def elaborate(self, platform):
+        m = Module()
+    
+        m.submodules.adapter = adapter = CV32E40PAdapter(self.cache)
+
+        memory_ready = Signal()
+        outstanding_cache_response = Signal()
+
+        wiring.connect(m, wiring.flipped(self.core_if))
+        # ("gnt", In(1)),
+        ("rvalid", In(1)),
+        ("err", In(1))
+        ("rdata", In(32)),
+        
+        with m.If(outstanding_cache_response):
+            # We're awaiting a response from the cache, so connect its outputs to the core
+            m.d.comb += self.core_if.rvalid.eq(adapter.core_if.rvalid)
+            m.d.comb += self.core_if.err.eq(adapter.core_if.err)
+            m.d.comb += self.core_if.rdata.eq(adapter.core_if.rdata)
+            # Clear outstanding response signal
+            m.d.sync += outstanding_cache_response.eq(0)
+
+        # Always connect the adapter's inputs (except gnt) to the core
+        m.d.comb += adapter.core_if.we.eq(self.core_if.we)
+        m.d.comb += adapter.core_if.be.eq(self.core_if.be)
+        m.d.comb += adapter.core_if.addr.eq(self.core_if.addr)
+        m.d.comb += adapter.core_if.wdata.eq(self.core_if.wdata)
+
+        with m.If(self.core_if.addr in range(0x1C00_0000, 0x1C08_0000)):
+            # The address lies within RAM range
+            with m.If(memory_ready):
+                # We're not awaiting a response from the memory -> Send request to cache
+                m.d.comb += adapter.core_if.req.eq(self.core_if.req)
+                # Also tell the core if its request was granted
+                m.d.comb += self.core_if.gnt.eq(adapter.core_if.gnt)
+                # Remember that there's an outstanding response from the cache
+                m.d.sync += outstanding_cache_response.eq(1)
+        with m.Else():
+            # The address does not lie within RAM range
+            with m.If(adapter.cache.port_ready):
+                # We're not awaiting a response from the cache AND the cache does not need the memory itself 
+                wiring.connect(m, wiring.flipped(self.core_if), self.memory_if)
+        
+
+
+
+        return m
