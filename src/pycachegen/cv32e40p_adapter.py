@@ -6,17 +6,13 @@ from amaranth.lib.wiring import In, Out
 
 from pycachegen.cache_config_validation import InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusInterface
-from pycachegen import Cache
+from pycachegen import Cache, CacheConfig
 
 
-class CV32E40PMemoryBusSignature(wiring.Signature):
+class CV32E40PLSUSignature(wiring.Signature):
     def __init__(
         self,
-        # address_width: int, data_width: int, bytes_per_word: int
     ):
-        # self.address_width = address_width
-        # self.data_width = data_width
-        # self.bytes_per_word = bytes_per_word
         super().__init__(
             [
                 ("req", Out(1)),
@@ -27,37 +23,21 @@ class CV32E40PMemoryBusSignature(wiring.Signature):
                 ("addr", Out(32)),
                 ("wdata", Out(32)),
                 ("rdata", In(32)),
-                ("err", In(1))
+                ("err", In(1)),
             ]
         )
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, CV32E40PMemoryBusSignature)
-            # and self.address_width == other.address_width
-            # and self.data_width == other.data_width
-            # and self.bytes_per_word == other.bytes_per_word
-        )
 
-    def __repr__(self):
-        return f"CV32E40PMemoryBusSignature()"  # {self.address_width}, {self.data_width}, {self.bytes_per_word})"
-
-
-class AdapterState(Enum):
-    READY = 0
-    WAIT = 1
-
-
-class CV32E40PAdapter(wiring.Component):
+class CV32E40PCacheLSUAdapter(wiring.Component):
     def __init__(self, cache: Cache):
         self.cache_config = cache.config
         self.cache = cache
         super().__init__(
             {
                 # Core <-> Adapter
-                "core_if": In(CV32E40PMemoryBusSignature()),
+                "core_if": In(CV32E40PLSUSignature()),
                 # Adapter <-> Main Memory
-                "memory_if": Out(CV32E40PMemoryBusSignature())
+                "memory_if": Out(CV32E40PLSUSignature()),
             }
         )
 
@@ -65,8 +45,6 @@ class CV32E40PAdapter(wiring.Component):
         m = Module()
 
         m.submodules.cache = cache = self.cache
-
-        state = Signal(AdapterState)
 
         """
         https://docs.openhwgroup.org/projects/cv32e40x-user-manual/en/latest/load_store_unit.html
@@ -99,7 +77,6 @@ class CV32E40PAdapter(wiring.Component):
         processing_read = Signal()
         processing_write = Signal()
 
-
         ## Connect cache.fe
         core_if = self.core_if
 
@@ -109,7 +86,7 @@ class CV32E40PAdapter(wiring.Component):
             with m.If(cache.fe.read_data_valid):
                 # When done, stop outputting read_data_valid as rvalid.
                 m.d.sync += processing_read.eq(0)
-        
+
         with m.If(processing_write):
             # When processing a write, set rvalid to port_ready
             # #TODO might not be a good idea? When should rvalid be set in case of a write???
@@ -125,7 +102,7 @@ class CV32E40PAdapter(wiring.Component):
         with m.If(core_if.gnt):
             m.d.sync += processing_read.eq(~core_if.we)
             m.d.sync += processing_write.eq(core_if.we)
-        
+
         # gnt may only be asserted when req gets asserted
         m.d.comb += core_if.gnt.eq(cache.fe.port_ready & core_if.req)
         # forward request
@@ -136,8 +113,8 @@ class CV32E40PAdapter(wiring.Component):
         m.d.comb += cache.fe.write_data.eq(core_if.wdata)
         # handing out the full word regardless of be should be fine (? TODO)
         m.d.comb += core_if.rdata.eq(cache.fe.read_data)
-        m.d.comb += core_if.err.eq(0) # Errors are not supported by the cache
-        m.d.comb += cache.fe.flush.eq(0) # Core doesn't use flush
+        m.d.comb += core_if.err.eq(0)  # Errors are not supported by the cache
+        m.d.comb += cache.fe.flush.eq(0)  # Core doesn't use flush
 
         ## Connect cache.be
         mem_if = self.memory_if
@@ -176,74 +153,103 @@ class CV32E40PAdapter(wiring.Component):
 
         m.d.comb += cache.be.port_ready.eq(mem_if.gnt)
         m.d.comb += mem_if.req.eq(cache.be.request_valid)
-        m.d.comb += mem_if.be.eq(Mux(cache.be.write_strobe.any(), cache.be.write_strobe, -1))
+        m.d.comb += mem_if.be.eq(
+            Mux(cache.be.write_strobe.any(), cache.be.write_strobe, -1)
+        )
         m.d.comb += mem_if.we.eq(cache.be.write_strobe.any())
         m.d.comb += mem_if.addr.eq(Cat(C(0, unsigned(2)), cache.be.address))
         m.d.comb += mem_if.wdata.eq(cache.be.write_data)
 
         return m
-    
+
+
 class SwitchState(Enum):
     IDLE = 0
     WAIT_FOR_CACHE_RESPONSE = 1
-    WAIT_FOR_CACHE_READY = 2
-    WAIT_FOR_MEMORY_RESPONSE = 3
-    
-class CacheSwitch(wiring.Component):
-    def __init__(self, cache: Cache):
-        self.cache_config = cache.config
-        self.cache = cache
+    WAIT_FOR_MEMORY_RESPONSE = 2
+
+
+class CV32E40PDataCache(wiring.Component):
+    def __init__(self, cache_config: CacheConfig):
+        self.cache_config = cache_config
         super().__init__(
             {
-                "core_if": In(CV32E40PMemoryBusSignature()),
-                "memory_if": Out(CV32E40PMemoryBusSignature())
+                "core_if": In(CV32E40PLSUSignature()),
+                "memory_if": Out(CV32E40PLSUSignature()),
             }
         )
 
     def elaborate(self, platform):
         m = Module()
-    
-        m.submodules.adapter = adapter = CV32E40PAdapter(self.cache)
 
-        memory_ready = Signal()
-        outstanding_cache_response = Signal()
+        cache = Cache(
+            InternalCacheConfig(
+                cache_config=self.cache_config,
+                address_width=30,
+                be_data_width=32,
+                be_address_width=30,
+                byte_size=8,
+            )
+        )
 
-        wiring.connect(m, wiring.flipped(self.core_if))
-        # ("gnt", In(1)),
-        ("rvalid", In(1)),
-        ("err", In(1))
-        ("rdata", In(32)),
-        
-        with m.If(outstanding_cache_response):
+        m.submodules.adapter = adapter = CV32E40PCacheLSUAdapter(cache)
+
+        state = Signal(SwitchState)
+
+        # Hand out the cache's or the memory's response
+        # and go back to idle state if we receive a response
+        # (that decision might be overwritten later if a new request arrives)
+        with m.If(state == SwitchState.WAIT_FOR_CACHE_RESPONSE):
             # We're awaiting a response from the cache, so connect its outputs to the core
             m.d.comb += self.core_if.rvalid.eq(adapter.core_if.rvalid)
             m.d.comb += self.core_if.err.eq(adapter.core_if.err)
             m.d.comb += self.core_if.rdata.eq(adapter.core_if.rdata)
-            # Clear outstanding response signal
-            m.d.sync += outstanding_cache_response.eq(0)
+            with m.If(adapter.core_if.rvalid):
+                m.d.sync += state.eq(SwitchState.IDLE)
+        with m.Elif(state == SwitchState.WAIT_FOR_MEMORY_RESPONSE):
+            # We're awaiting a response from the memory, so connect its outputs to the core
+            m.d.comb += self.core_if.rvalid.eq(self.memory_if.rvalid)
+            m.d.comb += self.core_if.err.eq(self.memory_if.err)
+            m.d.comb += self.core_if.rdata.eq(self.memory_if.rdata)
+            with m.If(self.memory_if.rvalid):
+                m.d.sync += state.eq(SwitchState.IDLE)
 
-        # Always connect the adapter's inputs (except gnt) to the core
-        m.d.comb += adapter.core_if.we.eq(self.core_if.we)
-        m.d.comb += adapter.core_if.be.eq(self.core_if.be)
-        m.d.comb += adapter.core_if.addr.eq(self.core_if.addr)
-        m.d.comb += adapter.core_if.wdata.eq(self.core_if.wdata)
+        # Also connect the cache BE to the memory if we're not
+        # waiting for a response from the memory
+        # This might be overwritten later if a new request
+        # for the memory arrives
+        with m.If(state != SwitchState.WAIT_FOR_MEMORY_RESPONSE):
+            wiring.connect(m, adapter.memory_if, wiring.flipped(self.memory_if))
 
-        with m.If(self.core_if.addr in range(0x1C00_0000, 0x1C08_0000)):
-            # The address lies within RAM range
-            with m.If(memory_ready):
-                # We're not awaiting a response from the memory -> Send request to cache
+        # Accept new requests
+        # Only consider requests if the cache is ready again
+        # The cache wouldn't grant a request while it's still busy, but
+        # the memory must still be connected to the cache and so we can't
+        # access the memory
+        with m.If(cache.fe.port_ready):
+            with m.If(
+                (self.core_if.addr >= 0x1C00_0000) & (self.core_if.addr < 0x1C08_0000)
+            ):
+                # The address lies within RAM range -> Send request to cache
+                m.d.comb += adapter.core_if.we.eq(self.core_if.we)
+                m.d.comb += adapter.core_if.be.eq(self.core_if.be)
+                m.d.comb += adapter.core_if.addr.eq(self.core_if.addr)
+                m.d.comb += adapter.core_if.wdata.eq(self.core_if.wdata)
                 m.d.comb += adapter.core_if.req.eq(self.core_if.req)
                 # Also tell the core if its request was granted
                 m.d.comb += self.core_if.gnt.eq(adapter.core_if.gnt)
-                # Remember that there's an outstanding response from the cache
-                m.d.sync += outstanding_cache_response.eq(1)
-        with m.Else():
-            # The address does not lie within RAM range
-            with m.If(adapter.cache.port_ready):
-                # We're not awaiting a response from the cache AND the cache does not need the memory itself 
-                wiring.connect(m, wiring.flipped(self.core_if), self.memory_if)
-        
-
-
+                with m.If(adapter.core_if.gnt):
+                    m.d.sync += state.eq(SwitchState.WAIT_FOR_CACHE_RESPONSE)
+            with m.Else():
+                # The address does not lie within RAM range -> Send request to memory
+                m.d.comb += self.memory_if.we.eq(self.core_if.we)
+                m.d.comb += self.memory_if.be.eq(self.core_if.be)
+                m.d.comb += self.memory_if.addr.eq(self.core_if.addr)
+                m.d.comb += self.memory_if.wdata.eq(self.core_if.wdata)
+                m.d.comb += self.memory_if.req.eq(self.core_if.req)
+                # Also tell the core if its request was granted
+                m.d.comb += self.core_if.gnt.eq(self.memory_if.gnt)
+                with m.If(self.memory_if.gnt):
+                    m.d.sync += state.eq(SwitchState.WAIT_FOR_MEMORY_RESPONSE)
 
         return m
