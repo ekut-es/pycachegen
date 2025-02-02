@@ -3,6 +3,7 @@ from enum import Enum
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import ceil_log2
 
 from pycachegen import Cache, CacheConfig
 from pycachegen.cache_config_validation import InternalCacheConfig
@@ -27,8 +28,6 @@ class CV32E40PDataCache(wiring.Component):
         checks whether the request address is withing the RAM region and only then
         sends the request to the cache, else the request will bypass the cache.
 
-        TODO: Reduce address width of the cache so it can store shorter tags
-
         TODO: Add support for multi layer cache hierarchies
 
         Args:
@@ -37,6 +36,11 @@ class CV32E40PDataCache(wiring.Component):
         """
         self.cache_config = cache_config
         self.delay = delay
+        # Address bounds for the RAM
+        # Addresses outside this region will bypass the cache
+        self.lower_address = 0x1C00_0000
+        self.upper_address = 0x1C08_0000
+        self.cache_address_width = ceil_log2(self.upper_address - self.lower_address) - 2
         super().__init__(
             {
                 "core_if": In(LSUSignature()),
@@ -47,12 +51,16 @@ class CV32E40PDataCache(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        # Create the cache
+        # The cache shall only use addresses wide enough to cover the RAM region
+        # so that it only needs to store small tags. Also the byte offset bits
+        # are cut off from the address (that happens within the adapter)
         cache = Cache(
             InternalCacheConfig(
                 cache_config=self.cache_config,
-                address_width=30,
+                address_width=self.cache_address_width,
                 be_data_width=32,
-                be_address_width=30,
+                be_address_width=self.cache_address_width,
                 byte_size=8,
             )
         )
@@ -93,6 +101,7 @@ class CV32E40PDataCache(wiring.Component):
         # for the memory arrives
         with m.If(state != SwitchState.WAIT_FOR_MEMORY_RESPONSE):
             wiring.connect(m, cache_be, wiring.flipped(self.memory_if))
+            m.d.comb += self.memory_if.addr.eq(cache_be.addr + self.lower_address)
 
         # Accept new requests
         # Only consider requests if the cache is ready again
@@ -101,12 +110,12 @@ class CV32E40PDataCache(wiring.Component):
         # access the memory
         with m.If(cache.fe.port_ready):
             with m.If(
-                (self.core_if.addr >= 0x1C00_0000) & (self.core_if.addr < 0x1C08_0000)
+                (self.core_if.addr >= self.lower_address) & (self.core_if.addr < self.upper_address)
             ):
                 # The address lies within RAM range -> Send request to cache
                 m.d.comb += cache_fe.we.eq(self.core_if.we)
                 m.d.comb += cache_fe.be.eq(self.core_if.be)
-                m.d.comb += cache_fe.addr.eq(self.core_if.addr)
+                m.d.comb += cache_fe.addr.eq(self.core_if.addr - self.lower_address)
                 m.d.comb += cache_fe.wdata.eq(self.core_if.wdata)
                 m.d.comb += cache_fe.req.eq(self.core_if.req)
                 # Also tell the core if its request was granted

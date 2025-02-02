@@ -62,9 +62,8 @@ class CacheAdapter(wiring.Component):
         m.d.comb += cache.fe.request_valid.eq(core_if.req)
         # cache can only do byte writes but not byte reads. write_strobe == 0 means read.
         m.d.comb += cache.fe.write_strobe.eq(Mux(core_if.we, core_if.be, 0))
-        m.d.comb += cache.fe.address.eq(core_if.addr[2:])  # TODO
+        m.d.comb += cache.fe.address.eq(core_if.addr[2:])
         m.d.comb += cache.fe.write_data.eq(core_if.wdata)
-        # handing out the full word regardless of be should be fine (? TODO)
         m.d.comb += core_if.rdata.eq(cache.fe.read_data)
         m.d.comb += core_if.err.eq(0)  # Errors are not supported by the cache
         m.d.comb += cache.fe.flush.eq(0)  # Core doesn't use flush

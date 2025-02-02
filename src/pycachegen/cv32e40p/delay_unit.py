@@ -27,11 +27,6 @@ class DelayUnit(wiring.Component):
         m.d.comb += self.master.addr.eq(self.slave.addr)
         m.d.comb += self.master.wdata.eq(self.slave.wdata)
 
-        # TODO Remove these lines if they're not needed
-        # m.d.comb += self.slave.err.eq(0)
-        # m.d.comb += self.slave.rdata.eq(0)
-        # m.d.comb += self.slave.rvalid.eq(0)
-
         # Whether we're waiting for a response from main memory
         awaiting_response = Signal()
         # Whether we're currently delaying the response to the cache
