@@ -163,6 +163,66 @@ class CV32E40PCacheLSUAdapter(wiring.Component):
         return m
 
 
+class CV32E40PLSUDelayUnit(wiring.Component):
+
+    def __init__(self, delay: int):
+        self.delay = delay
+        super().__init__(
+            # master: to main memory
+            # slave: to cache
+            {"master": Out(CV32E40PLSUSignature()), "slave": In(CV32E40PLSUSignature())}
+        )
+
+    def elaborate(self, platform):
+        m = Module()
+        m.d.comb += self.master.we.eq(self.slave.we)
+        m.d.comb += self.master.be.eq(self.slave.be)
+        m.d.comb += self.master.addr.eq(self.slave.addr)
+        m.d.comb += self.master.wdata.eq(self.slave.wdata)
+
+        m.d.comb += self.slave.err.eq(0)
+        m.d.comb += self.slave.rdata.eq(0)
+        m.d.comb += self.slave.rvalid.eq(0)
+
+        # Whether we're waiting for a response from main memory
+        awaiting_response = Signal()
+        # Whether we're currently delaying the response to the cache
+        delaying_response = Signal()
+
+        delay_counter = Signal(range(self.delay))
+
+        rdata = Signal(unsigned(32))
+        err = Signal()
+
+        with m.If(delaying_response):
+            m.d.sync += delay_counter.eq(delay_counter + 1)
+            with m.If(delay_counter == (self.delay - 1)):
+                m.d.comb += self.slave.err.eq(err)
+                m.d.comb += self.slave.rdata.eq(rdata)
+                m.d.comb += self.slave.rvalid.eq(1)
+                m.d.sync += delay_counter.eq(0)
+                m.d.sync += delaying_response.eq(0)
+
+        with m.If(
+            ~(awaiting_response | (delaying_response & ~(delay_counter == self.delay)))
+        ):
+            # Not awaiting or delaying a response -> let the req (and gnt) through
+            m.d.comb += self.master.req.eq(self.slave.req)
+            m.d.comb += self.slave.gnt.eq(self.master.gnt)
+            with m.If(self.slave.req & self.master.gnt):
+                # request was granted
+                m.d.sync += awaiting_response.eq(1)
+
+        with m.If(awaiting_response):
+            with m.If(self.master.rvalid):
+                m.d.sync += rdata.eq(self.master.rdata)
+                m.d.sync += err.eq(self.master.err)
+                m.d.sync += awaiting_response.eq(0)
+                m.d.sync += delaying_response.eq(1)
+
+        return m
+
+
 class SwitchState(Enum):
     IDLE = 0
     WAIT_FOR_CACHE_RESPONSE = 1
@@ -170,8 +230,9 @@ class SwitchState(Enum):
 
 
 class CV32E40PDataCache(wiring.Component):
-    def __init__(self, cache_config: CacheConfig):
+    def __init__(self, cache_config: CacheConfig, delay: int):
         self.cache_config = cache_config
+        self.delay = delay
         super().__init__(
             {
                 "core_if": In(CV32E40PLSUSignature()),
@@ -193,6 +254,13 @@ class CV32E40PDataCache(wiring.Component):
         )
 
         m.submodules.adapter = adapter = CV32E40PCacheLSUAdapter(cache)
+        cache_fe = adapter.core_if
+        if self.delay != 0:
+            m.submodules.delay_unit = delay_unit = CV32E40PLSUDelayUnit(self.delay)
+            wiring.connect(m, adapter.memory_if, delay_unit.slave)
+            cache_be = delay_unit.master
+        else:
+            cache_be = adapter.memory_if
 
         state = Signal(SwitchState)
 
@@ -201,10 +269,10 @@ class CV32E40PDataCache(wiring.Component):
         # (that decision might be overwritten later if a new request arrives)
         with m.If(state == SwitchState.WAIT_FOR_CACHE_RESPONSE):
             # We're awaiting a response from the cache, so connect its outputs to the core
-            m.d.comb += self.core_if.rvalid.eq(adapter.core_if.rvalid)
-            m.d.comb += self.core_if.err.eq(adapter.core_if.err)
-            m.d.comb += self.core_if.rdata.eq(adapter.core_if.rdata)
-            with m.If(adapter.core_if.rvalid):
+            m.d.comb += self.core_if.rvalid.eq(cache_fe.rvalid)
+            m.d.comb += self.core_if.err.eq(cache_fe.err)
+            m.d.comb += self.core_if.rdata.eq(cache_fe.rdata)
+            with m.If(cache_fe.rvalid):
                 m.d.sync += state.eq(SwitchState.IDLE)
         with m.Elif(state == SwitchState.WAIT_FOR_MEMORY_RESPONSE):
             # We're awaiting a response from the memory, so connect its outputs to the core
@@ -219,7 +287,7 @@ class CV32E40PDataCache(wiring.Component):
         # This might be overwritten later if a new request
         # for the memory arrives
         with m.If(state != SwitchState.WAIT_FOR_MEMORY_RESPONSE):
-            wiring.connect(m, adapter.memory_if, wiring.flipped(self.memory_if))
+            wiring.connect(m, cache_be, wiring.flipped(self.memory_if))
 
         # Accept new requests
         # Only consider requests if the cache is ready again
@@ -231,14 +299,14 @@ class CV32E40PDataCache(wiring.Component):
                 (self.core_if.addr >= 0x1C00_0000) & (self.core_if.addr < 0x1C08_0000)
             ):
                 # The address lies within RAM range -> Send request to cache
-                m.d.comb += adapter.core_if.we.eq(self.core_if.we)
-                m.d.comb += adapter.core_if.be.eq(self.core_if.be)
-                m.d.comb += adapter.core_if.addr.eq(self.core_if.addr)
-                m.d.comb += adapter.core_if.wdata.eq(self.core_if.wdata)
-                m.d.comb += adapter.core_if.req.eq(self.core_if.req)
+                m.d.comb += cache_fe.we.eq(self.core_if.we)
+                m.d.comb += cache_fe.be.eq(self.core_if.be)
+                m.d.comb += cache_fe.addr.eq(self.core_if.addr)
+                m.d.comb += cache_fe.wdata.eq(self.core_if.wdata)
+                m.d.comb += cache_fe.req.eq(self.core_if.req)
                 # Also tell the core if its request was granted
-                m.d.comb += self.core_if.gnt.eq(adapter.core_if.gnt)
-                with m.If(adapter.core_if.gnt):
+                m.d.comb += self.core_if.gnt.eq(cache_fe.gnt)
+                with m.If(cache_fe.gnt):
                     m.d.sync += state.eq(SwitchState.WAIT_FOR_CACHE_RESPONSE)
             with m.Else():
                 # The address does not lie within RAM range -> Send request to memory
