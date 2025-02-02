@@ -18,28 +18,31 @@ class SwitchState(Enum):
 
 
 class CV32E40PDataCache(wiring.Component):
-    def __init__(self, cache_config: CacheConfig, delay: int):
-        """A data cache for the CV32E40P core and the Pulpissimo SoC. It is designed to go
-        in the fc subsystem to sit between the core and the TCDM. The OBI PULP Adapter
-        is also still required so as to only set req on the memory interface to 1
-        if there's no outstanding request.
-
+    def __init__(self, cache_config: CacheConfig, delay: int, lower_address: int, upper_address: int):
+        """A data cache for the CV32E40P core.
+         
         This module uses the normal cache, the cv32e40p adapter and (optionally) the delay unit. It additionally
         checks whether the request address is withing the RAM region and only then
         sends the request to the cache, else the request will bypass the cache.
+
+        When used with the Pulpissimo SoC, it should be placed in the fc subsystem 
+        in between the core and the TCDM. The OBI PULP Adapter is also still required
+        so as to only set req on the memory interface to 1 if there's no outstanding request.
 
         TODO: Add support for multi layer cache hierarchies
 
         Args:
             cache_config (CacheConfig): Configuration of the Cache. Note that data_width must be set to 32.
             delay (int): Amount of cycles by which the response for a memory request from the cache should be delayed. Can be set to 0.
+            lower_address (int): The lower address of the RAM (inclusive)
+            upper_address (int): The upper address of the RAM (exclusive)
         """
         self.cache_config = cache_config
         self.delay = delay
         # Address bounds for the RAM
         # Addresses outside this region will bypass the cache
-        self.lower_address = 0x1C00_0000
-        self.upper_address = 0x1C08_0000
+        self.lower_address = lower_address
+        self.upper_address = upper_address
         self.cache_address_width = ceil_log2(self.upper_address - self.lower_address) - 2
         super().__init__(
             {
