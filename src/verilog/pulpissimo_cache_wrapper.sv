@@ -16,7 +16,7 @@ module pulpissimo_cache_wrapper
     //Cache Data Bus (Arbiter<->Cache)
     logic [31:0] core_data_addr, core_data_rdata, core_data_wdata;
     logic        core_data_req, core_data_gnt, core_data_rvalid, core_data_err;
-    logic        core_data_we  ;
+    logic        core_data_we, core_data_wen  ;
     logic [ 3:0]  core_data_be ;
 
     // index of the request chosen by the arbiter
@@ -32,7 +32,8 @@ module pulpissimo_cache_wrapper
         assign req_data_agg_in[i] = {tcdm_masters[i].wen, tcdm_masters[i].be, tcdm_masters[i].add, tcdm_masters[i].wdata};
     end
     //Disaggregate the output data
-    assign {core_data_we, core_data_be, core_data_addr, core_data_wdata} = req_data_agg_out;
+    assign {core_data_wen, core_data_be, core_data_addr, core_data_wdata} = req_data_agg_out;
+    assign core_data_we = ~core_data_wen;
 
     // create arrays of req and gnt for arbiter
     logic [NR_MASTER_PORTS-1:0] tcdm_masters_req;
@@ -68,7 +69,7 @@ module pulpissimo_cache_wrapper
       if (!rst_ni) begin
         last_idx <= '0;
       end else begin
-        if (core_data_gnt) begin
+        if (core_data_req & core_data_gnt) begin
           last_idx <= arbiter_idx;
         end else begin
           last_idx <= last_idx;
@@ -88,6 +89,8 @@ module pulpissimo_cache_wrapper
     // Create a separate signal for req and a obi pulp adapter, because req shall
     // not be asserted while another request is being processed, I think
     logic cache_req_o;
+    logic tcdm_slave_we;
+    assign tcdm_slave.wen = ~tcdm_slave_we;
     obi_pulp_adapter i_obi_pulp_adapter_data (
         .rst_ni         (rst_ni),
         .clk_i          (clk_i),
@@ -111,7 +114,7 @@ module pulpissimo_cache_wrapper
         .core_if__err       (core_data_err),
         .memory_if__req     (cache_req_o),
         .memory_if__addr    (tcdm_slave.add),
-        .memory_if__we      (tcdm_slave.wen),
+        .memory_if__we      (tcdm_slave_we),
         .memory_if__wdata   (tcdm_slave.wdata),
         .memory_if__be      (tcdm_slave.be),
         .memory_if__gnt     (tcdm_slave.gnt),

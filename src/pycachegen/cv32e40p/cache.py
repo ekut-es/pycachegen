@@ -11,6 +11,7 @@ from pycachegen.cv32e40p.lsu_signature import LSUSignature
 from pycachegen.cv32e40p.cache_adapter import CacheAdapter
 from pycachegen.cv32e40p.delay_unit import DelayUnit
 
+
 class SwitchState(Enum):
     IDLE = 0
     WAIT_FOR_CACHE_RESPONSE = 1
@@ -18,14 +19,20 @@ class SwitchState(Enum):
 
 
 class CV32E40PDataCache(wiring.Component):
-    def __init__(self, cache_config: CacheConfig, delay: int, lower_address: int, upper_address: int):
+    def __init__(
+        self,
+        cache_config: CacheConfig,
+        delay: int,
+        lower_address: int,
+        upper_address: int,
+    ):
         """A data cache for the CV32E40P core.
-         
+
         This module uses the normal cache, the cv32e40p adapter and (optionally) the delay unit. It additionally
         checks whether the request address is withing the RAM region and only then
         sends the request to the cache, else the request will bypass the cache.
 
-        When used with the Pulpissimo SoC, it should be placed in the fc subsystem 
+        When used with the Pulpissimo SoC, it should be placed in the fc subsystem
         in between the core and the TCDM. The OBI PULP Adapter is also still required
         so as to only set req on the memory interface to 1 if there's no outstanding request.
 
@@ -43,7 +50,9 @@ class CV32E40PDataCache(wiring.Component):
         # Addresses outside this region will bypass the cache
         self.lower_address = lower_address
         self.upper_address = upper_address
-        self.cache_address_width = ceil_log2(self.upper_address - self.lower_address) - 2
+        self.cache_address_width = (
+            ceil_log2(self.upper_address - self.lower_address) - 2
+        )
         super().__init__(
             {
                 "core_if": In(LSUSignature()),
@@ -106,35 +115,41 @@ class CV32E40PDataCache(wiring.Component):
             wiring.connect(m, cache_be, wiring.flipped(self.memory_if))
             m.d.comb += self.memory_if.addr.eq(cache_be.addr + self.lower_address)
 
-        # Accept new requests
+        # Accept new requests if we're not awaiting a response
         # Only consider requests if the cache is ready again
         # The cache wouldn't grant a request while it's still busy, but
         # the memory must still be connected to the cache and so we can't
         # access the memory
-        with m.If(cache.fe.port_ready):
-            with m.If(
-                (self.core_if.addr >= self.lower_address) & (self.core_if.addr < self.upper_address)
-            ):
-                # The address lies within RAM range -> Send request to cache
-                m.d.comb += cache_fe.we.eq(self.core_if.we)
-                m.d.comb += cache_fe.be.eq(self.core_if.be)
-                m.d.comb += cache_fe.addr.eq(self.core_if.addr - self.lower_address)
-                m.d.comb += cache_fe.wdata.eq(self.core_if.wdata)
-                m.d.comb += cache_fe.req.eq(self.core_if.req)
-                # Also tell the core if its request was granted
-                m.d.comb += self.core_if.gnt.eq(cache_fe.gnt)
-                with m.If(cache_fe.gnt):
-                    m.d.sync += state.eq(SwitchState.WAIT_FOR_CACHE_RESPONSE)
-            with m.Else():
-                # The address does not lie within RAM range -> Send request to memory
-                m.d.comb += self.memory_if.we.eq(self.core_if.we)
-                m.d.comb += self.memory_if.be.eq(self.core_if.be)
-                m.d.comb += self.memory_if.addr.eq(self.core_if.addr)
-                m.d.comb += self.memory_if.wdata.eq(self.core_if.wdata)
-                m.d.comb += self.memory_if.req.eq(self.core_if.req)
-                # Also tell the core if its request was granted
-                m.d.comb += self.core_if.gnt.eq(self.memory_if.gnt)
-                with m.If(self.memory_if.gnt):
-                    m.d.sync += state.eq(SwitchState.WAIT_FOR_MEMORY_RESPONSE)
+        with m.If(
+            (state == SwitchState.IDLE)
+            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (cache_fe.rvalid))
+            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (self.memory_if.rvalid))
+        ):
+            with m.If(cache.fe.port_ready):
+                with m.If(
+                    (self.core_if.addr >= self.lower_address)
+                    & (self.core_if.addr < self.upper_address)
+                ):
+                    # The address lies within RAM range -> Send request to cache
+                    m.d.comb += cache_fe.we.eq(self.core_if.we)
+                    m.d.comb += cache_fe.be.eq(self.core_if.be)
+                    m.d.comb += cache_fe.addr.eq(self.core_if.addr - self.lower_address)
+                    m.d.comb += cache_fe.wdata.eq(self.core_if.wdata)
+                    m.d.comb += cache_fe.req.eq(self.core_if.req)
+                    # Also tell the core if its request was granted
+                    m.d.comb += self.core_if.gnt.eq(cache_fe.gnt)
+                    with m.If(cache_fe.gnt):
+                        m.d.sync += state.eq(SwitchState.WAIT_FOR_CACHE_RESPONSE)
+                with m.Else():
+                    # The address does not lie within RAM range -> Send request to memory
+                    m.d.comb += self.memory_if.we.eq(self.core_if.we)
+                    m.d.comb += self.memory_if.be.eq(self.core_if.be)
+                    m.d.comb += self.memory_if.addr.eq(self.core_if.addr)
+                    m.d.comb += self.memory_if.wdata.eq(self.core_if.wdata)
+                    m.d.comb += self.memory_if.req.eq(self.core_if.req)
+                    # Also tell the core if its request was granted
+                    m.d.comb += self.core_if.gnt.eq(self.memory_if.gnt)
+                    with m.If(self.memory_if.gnt):
+                        m.d.sync += state.eq(SwitchState.WAIT_FOR_MEMORY_RESPONSE)
 
         return m
