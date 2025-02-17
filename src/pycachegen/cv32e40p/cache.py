@@ -23,8 +23,7 @@ class CV32E40PDataCache(wiring.Component):
         self,
         cache_config: CacheConfig,
         delay: int,
-        lower_address: int,
-        upper_address: int,
+        address_ranges: list[tuple[int, int]]
     ):
         """A data cache for the CV32E40P core.
 
@@ -41,15 +40,13 @@ class CV32E40PDataCache(wiring.Component):
         Args:
             cache_config (CacheConfig): Configuration of the Cache. Note that data_width must be set to 32.
             delay (int): Amount of cycles by which the response for a memory request from the cache should be delayed. Can be set to 0.
-            lower_address (int): The lower address of the RAM (inclusive)
-            upper_address (int): The upper address of the RAM (exclusive)
+            address_ranges (list[tuple[int, int]]): List of address ranges (lower bound inclusive, upper bound exclusive) for which the cache should be used. Other addresses will bypass the cache.
         """
         self.cache_config = cache_config
         self.delay = delay
-        # Address bounds for the RAM
-        # Addresses outside this region will bypass the cache
-        self.lower_address = lower_address
-        self.upper_address = upper_address
+        self.address_ranges = address_ranges
+        self.lower_address = min([lower for lower, _ in self.address_ranges])
+        self.upper_address = max([upper for _, upper in self.address_ranges])
         self.cache_address_width = (
             ceil_log2(self.upper_address - self.lower_address) - 2
         )
@@ -115,6 +112,13 @@ class CV32E40PDataCache(wiring.Component):
             wiring.connect(m, cache_be, wiring.flipped(self.memory_if))
             m.d.comb += self.memory_if.addr.eq(cache_be.addr + self.lower_address)
 
+        # Determine if the current address is in any of the ranges for the cache
+        addr_in_range = Signal(unsigned(len(self.address_ranges)))
+        addr_for_cache = Signal()
+        for i, (lower, upper) in enumerate(self.address_ranges):
+            m.d.comb += addr_in_range[i].eq((self.core_if.addr >= lower) & (self.core_if.addr < upper))
+        m.d.comb += addr_for_cache.eq(addr_in_range.any())
+
         # Accept new requests if we're not awaiting a response
         # Only consider requests if the cache is ready again
         # The cache wouldn't grant a request while it's still busy, but
@@ -126,10 +130,7 @@ class CV32E40PDataCache(wiring.Component):
             | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (self.memory_if.rvalid))
         ):
             with m.If(cache.fe.port_ready):
-                with m.If(
-                    (self.core_if.addr >= self.lower_address)
-                    & (self.core_if.addr < self.upper_address)
-                ):
+                with m.If(addr_for_cache):
                     # The address lies within RAM range -> Send request to cache
                     m.d.comb += cache_fe.we.eq(self.core_if.we)
                     m.d.comb += cache_fe.be.eq(self.core_if.be)
