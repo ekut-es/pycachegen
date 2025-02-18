@@ -7,9 +7,9 @@ from amaranth.utils import ceil_log2
 
 from pycachegen import Cache, CacheConfig
 from pycachegen.cache_config_validation import InternalCacheConfig
-from pycachegen.cv32e40p.lsu_signature import LSUSignature
-from pycachegen.cv32e40p.cache_adapter import CacheAdapter
-from pycachegen.cv32e40p.delay_unit import DelayUnit
+from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
+from pycachegen.pulpissimo.cache_adapter import CacheAdapter
+from pycachegen.pulpissimo.delay_unit import DelayUnit
 
 
 class SwitchState(Enum):
@@ -18,7 +18,7 @@ class SwitchState(Enum):
     WAIT_FOR_MEMORY_RESPONSE = 2
 
 
-class CV32E40PDataCache(wiring.Component):
+class PulpissimoDataCache(wiring.Component):
     def __init__(
         self,
         cache_config: CacheConfig,
@@ -52,8 +52,8 @@ class CV32E40PDataCache(wiring.Component):
         )
         super().__init__(
             {
-                "core_if": In(LSUSignature()),
-                "memory_if": Out(LSUSignature()),
+                "core_if": In(TCDMSignature()),
+                "memory_if": Out(TCDMSignature()),
             }
         )
 
@@ -91,17 +91,17 @@ class CV32E40PDataCache(wiring.Component):
         # (that decision might be overwritten later if a new request arrives)
         with m.If(state == SwitchState.WAIT_FOR_CACHE_RESPONSE):
             # We're awaiting a response from the cache, so connect its outputs to the core
-            m.d.comb += self.core_if.rvalid.eq(cache_fe.rvalid)
-            m.d.comb += self.core_if.err.eq(cache_fe.err)
-            m.d.comb += self.core_if.rdata.eq(cache_fe.rdata)
-            with m.If(cache_fe.rvalid):
+            m.d.comb += self.core_if.r_valid.eq(cache_fe.r_valid)
+            m.d.comb += self.core_if.r_opc.eq(cache_fe.r_opc)
+            m.d.comb += self.core_if.r_rdata.eq(cache_fe.r_rdata)
+            with m.If(cache_fe.r_valid):
                 m.d.sync += state.eq(SwitchState.IDLE)
         with m.Elif(state == SwitchState.WAIT_FOR_MEMORY_RESPONSE):
             # We're awaiting a response from the memory, so connect its outputs to the core
-            m.d.comb += self.core_if.rvalid.eq(self.memory_if.rvalid)
-            m.d.comb += self.core_if.err.eq(self.memory_if.err)
-            m.d.comb += self.core_if.rdata.eq(self.memory_if.rdata)
-            with m.If(self.memory_if.rvalid):
+            m.d.comb += self.core_if.r_valid.eq(self.memory_if.r_valid)
+            m.d.comb += self.core_if.r_opc.eq(self.memory_if.r_opc)
+            m.d.comb += self.core_if.r_rdata.eq(self.memory_if.r_rdata)
+            with m.If(self.memory_if.r_valid):
                 m.d.sync += state.eq(SwitchState.IDLE)
 
         # Also connect the cache BE to the memory if we're not
@@ -110,13 +110,13 @@ class CV32E40PDataCache(wiring.Component):
         # for the memory arrives
         with m.If(state != SwitchState.WAIT_FOR_MEMORY_RESPONSE):
             wiring.connect(m, cache_be, wiring.flipped(self.memory_if))
-            m.d.comb += self.memory_if.addr.eq(cache_be.addr + self.lower_address)
+            m.d.comb += self.memory_if.add.eq(cache_be.add + self.lower_address)
 
         # Determine if the current address is in any of the ranges for the cache
         addr_in_range = Signal(unsigned(len(self.address_ranges)))
         addr_for_cache = Signal()
         for i, (lower, upper) in enumerate(self.address_ranges):
-            m.d.comb += addr_in_range[i].eq((self.core_if.addr >= lower) & (self.core_if.addr < upper))
+            m.d.comb += addr_in_range[i].eq((self.core_if.add >= lower) & (self.core_if.add < upper))
         m.d.comb += addr_for_cache.eq(addr_in_range.any())
 
         # Accept new requests if we're not awaiting a response
@@ -126,15 +126,15 @@ class CV32E40PDataCache(wiring.Component):
         # access the memory
         with m.If(
             (state == SwitchState.IDLE)
-            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (cache_fe.rvalid))
-            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (self.memory_if.rvalid))
+            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (cache_fe.r_valid))
+            | ((state == SwitchState.WAIT_FOR_CACHE_RESPONSE) & (self.memory_if.r_valid))
         ):
             with m.If(cache.fe.port_ready):
                 with m.If(addr_for_cache):
                     # The address lies within RAM range -> Send request to cache
-                    m.d.comb += cache_fe.we.eq(self.core_if.we)
+                    m.d.comb += cache_fe.wen.eq(self.core_if.wen)
                     m.d.comb += cache_fe.be.eq(self.core_if.be)
-                    m.d.comb += cache_fe.addr.eq(self.core_if.addr - self.lower_address)
+                    m.d.comb += cache_fe.add.eq(self.core_if.add - self.lower_address)
                     m.d.comb += cache_fe.wdata.eq(self.core_if.wdata)
                     m.d.comb += cache_fe.req.eq(self.core_if.req)
                     # Also tell the core if its request was granted
@@ -143,9 +143,9 @@ class CV32E40PDataCache(wiring.Component):
                         m.d.sync += state.eq(SwitchState.WAIT_FOR_CACHE_RESPONSE)
                 with m.Else():
                     # The address does not lie within RAM range -> Send request to memory
-                    m.d.comb += self.memory_if.we.eq(self.core_if.we)
+                    m.d.comb += self.memory_if.wen.eq(self.core_if.wen)
                     m.d.comb += self.memory_if.be.eq(self.core_if.be)
-                    m.d.comb += self.memory_if.addr.eq(self.core_if.addr)
+                    m.d.comb += self.memory_if.add.eq(self.core_if.add)
                     m.d.comb += self.memory_if.wdata.eq(self.core_if.wdata)
                     m.d.comb += self.memory_if.req.eq(self.core_if.req)
                     # Also tell the core if its request was granted
