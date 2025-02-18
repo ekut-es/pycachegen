@@ -14,14 +14,14 @@ class TCDMSignature(wiring.Signature):
             [
                 # Request Channel
                 ("req", Out(1)),
-                ("add", Out(32)),  # TODO
-                ("wen", Out(1)),  # TODO
+                ("add", Out(32)),
+                ("wen", Out(1)),
                 ("wdata", Out(32)),
                 ("be", Out(4)),
                 ("gnt", In(1)),
                 # Response Channel
-                ("r_valid", In(1)),  # TODO
-                ("r_rdata", In(32)),  # TODO
-                ("r_opc", In(1)),  # TODO
+                ("r_valid", In(1)),
+                ("r_rdata", In(32)),
+                ("r_opc", In(1)),
             ]
         )

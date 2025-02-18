@@ -1,4 +1,10 @@
-module pulpissimo_cache_wrapper
+// This is the top level module for usage in the pulpissimo SoC.
+// It uses an arbiter for connecting multiple masters to the cache subsystem.
+// I suggest arbitrating between fc data, udma rx, udma tx, debug and the 4 AXI channels
+// but not fc instructions so as to not introduce a severe bottleneck.
+// It also uses an obi pulp adapter for connecting the subsystem to the rest
+// of the TCDM system.
+module pulpissimo_cache_subsystem_wrapper
     #(
       parameter int  NR_MASTER_PORTS = 4
     )(
@@ -7,22 +13,16 @@ module pulpissimo_cache_wrapper
        XBAR_TCDM_BUS.Master tcdm_masters[NR_MASTER_PORTS],
        XBAR_TCDM_BUS.Slave tcdm_mem_if
     );
-    // Do **not** change. The TCDM interface uses hardcoded bus widths so we cannot just change them here.
     localparam int unsigned BE_WIDTH = 4;
     localparam int unsigned ADDR_WIDTH = 32;
     localparam int unsigned DATA_WIDTH = 32;
     localparam int unsigned REQ_AGG_DATA_WIDTH  = 1+BE_WIDTH+ADDR_WIDTH+DATA_WIDTH; // +1 is for the write enable (wen),
     
-    //Cache Data Bus (Arbiter<->Cache)
+    //Cache Data Bus (Arbiter<->Cache Subsystem)
     logic [31:0] arb_2_cache_addr, arb_2_cache_rdata, arb_2_cache_wdata;
     logic        arb_2_cache_req, arb_2_cache_gnt, arb_2_cache_rvalid, arb_2_cache_err;
     logic        arb_2_cache_wen;
     logic [ 3:0]  arb_2_cache_be ;
-
-    // index of the request chosen by the arbiter
-    logic [$clog2(NR_MASTER_PORTS)-1:0] arbiter_idx ;
-    // reg for previous index
-    reg [$clog2(NR_MASTER_PORTS)-1:0] last_idx ;
 
     //Aggregated Request Data
     logic [NR_MASTER_PORTS-1:0][REQ_AGG_DATA_WIDTH-1:0] req_data_agg_in;
@@ -42,7 +42,11 @@ module pulpissimo_cache_wrapper
       assign tcdm_masters[i].gnt = tcdm_masters_gnt[i];  
     end
 
-    // Abitrate fc data, udma rx, udma tx and debug
+    // index of the request chosen by the arbiter
+    logic [$clog2(NR_MASTER_PORTS)-1:0] arbiter_idx ;
+    // reg for previous index
+    reg [$clog2(NR_MASTER_PORTS)-1:0] last_idx ;
+
     rr_arb_tree #(
       .NumIn     ( NR_MASTER_PORTS ),
       .DataWidth ( REQ_AGG_DATA_WIDTH ),
@@ -56,7 +60,7 @@ module pulpissimo_cache_wrapper
       .req_i   ( tcdm_masters_req ),
       .gnt_o   ( tcdm_masters_gnt  ),
       .data_i  ( req_data_agg_in ),
-      // Arbiter <-> Cache
+      // Arbiter <-> Cache Subsystem
       .gnt_i   ( arb_2_cache_gnt   ),
       .req_o   ( arb_2_cache_req   ),
       .data_o  ( req_data_agg_out ),
@@ -84,7 +88,6 @@ module pulpissimo_cache_wrapper
       assign tcdm_masters[i].r_opc = arb_2_cache_err;
     end
 
-
     // Create a separate signal for req and a obi pulp adapter, because req shall
     // not be asserted while another request is being processed, I think
     logic tcdm_mem_if_req;
@@ -96,27 +99,27 @@ module pulpissimo_cache_wrapper
         .mem_rvalid_i   (tcdm_mem_if.r_valid),
         .mem_req_o      (tcdm_mem_if.req)
     );
-    // Create the data cache. Connect it to to arbiter and the slave port
-    pulpissimo_data_cache data_cache (
+    // Create the data cache. Connect it to the arbiter and the slave port
+    pulpissimo_cache_subsystem cache_subsystem (
         .rst                (~rst_ni),
         .clk                (clk_i),
-        .core_if__req       (arb_2_cache_req),
-        .core_if__add      (arb_2_cache_addr),
-        .core_if__wen       (arb_2_cache_wen),
-        .core_if__wdata     (arb_2_cache_wdata),
-        .core_if__be        (arb_2_cache_be),
-        .core_if__gnt       (arb_2_cache_gnt),
-        .core_if__r_valid    (arb_2_cache_rvalid),
-        .core_if__r_rdata     (arb_2_cache_rdata),
-        .core_if__r_opc       (arb_2_cache_err),
-        .memory_if__req     (tcdm_mem_if_req),
-        .memory_if__add    (tcdm_mem_if.add),
-        .memory_if__wen      (tcdm_mem_if.wen),
-        .memory_if__wdata   (tcdm_mem_if.wdata),
-        .memory_if__be      (tcdm_mem_if.be),
-        .memory_if__gnt     (tcdm_mem_if.gnt),
-        .memory_if__r_valid  (tcdm_mem_if.r_valid),
-        .memory_if__r_rdata   (tcdm_mem_if.r_rdata),
-        .memory_if__r_opc     (tcdm_mem_if.r_opc)
+        .requestor__req       (arb_2_cache_req),
+        .requestor__add      (arb_2_cache_addr),
+        .requestor__wen       (arb_2_cache_wen),
+        .requestor__wdata     (arb_2_cache_wdata),
+        .requestor__be        (arb_2_cache_be),
+        .requestor__gnt       (arb_2_cache_gnt),
+        .requestor__r_valid    (arb_2_cache_rvalid),
+        .requestor__r_rdata     (arb_2_cache_rdata),
+        .requestor__r_opc       (arb_2_cache_err),
+        .target__req     (tcdm_mem_if_req),
+        .target__add    (tcdm_mem_if.add),
+        .target__wen      (tcdm_mem_if.wen),
+        .target__wdata   (tcdm_mem_if.wdata),
+        .target__be      (tcdm_mem_if.be),
+        .target__gnt     (tcdm_mem_if.gnt),
+        .target__r_valid  (tcdm_mem_if.r_valid),
+        .target__r_rdata   (tcdm_mem_if.r_rdata),
+        .target__r_opc     (tcdm_mem_if.r_opc)
     );
 endmodule
