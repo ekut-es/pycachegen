@@ -64,6 +64,7 @@ class CacheSubsystem(wiring.Component):
 
         cache_fe = cache.fe
         cache_be = cache.be
+        cache_ready = cache.fe.port_ready
 
         # Create a delay unit if needed
         if self.read_delay or self.write_delay:
@@ -74,6 +75,8 @@ class CacheSubsystem(wiring.Component):
             )
             wiring.connect(m, cache_be, delay_unit.requestor)
             cache_be = delay_unit.target
+            # when using a delay unit, also wait until the delay unit hast sent its requests
+            cache_ready &= delay_unit.requestor.port_ready
 
         # Connect cache to adapter
         wiring.connect(m, adapter.cache_fe, cache_fe)
@@ -82,7 +85,7 @@ class CacheSubsystem(wiring.Component):
         # Connect adapter to router
         wiring.connect(m, router.cache_fe, adapter.requestor)
         wiring.connect(m, adapter.target, router.cache_be)
-        m.d.comb += router.cache_port_ready.eq(cache.fe.port_ready)
+        m.d.comb += router.cache_port_ready.eq(cache_ready)
 
         # Connect self to router
         wiring.connect(m, wiring.flipped(self.requestor), router.requestor)
