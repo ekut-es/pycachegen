@@ -1,3 +1,5 @@
+from typing import Optional
+
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
@@ -9,12 +11,13 @@ from pycachegen.pulpissimo.tcdm_cache_router import TCDMCacheRouter
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.cache_config_validation import CacheConfig, InternalCacheConfig
+from pycachegen.memory_bus import MemoryBusSignature
 
 
 class CacheSubsystem(wiring.Component):
     def __init__(
         self,
-        cache_config: CacheConfig,
+        cache_config: Optional[CacheConfig],
         address_ranges: list[tuple[int, int]],
         read_delay: int,
         write_delay: int,
@@ -25,27 +28,34 @@ class CacheSubsystem(wiring.Component):
         masters to the cache, you should use the subsystem wrapper.
 
         Args:
-            cache_config (CacheConfig): Configuration for the cache.
+            cache_config (Optional[CacheConfig]): Configuration for the cache. Can be set to None if no cache should be used.
             address_ranges (list[tuple[int, int]]): List of tuples of lower (inclusive) and upper (exclusive) bounds which represent address ranges for which the cache should be used. Requests with other addresses will bypass the cache.
             read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0 if write_delay is also 0.
             write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to 0 if read_delay is also 0.
         """
-        assert cache_config.data_width == 32
         self.read_delay = read_delay
         self.write_delay = write_delay
+        self.use_delay = bool(read_delay) or bool(write_delay)
         self.address_ranges = address_ranges
         self.lower_address = min([lower for lower, _ in self.address_ranges])
         self.upper_address = max([upper for _, upper in self.address_ranges])
         self.cache_address_width = (
             ceil_log2(self.upper_address - self.lower_address) - 2
         )
-        self.cache_config = InternalCacheConfig(
-            cache_config=cache_config,
-            address_width=self.cache_address_width,
-            be_data_width=32,
-            be_address_width=self.cache_address_width,
-            byte_size=8,
+        self.cache_signature = MemoryBusSignature(
+            address_width=self.cache_address_width, data_width=32, bytes_per_word=4
         )
+        self.use_cache = False
+        if cache_config is not None:
+            assert cache_config.data_width == 32
+            self.cache_config = InternalCacheConfig(
+                    cache_config=cache_config,
+                    address_width=self.cache_address_width,
+                    be_data_width=32,
+                    be_address_width=self.cache_address_width,
+                    byte_size=8,
+                )
+            self.use_cache = True
         super().__init__(
             {"requestor": In(TCDMSignature()), "target": Out(TCDMSignature())}
         )
@@ -53,34 +63,52 @@ class CacheSubsystem(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.cache = cache = Cache(self.cache_config)
-        m.submodules.adapter = adapter = TCDMCacheAdapter(
-            self.cache_config.fe_signature
-        )
+        use_cache = self.use_cache 
+        use_delay = self.use_delay 
+
+        if (not use_cache) and (not use_delay):
+            # just connect the requestor to the target
+            wiring.connect(m, wiring.flipped(self.requestor), wiring.flipped(self.target))
+            # useless signal so that clk and rst get generated...
+            x = Signal()
+            m.d.sync += x.eq(~x)
+            return m
+
+        m.submodules.adapter = adapter = TCDMCacheAdapter(self.cache_signature)
         m.submodules.router = router = TCDMCacheRouter(
             address_ranges=self.address_ranges,
             lowest_address=self.lower_address,
         )
 
-        cache_fe = cache.fe
-        cache_be = cache.be
-        cache_ready = cache.fe.port_ready
+        cache_ready = 1
+
+        # Create a cache if needed
+        if use_cache:
+            m.submodules.cache = cache = Cache(self.cache_config)
+            cache_ready &= cache.fe.port_ready
 
         # Create a delay unit if needed
-        if self.read_delay or self.write_delay:
+        if use_delay:
             m.submodules.delay_unit = delay_unit = DelayUnit(
-                mem_signature=self.cache_config.fe_signature,
+                mem_signature=self.cache_signature,
                 read_delay=self.read_delay,
                 write_delay=self.write_delay,
             )
-            wiring.connect(m, cache_be, delay_unit.requestor)
-            cache_be = delay_unit.target
-            # when using a delay unit, also wait until the delay unit hast sent its requests
             cache_ready &= delay_unit.requestor.port_ready
 
-        # Connect cache to adapter
-        wiring.connect(m, adapter.cache_fe, cache_fe)
-        wiring.connect(m, cache_be, adapter.cache_be)
+        if (not use_cache) and (use_delay):
+            # connect adapter only to delay unit
+            wiring.connect(m, adapter.cache_fe, delay_unit.requestor)
+            wiring.connect(m, delay_unit.target, adapter.cache_be)
+        elif (use_cache) and (not use_delay):
+            # connect adapter only to cache
+            wiring.connect(m, adapter.cache_fe, cache.fe)
+            wiring.connect(m, cache.be, adapter.cache_be)
+        elif (use_cache) and (use_delay):
+            # connect cache to delay unit and then to adapter
+            wiring.connect(m, cache.be, delay_unit.requestor)
+            wiring.connect(m, adapter.cache_fe, cache.fe)
+            wiring.connect(m, delay_unit.target, adapter.cache_be)
 
         # Connect adapter to router
         wiring.connect(m, router.cache_fe, adapter.requestor)
