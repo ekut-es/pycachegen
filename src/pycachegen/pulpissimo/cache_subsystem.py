@@ -12,8 +12,9 @@ from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.cache_config_validation import CacheConfig, InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.utils import log_parameters
 
-
+@log_parameters
 class CacheSubsystem(wiring.Component):
     def __init__(
         self,

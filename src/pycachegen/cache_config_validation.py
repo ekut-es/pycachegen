@@ -3,6 +3,7 @@ from math import floor, ceil
 from amaranth.utils import exact_log2, ceil_log2
 from pycachegen.cache_address import CacheAddressLayout
 from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.utils import log_parameters
 
 
 class ReplacementPolicies(Enum):
@@ -167,7 +168,7 @@ def assert_cache_latencies_valid(hit_latency: int, miss_latency: int) -> None:
             f"The hit and miss latencies must either both be 0 or greater than 0, but they are configured to be {hit_latency} and {miss_latency}"
         )
 
-
+@log_parameters
 class CacheConfig:
     def __init__(
         self,
@@ -196,6 +197,10 @@ class CacheConfig:
             miss_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a miss.
             data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be created if this value is an empty string.
         """
+        # init_params = inspect.signature(self.__class__.__init__).parameters
+        # init_params = [p for p in init_params if p != "self"]
+        # local_vars = locals()
+        # self._params = {p: local_vars[p] for p in init_params}
         self.data_width = data_width
         self.num_ways = num_ways
         self.num_sets = num_sets
@@ -206,6 +211,14 @@ class CacheConfig:
         self.hit_latency = hit_latency
         self.miss_latency = miss_latency
         self.data_memory_module = data_memory_module
+
+    # def __repr__(self):
+    #     params_str = ", ".join(f"{k}={v!r}" for k, v in self._params.items())
+    #     return f"{self.__class__.__name__}({params_str})"
+    
+if __name__ == "__main__":
+    cc = CacheConfig(32, 4, 16, ReplacementPolicies.FIFO, False, True, 2, 0, 0, "")
+    print(repr(cc))
 
 
 class InternalCacheConfig:

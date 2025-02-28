@@ -12,7 +12,7 @@ from pycachegen.cache_address import (
     get_blockwise_incremented_address,
 )
 from pycachegen.replacement_policy import ReplacementPolicy
-from pycachegen.elaborate_utils import one_hot_encode
+from pycachegen.utils import one_hot_encode
 from pycachegen.data_store import DataStore
 from pycachegen.tag_store import TagStore
 
