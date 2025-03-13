@@ -1,14 +1,21 @@
 from amaranth import *
-from amaranth.lib import wiring, data
-from amaranth.lib.memory import Memory
+from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.lib.fifo import SyncFIFO
-from pycachegen.cache_config_validation import InternalMemoryConfig
 from pycachegen.memory_bus import MemoryBusSignature, MemoryRequestLayout
 
 
 class WriteBuffer(wiring.Component):
     def __init__(self, signature: MemoryBusSignature, depth: int):
+        """A simple write buffer with configurable depth.
+
+        Writes to the same address will not be merged. Reads will be delayed
+        until the buffer has been emptied.
+
+        Args:
+            signature (MemoryBusSignature): The signature of the memory bus.
+            depth (int): The number of write requests that can be buffered.
+        """
         self.mem_signature = signature
         self.depth = depth
         self.request_layout = MemoryRequestLayout(signature)
