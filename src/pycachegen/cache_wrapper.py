@@ -13,6 +13,7 @@ from pycachegen.main_memory import MainMemory
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.cache_delay_module import CacheDelayModule
 from pycachegen.arbiter import Arbiter, ArbitrationScheme
+from pycachegen.write_buffer import WriteBuffer
 
 
 class CacheWrapper(wiring.Component):
@@ -24,6 +25,7 @@ class CacheWrapper(wiring.Component):
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
+        write_buffer_depths: list[int] = []
     ) -> None:
         """Generates a top level module containing an arbitrary amount of caches and a main memory.
         There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
@@ -36,12 +38,14 @@ class CacheWrapper(wiring.Component):
             memory_config (MemoryConfig): Configuration for the main memory.
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
             arbitration_scheme (ArbitrationScheme): Scheme for the arbiter in case there is more than one port. Supports priority and round robin scheme.
+            write_buffer_depth (list[int]): List of write the depths of the write buffers for each cache. Can be left empty if no write buffers shall be used. The depth describes the number of BE write requests that can be buffered.
         """
         self.num_ports = num_ports
         self.arbitration_scheme = arbitration_scheme
         self.byte_size = byte_size
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
+        self.write_buffer_depths = write_buffer_depths
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -136,6 +140,10 @@ class CacheWrapper(wiring.Component):
                 wiring.connect(delay_module.be, cache.fe)
                 m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
+            if self.write_buffer_depths != [] and (depth := self.write_buffer_depths[i]) != 0:
+                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = WriteBuffer(signature=cache_config.be_signature, depth=depth)
+                wiring.connect(cache.be, write_buffer.fe)
+                memory_hierarchy.append(write_buffer)
 
         # connect the hit signal of the first cache to the l1_hit output
         if len(memory_hierarchy):
