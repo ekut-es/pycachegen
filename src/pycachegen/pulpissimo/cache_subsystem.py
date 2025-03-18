@@ -127,28 +127,8 @@ class CacheSubsystem(wiring.Component):
         for fe, be in zip(fes, bes):
             wiring.connect(m, fe, be)
 
-
-        # if (not use_cache) and (use_delay):
-        #     # connect adapter only to delay unit
-        #     wiring.connect(m, adapter.cache_fe, delay_unit.requestor)
-        #     wiring.connect(m, delay_unit.target, adapter.cache_be)
-        # elif (use_cache) and (not use_delay):
-        #     # connect adapter only to cache
-        #     wiring.connect(m, adapter.cache_fe, cache.fe)
-        #     wiring.connect(m, cache.be, adapter.cache_be)
-        # elif (use_cache) and (use_delay):
-        #     # connect cache to delay unit and then to adapter
-        #     wiring.connect(m, cache.be, delay_unit.requestor)
-        #     wiring.connect(m, adapter.cache_fe, cache.fe)
-        #     wiring.connect(m, delay_unit.target, adapter.cache_be)
-
-        # Connect adapter to router
-        wiring.connect(m, router.cache_fe, adapter.requestor)
-        wiring.connect(m, adapter.target, router.cache_be)
-        m.d.comb += router.cache_port_ready.eq(cache_ready)
-
-        # Connect self to router
-        wiring.connect(m, wiring.flipped(self.requestor), router.requestor)
-        wiring.connect(m, router.target, wiring.flipped(self.target))
+        # Connect self to adapter
+        wiring.connect(m, wiring.flipped(self.requestor), adapter.requestor)
+        wiring.connect(m, adapter.target, wiring.flipped(self.target))
 
         return m
