@@ -80,8 +80,8 @@ class CacheSubsystem(wiring.Component):
                 m, wiring.flipped(self.requestor), wiring.flipped(self.target)
             )
             # useless signal so that clk and rst get generated...
-            x = Signal()
-            m.d.sync += x.eq(~x)
+            x = Signal(unsigned(4))
+            m.d.sync += x.eq(x+1)
             return m
 
         m.submodules.adapter = adapter = TCDMCacheAdapter(self.cache_signature)

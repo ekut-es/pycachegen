@@ -46,13 +46,13 @@ module pulpissimo_cache_subsystem_wrapper #(
 
 
   // update outstanding_cache_response status
-  always_ff @(posedge clk_i, negedge rst_ni) begin
+  always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-      outstanding_cache_response <= 1'b0;
+      outstanding_cache_response <= '0;
     end else begin
       if (arb_2_cache_req && arb_2_cache_gnt) begin
         outstanding_cache_response <= 1'b1; // new granted request for cache
-      end else if (outstanding_cache_response == 1'b1 && arb_2_cache_rvalid) begin
+      end else if ((outstanding_cache_response == 1'b1) && arb_2_cache_rvalid) begin
         outstanding_cache_response <= 1'b0; // response but no new granted request
       end else begin
         outstanding_cache_response <= outstanding_cache_response; // no new request or response
@@ -79,7 +79,7 @@ module pulpissimo_cache_subsystem_wrapper #(
       tcdm_out[i].wen = tcdm_in[i].wen;
       tcdm_out[i].be = tcdm_in[i].be;
       // Forward the responses back to the correct requesters
-      if (outstanding_cache_response && i == arb_curr_idx) begin
+      if (outstanding_cache_response && (i == arb_curr_idx)) begin
           tcdm_in[i].r_valid = arb_2_cache_rvalid;
           tcdm_in[i].r_rdata = arb_2_cache_rdata;
           tcdm_in[i].r_opc = arb_2_cache_err;
@@ -94,13 +94,12 @@ module pulpissimo_cache_subsystem_wrapper #(
   // Arbiter for access to the cache
   rr_arb_tree #(
     .NumIn     ( NR_MASTER_PORTS ),
-    .DataWidth ( REQ_AGG_DATA_WIDTH ),
-    .LockIn (1'b1)
+    .DataWidth ( REQ_AGG_DATA_WIDTH )
   ) i_rr_arb_tree (
     .clk_i   ( clk_i      ),
     .rst_ni  ( rst_ni     ),
-    .flush_i ( 1'b0       ),
-    .rr_i    (            ),
+    .flush_i ( '0         ),
+    .rr_i    ( '0         ),
     .idx_o   ( arb_next_idx    ),
     // Masters <-> Arbiter
     .req_i   ( req_2_arb_req  ),
@@ -117,7 +116,7 @@ module pulpissimo_cache_subsystem_wrapper #(
     if (!rst_ni) begin
       arb_curr_idx <= '0;
     end else begin
-      if (arb_2_cache_req & arb_2_cache_gnt) begin
+      if (arb_2_cache_req && arb_2_cache_gnt) begin
         arb_curr_idx <= arb_next_idx;
       end else begin
         arb_curr_idx <= arb_curr_idx;
@@ -137,9 +136,16 @@ module pulpissimo_cache_subsystem_wrapper #(
       .mem_req_o      (tcdm_priv0.req)
   );
 
+  logic rst;
+  reset_synchronizer reset_synchronizer_i (
+    .clk_i(clk_i),
+    .arst_ni(rst_ni),
+    .rst_o(rst)
+  );
+
   // Create the cache subsystem. Connect it to the arbiter and the priv0 output.
   pulpissimo_cache_subsystem cache_subsystem (
-      .rst                (~rst_ni),
+      .rst                (rst),
       .clk                (clk_i),
       .requestor__req       (arb_2_cache_req),
       .requestor__add      (arb_2_cache_addr),
