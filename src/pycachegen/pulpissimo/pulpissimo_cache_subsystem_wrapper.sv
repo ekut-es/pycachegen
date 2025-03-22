@@ -13,9 +13,9 @@ module pulpissimo_cache_subsystem_wrapper #(
 )(
   input logic clk_i,
   input logic rst_ni,
-  XBAR_TCDM_BUS.Master tcdm_in[NR_MASTER_PORTS],
-  XBAR_TCDM_BUS.Slave tcdm_out[NR_MASTER_PORTS],
-  XBAR_TCDM_BUS.Slave tcdm_priv0
+  XBAR_TCDM_BUS.Slave tcdm_in[NR_MASTER_PORTS],
+  XBAR_TCDM_BUS.Master tcdm_out[NR_MASTER_PORTS],
+  XBAR_TCDM_BUS.Master tcdm_priv0
 );
   localparam int unsigned BE_WIDTH = 4;
   localparam int unsigned ADDR_WIDTH = 32;
