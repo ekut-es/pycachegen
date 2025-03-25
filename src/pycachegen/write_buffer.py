@@ -1,16 +1,25 @@
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
-from amaranth.lib.fifo import SyncFIFO
+
 from pycachegen.memory_bus import MemoryBusSignature, MemoryRequestLayout
+from pycachegen.utils import one_hot_encode, is_onehot
 
-
+def _incr(signal, modulo):
+    if modulo == 2 ** len(signal):
+        return signal + 1
+    else:
+        return Mux(signal == modulo - 1, 0, signal + 1)
+    
 class WriteBuffer(wiring.Component):
-    def __init__(self, signature: MemoryBusSignature, depth: int):
-        """A simple write buffer with configurable depth.
+    def __init__(self, *, signature: MemoryBusSignature, depth: int):
+        """A write buffer with configurable depth.
 
-        Writes to the same address will not be merged. Reads will be delayed
-        until the buffer has been emptied.
+        Writes to the same address will not be merged. Reads that can be fulfilled
+        by the data in the buffer will be answered in 1 cycle. Reads with
+        addresses for which there are no writes in the buffer will have priority
+        over writes from the buffer. Reads for which there is a write with partial
+        write strobe will be delayed.
 
         Args:
             signature (MemoryBusSignature): The signature of the memory bus.
@@ -22,53 +31,90 @@ class WriteBuffer(wiring.Component):
         self.width = self.request_layout.size
         super().__init__({"fe": In(signature), "be": Out(signature)})
 
-    def elaborate(self, platform) -> None:
+    def elaborate(self, platform):
         m = Module()
 
-        # Always connect the read data from the BE to the FE
-        m.d.comb += [
-            self.fe.read_data.eq(self.be.read_data),
-            self.fe.read_data_valid.eq(self.be.read_data_valid)
-        ]
+        level = Signal(range(self.depth + 1))
+        write_ptr = Signal(range(self.depth))
+        read_ptr = Signal(range(self.depth))
 
-        # The actual FIFO buffer
-        m.submodules.fifo = fifo = SyncFIFO(width=self.width, depth=self.depth)
+        storage = Array([Signal(self.request_layout, name=f"storage[{i}]") for i in range(self.depth)])
 
-        # Aggregate data for FIFO input
-        fe_request = Signal(self.request_layout)
-        m.d.comb += [
-            fe_request.address.eq(self.fe.address),
-            fe_request.write_data.eq(self.fe.write_data),
-            fe_request.write_strobe.eq(self.fe.write_strobe),
-        ]
-        m.d.comb += fifo.w_data.eq(fe_request)
+        addr_match_vec = Signal(unsigned(self.depth))
+        for idx, el in enumerate(storage):
+            # Find out whether the requested address is in the FIFO or not
+            # only look at valid entries of the FIFO!!!
+            m.d.comb += addr_match_vec[idx].eq(
+                (el.address == self.fe.address)
+                & ((level == self.depth) | Mux(read_ptr <= write_ptr, (idx >= read_ptr) & (idx < write_ptr), (idx >= read_ptr) | (idx < write_ptr)))
+            )
+        addr_match_idx = Signal(range(self.depth))
+        m.d.comb += addr_match_idx.eq(one_hot_encode(m, addr_match_vec))
 
-        # Disaggregate the FIFO output data
-        be_request = Signal(self.request_layout)
-        m.d.comb += be_request.eq(fifo.r_data)
+        # Buffers for data read from FIFO
+        read_data_buffer = Signal(unsigned(self.mem_signature.data_width))
+        read_data_valid_buffer = Signal()
+        # Select where the FE read data comes from
+        read_data_source = Signal() # 0 = BE, 1 = Buffer
+        with m.If(read_data_source):
+            m.d.comb += [self.fe.read_data.eq(read_data_buffer), self.fe.read_data_valid.eq(read_data_valid_buffer)]
+        with m.Else():
+            m.d.comb += [self.fe.read_data.eq(self.be.read_data), self.fe.read_data_valid.eq(self.be.read_data_valid)]
+            
+        fe_read = self.fe.request_valid & ~self.fe.write_strobe.any()
+        fe_write = self.fe.request_valid & self.fe.write_strobe.any()
+        fifo_read = Signal()
+        fifo_write = Signal()
 
-        with m.If(self.fe.write_strobe.any()):
-            # write -> buffer the request
-            m.d.comb += fifo.w_en.eq(self.fe.request_valid)
-            m.d.comb += self.fe.port_ready.eq(fifo.w_rdy)
-
-        with m.If(fifo.r_level != 0):
-            # There's a valid request in the FIFO, send it to the memory
-            m.d.comb += [
-                self.be.address.eq(be_request.address),
-                self.be.write_data.eq(be_request.write_data),
-                self.be.write_strobe.eq(be_request.write_strobe),
-                self.be.request_valid.eq(1)
-            ]
-            m.d.comb += fifo.r_en.eq(self.be.port_ready)
-        with m.Elif(~self.fe.write_strobe.any()):
-            # The FIFO is empty and we have a read request -> send that
+        with m.If(fe_read & ~addr_match_vec.any()):
+            # Send FE read request directly to BE, the requested address is not in the FIFO
             m.d.comb += [
                 self.be.address.eq(self.fe.address),
                 self.be.write_strobe.eq(0),
-                self.be.request_valid.eq(1)
+                self.be.request_valid.eq(1),
+                self.fe.port_ready.eq(self.be.port_ready)
             ]
-            m.d.comb += self.fe.port_ready.eq(self.be.port_ready)
+            m.d.sync += read_data_source.eq(0)
+        with m.Else():
+            with m.If(fe_read & is_onehot(addr_match_vec) & storage[addr_match_idx].write_strobe.all()):
+                # Read request can be answered by buffer because there is exactly one request
+                # for that address in the buffer and it has a full write strobe
+                # If fe_read but the other requirements are not met, the request has to wait until the
+                # conflicting writes from the FIFO have been sent
+                m.d.comb += self.fe.port_ready.eq(1)
+                m.d.sync += [read_data_source.eq(1), read_data_buffer.eq(storage[addr_match_idx].write_data), read_data_valid_buffer.eq(1)]
+
+            with m.If(fe_write & ((level != self.depth) | fifo_read)):
+                # Put write into buffer
+                m.d.comb += [self.fe.port_ready.eq(1), fifo_write.eq(1)]
+                m.d.sync += [
+                    storage[write_ptr].address.eq(self.fe.address),
+                    storage[write_ptr].write_data.eq(self.fe.write_data),
+                    storage[write_ptr].write_strobe.eq(self.fe.write_strobe)
+                ]
+
+            with m.If(level > 0):
+                # Send buffered request to BE
+                req = storage[read_ptr]
+                m.d.comb += [
+                    self.be.address.eq(req.address),
+                    self.be.write_strobe.eq(req.write_strobe),
+                    self.be.write_data.eq(req.write_data),
+                    self.be.request_valid.eq(1),
+                    fifo_read.eq(self.be.port_ready)
+                ]
+
+        # Update pointers
+        with m.If(fifo_write):
+            m.d.sync += write_ptr.eq(_incr(write_ptr, self.depth))
+        with m.If(fifo_read):
+            m.d.sync += read_ptr.eq(_incr(read_ptr, self.depth))
+
+        # Update level
+        with m.If(fifo_write & ~fifo_read):
+            m.d.sync += level.eq(level + 1)
+        with m.If(~fifo_write & fifo_read):
+            m.d.sync += level.eq(level - 1)
 
         return m
     

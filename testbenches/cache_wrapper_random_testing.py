@@ -26,11 +26,14 @@ def random_test(dut: CacheWrapper) -> None:
             else:
                 # jump to a nearby address
                 address = (
-                    address + random.randrange(-rand_interval_size, rand_interval_size)
+                    address + random.randint(-rand_interval_size, rand_interval_size)
                 ) % max_address
-            write_strobe = (
-                0 if random.random() < 0.5 else (2 ** (dut.fe_bytes_per_word) - 1)
-            )
+            if random.random() < 0.5: # 50%
+                write_strobe = 0
+            elif random.random() < 0.75: # 37,5%
+                write_strobe = 2 ** (dut.fe_bytes_per_word) - 1
+            else: # 12,5%
+                write_strobe = random.randrange(0, 2 ** (dut.fe_bytes_per_word))
             write_data = random.randrange(0, 2**dut.fe_data_width)
 
             # send the request
@@ -51,13 +54,26 @@ def random_test(dut: CacheWrapper) -> None:
 
             if write_strobe:
                 # write to dict
-                memory_dict[address] = write_data
+                val = memory_dict.get(address, 0)
+                new_val = 0
+                for i in range(dut.fe_bytes_per_word):
+                    byte_in_mem = (val >> (i*dut.byte_size)) % (2**dut.byte_size)
+                    byte_in_req = (write_data >> (i*dut.byte_size)) % (2**dut.byte_size)
+                    if write_strobe & (1 << i):
+                        new_byte = byte_in_req
+                    else:
+                        new_byte = byte_in_mem
+                    new_val += new_byte << (i*dut.byte_size)
+                memory_dict[address] = new_val
             else:
                 # check if read data is correct
-                assert ctx.get(dut.fe_0.read_data_valid), str(requests_processed)
-                assert ctx.get(dut.fe_0.read_data) == memory_dict.get(address, 0), str(
-                    requests_processed
-                )
+                try:
+                    assert ctx.get(dut.fe_0.read_data_valid)
+                    assert ctx.get(dut.fe_0.read_data) == memory_dict.get(address, 0)
+                except:
+                    raise RuntimeError(
+                        f"Request {requests_processed} failed: Tried reading from {address} expecting {memory_dict.get(address, 0)}, got {ctx.get(dut.fe_0.read_data)} (valid: {ctx.get(dut.fe_0.read_data_valid)})"
+                    )
 
             # print statistics
             if requests_processed % 100 == 0:
@@ -70,6 +86,8 @@ def random_test(dut: CacheWrapper) -> None:
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
     sim.run()
+    # with sim.write_vcd("random.vcd"):
+    #     sim.run()
 
 
 if __name__ == "__main__":
@@ -78,24 +96,25 @@ if __name__ == "__main__":
         byte_size=8,
         address_width=8,
         memory_config=MemoryConfig(
-            data_width=64,
-            read_latency=2,
-            write_latency=3,
+            data_width=32,
+            read_latency=7,
+            write_latency=11,
             min_address=0,
-            max_address=2**7,
+            max_address=2**8,
         ),
         cache_configs=[
             CacheConfig(
                 data_width=32,
-                num_ways=4,
-                num_sets=4,
-                block_size=4,
+                num_ways=2,
+                num_sets=8,
+                block_size=1,
                 replacement_policy=ReplacementPolicies.PLRU_TREE,
-                write_through=False,
-                write_allocate=True,
+                write_through=True,
+                write_allocate=False,
                 hit_latency=0,
                 miss_latency=0,
             )
         ],
+        write_buffer_depths=[16],
     )
     random_test(cache)

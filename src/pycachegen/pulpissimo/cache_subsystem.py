@@ -13,7 +13,7 @@ from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.cache_config_validation import CacheConfig, InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.utils import log_parameters
-from pycachegen.advanced_write_buffer import AdvancedWriteBuffer
+from pycachegen.write_buffer import WriteBuffer
 
 
 @log_parameters
@@ -103,7 +103,7 @@ class CacheSubsystem(wiring.Component):
 
         # Create a write buffer if needed
         if self.write_buffer_depth != 0:
-            m.submodules.write_buffer = write_buffer = AdvancedWriteBuffer(
+            m.submodules.write_buffer = write_buffer = WriteBuffer(
                 signature=self.cache_config.be_signature, depth=self.write_buffer_depth
             )
             fes.append(write_buffer.fe)

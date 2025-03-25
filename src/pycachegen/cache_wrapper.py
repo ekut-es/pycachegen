@@ -14,7 +14,6 @@ from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.cache_delay_module import CacheDelayModule
 from pycachegen.arbiter import Arbiter, ArbitrationScheme
 from pycachegen.write_buffer import WriteBuffer
-from pycachegen.advanced_write_buffer import AdvancedWriteBuffer
 
 
 class CacheWrapper(wiring.Component):
@@ -142,7 +141,7 @@ class CacheWrapper(wiring.Component):
                 m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
             if self.write_buffer_depths != [] and (depth := self.write_buffer_depths[i]) != 0:
-                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = AdvancedWriteBuffer(signature=cache_config.be_signature, depth=depth)
+                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = WriteBuffer(signature=cache_config.be_signature, depth=depth)
                 wiring.connect(cache.be, write_buffer.fe)
                 memory_hierarchy.append(write_buffer)
 

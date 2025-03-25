@@ -27,6 +27,17 @@ def one_hot_encode(module: Module, input: Signal) -> Signal:
             m.d.comb += output.eq(0)
     return output
 
+def is_onehot(sig: Signal):
+    """Returns 1 if exactly 1 bit is set.
+
+    Args:
+        sig (Signal): The signal to look at.
+
+    Returns:
+        Whether sig is one hot.
+    """
+    return sig.any() & ~((sig & (sig - 1)).any())
+
 
 def log_parameters(cls):
     """Decorator to automatically track init parameters for logging."""
