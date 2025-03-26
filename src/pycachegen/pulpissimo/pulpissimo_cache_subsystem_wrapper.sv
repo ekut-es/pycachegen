@@ -136,16 +136,9 @@ module pulpissimo_cache_subsystem_wrapper #(
       .mem_req_o      (tcdm_priv0.req)
   );
 
-  logic rst;
-  reset_synchronizer reset_synchronizer_i (
-    .clk_i(clk_i),
-    .arst_ni(rst_ni),
-    .rst_o(rst)
-  );
-
   // Create the cache subsystem. Connect it to the arbiter and the priv0 output.
   pulpissimo_cache_subsystem cache_subsystem (
-      .rst                (rst),
+      .rst                (~rst_ni),
       .clk                (clk_i),
       .requestor__req       (arb_2_cache_req),
       .requestor__add      (arb_2_cache_addr),
