@@ -69,13 +69,13 @@ class CacheWrapperBenchHelper:
         ctx.set(self._dut.fe_0.request_valid, 0)
         assert ctx.get(self._dut.fe_0.port_ready)
 
-    async def write(self, ctx, address: int, data: int, hit_expected: bool):
+    async def write(self, ctx, address: int, data: int, hit_expected: bool, write_strobe: int = -1):
         print(
-            f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}"
+            f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}, strobe {write_strobe}"
         )
         ctx.set(self._dut.fe_0.address, address)
         ctx.set(self._dut.fe_0.write_data, data)
-        ctx.set(self._dut.fe_0.write_strobe, -1)
+        ctx.set(self._dut.fe_0.write_strobe, write_strobe)
         ctx.set(self._dut.fe_0.request_valid, 1)
         await self._tick(ctx)
         ctx.set(self._dut.fe_0.request_valid, 0)

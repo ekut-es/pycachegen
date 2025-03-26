@@ -14,7 +14,7 @@ from pycachegen.cache_config_validation import (
 def test():
     dut = CacheWrapper(
         num_ports=1,
-        byte_size=8,
+        byte_size=4,
         address_width=8,
         cache_configs=[
             CacheConfig(
@@ -45,9 +45,16 @@ def test():
         await helper.write(ctx, 1, 0x1010, False)
         await helper.write(ctx, 2, 0x1020, False)
         await helper.write(ctx, 3, 0x1030, False)
+        await helper.write(ctx, 4, 0x1040, False)
+        await helper.write(ctx, 5, 0x1050, False)
+        await helper.write(ctx, 6, 0x1060, False)
+        await helper.write(ctx, 7, 0x1070, False)
 
         # read the data that was written last
-        await helper.read(ctx, 3, 0x1030, False)
+        await helper.read(ctx, 7, 0x1070, False)
+
+        # read the data that was never written to
+        await helper.read(ctx, 8, 0, False)
 
         # do some more writes
         await helper.write(ctx, 1, 0x1011, False)
@@ -55,5 +62,22 @@ def test():
 
         # read data that should already be written to main memory
         await helper.read(ctx, 0, 0x1000, False)
+
+        # write to the same address repeatedly
+        await helper.write(ctx, 6, 0x1061, False)
+        await helper.write(ctx, 6, 0x1062, False)
+        await helper.write(ctx, 6, 0x1063, False)
+        await helper.write(ctx, 6, 0x1064, False)
+        await helper.write(ctx, 6, 0x1065, False)
+
+        # read from that address again
+        await helper.read(ctx, 6, 0x1065, False)
+
+        # do some byte writes
+        await helper.write(ctx, 4, 0x0A00, False, 0b0100)
+        await helper.write(ctx, 4, 0x000A, False, 0b0001)
+
+        # read from that address again
+        await helper.read(ctx, 4, 0x1A4A, False)
 
     run_bench(dut=dut, bench=bench)
