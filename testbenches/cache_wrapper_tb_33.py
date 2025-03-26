@@ -80,4 +80,19 @@ def test():
         # read from that address again
         await helper.read(ctx, 4, 0x1A4A, False)
 
+        # The buffer is now empty again, because the last read had to wait
+        # do some writes to the same address to check that write merging doesn't
+        # happen to the data at the read_ptr if that data is also being sent to the main memory
+        await helper.write(ctx, 3, 0x0B00, False, 0b0100)
+        await helper.write(ctx, 3, 0x000B, False, 0b0001)
+
+        # read from that address again
+        await helper.read(ctx, 3, 0x1B3B, False)
+
+        # The buffer is now empty again
+        # Write and read immediately afterward
+        await helper.write(ctx, 9, 0x1090, False)
+        await helper.read(ctx, 9, 0x1090, False)
+
+
     run_bench(dut=dut, bench=bench)

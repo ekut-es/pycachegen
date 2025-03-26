@@ -3,7 +3,7 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from pycachegen.memory_bus import MemoryBusSignature, MemoryRequestLayout
-from pycachegen.utils import one_hot_encode, is_onehot
+from pycachegen.utils import one_hot_encode
 
 def _incr(signal, modulo):
     if modulo == 2 ** len(signal):
@@ -15,7 +15,7 @@ class WriteBuffer(wiring.Component):
     def __init__(self, *, signature: MemoryBusSignature, depth: int):
         """A write buffer with configurable depth.
 
-        Writes to the same address will not be merged. Reads that can be fulfilled
+        Writes to the same address will be merged. Reads that can be fulfilled
         by the data in the buffer will be answered in 1 cycle. Reads with
         addresses for which there are no writes in the buffer will have priority
         over writes from the buffer. Reads for which there is a write with partial
@@ -29,6 +29,7 @@ class WriteBuffer(wiring.Component):
         self.depth = depth
         self.request_layout = MemoryRequestLayout(signature)
         self.width = self.request_layout.size
+        self.byte_size = signature.data_width // signature.bytes_per_word
         super().__init__({"fe": In(signature), "be": Out(signature)})
 
     def elaborate(self, platform):
@@ -76,22 +77,38 @@ class WriteBuffer(wiring.Component):
             ]
             m.d.sync += read_data_source.eq(0)
         with m.Else():
-            with m.If(fe_read & is_onehot(addr_match_vec) & storage[addr_match_idx].write_strobe.all()):
-                # Read request can be answered by buffer because there is exactly one request
-                # for that address in the buffer and it has a full write strobe
-                # If fe_read but the other requirements are not met, the request has to wait until the
-                # conflicting writes from the FIFO have been sent
+            with m.If(fe_read & addr_match_vec.any() & storage[addr_match_idx].write_strobe.all()):
+                # Read request can be answered by buffer because the address is in the buffer and
+                # the write strobe there is all ones
+                # if the write strobe is not all ones, the read has to wait until that request has left the buffer
                 m.d.comb += self.fe.port_ready.eq(1)
                 m.d.sync += [read_data_source.eq(1), read_data_buffer.eq(storage[addr_match_idx].write_data), read_data_valid_buffer.eq(1)]
 
-            with m.If(fe_write & ((level != self.depth) | fifo_read)):
-                # Put write into buffer
-                m.d.comb += [self.fe.port_ready.eq(1), fifo_write.eq(1)]
-                m.d.sync += [
-                    storage[write_ptr].address.eq(self.fe.address),
-                    storage[write_ptr].write_data.eq(self.fe.write_data),
-                    storage[write_ptr].write_strobe.eq(self.fe.write_strobe)
-                ]
+            with m.If(fe_write):
+                with m.If(addr_match_vec.any() & ((~fifo_read) | (read_ptr != addr_match_idx))):
+                    # Write to an address thats already in the buffer and the element in
+                    # the buffer is not currently being sent to the main memory
+                    # Merge the two writes
+                    fifo_req = storage[addr_match_idx]
+                    # Merge write strobe
+                    m.d.sync += fifo_req.write_strobe.eq(fifo_req.write_strobe | self.fe.write_strobe)
+                    # Merge write data
+                    for idx, new_strobe_bit in enumerate(self.fe.write_strobe):
+                        new_byte = self.fe.write_data.word_select(idx, self.byte_size)
+                        data_byte_in_fifo = fifo_req.write_data.word_select(idx, self.byte_size)
+                        with m.If(new_strobe_bit):
+                            m.d.sync += data_byte_in_fifo.eq(new_byte)
+                    # Accept FE request
+                    m.d.comb += self.fe.port_ready.eq(1)
+                with m.Elif((level != self.depth) | fifo_read):
+                    # Write to an address that is not already in the buffer and the buffer is not
+                    # yet full -> Put write into buffer
+                    m.d.comb += [self.fe.port_ready.eq(1), fifo_write.eq(1)]
+                    m.d.sync += [
+                        storage[write_ptr].address.eq(self.fe.address),
+                        storage[write_ptr].write_data.eq(self.fe.write_data),
+                        storage[write_ptr].write_strobe.eq(self.fe.write_strobe)
+                    ]
 
             with m.If(level > 0):
                 # Send buffered request to BE
