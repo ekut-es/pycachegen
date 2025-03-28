@@ -3,8 +3,8 @@ from amaranth.lib import data, wiring
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.cache_config import InternalMemoryConfig
-from pycachegen.memory_bus import MemoryBusSignature
+from .cache_config import InternalMemoryConfig
+from .memory_bus import MemoryBusSignature
 
 
 class MainMemory(wiring.Component):

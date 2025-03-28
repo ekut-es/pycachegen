@@ -2,9 +2,9 @@ from enum import Enum
 
 from amaranth.utils import ceil_log2, exact_log2
 
-from pycachegen.cache_address import CacheAddressLayout
-from pycachegen.memory_bus import MemoryBusSignature
-from pycachegen.utils import log_parameters
+from .cache_address import CacheAddressLayout
+from .memory_bus import MemoryBusSignature
+from .utils import log_parameters
 
 
 class ReplacementPolicies(Enum):

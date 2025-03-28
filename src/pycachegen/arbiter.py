@@ -4,7 +4,7 @@ from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.memory_bus import MemoryBusInterface, MemoryBusSignature
+from .memory_bus import MemoryBusSignature
 
 
 class ArbitrationScheme(Enum):

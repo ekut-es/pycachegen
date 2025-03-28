@@ -6,16 +6,12 @@ from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
-from pycachegen.cache_address import (
-    CacheAddressLayout,
-    get_blockwise_incremented_address,
-)
-from pycachegen.cache_config import InternalCacheConfig
-from pycachegen.data_store import DataStore
-from pycachegen.memory_bus import MemoryBusSignature
-from pycachegen.replacement_policy import ReplacementPolicy
-from pycachegen.tag_store import TagStore
-from pycachegen.utils import one_hot_encode
+from .cache_address import get_blockwise_incremented_address
+from .cache_config import InternalCacheConfig
+from .data_store import DataStore
+from .replacement_policy import ReplacementPolicy
+from .tag_store import TagStore
+from .utils import one_hot_encode
 
 
 class States(Enum):

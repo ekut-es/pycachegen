@@ -4,7 +4,7 @@ from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
-from pycachegen.cache_config import InternalCacheConfig
+from .cache_config import InternalCacheConfig
 
 
 class TagStore(wiring.Component):

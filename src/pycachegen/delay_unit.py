@@ -2,7 +2,7 @@ from amaranth import Module, Mux, Signal
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.memory_bus import MemoryBusSignature
+from .memory_bus import MemoryBusSignature
 
 
 class DelayUnit(wiring.Component):

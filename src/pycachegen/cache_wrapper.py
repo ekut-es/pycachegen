@@ -3,18 +3,18 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
-from pycachegen.arbiter import Arbiter, ArbitrationScheme
-from pycachegen.cache import Cache
-from pycachegen.cache_config import (
+from .arbiter import Arbiter, ArbitrationScheme
+from .cache import Cache
+from .cache_config import (
     CacheConfig,
     InternalCacheConfig,
     InternalMemoryConfig,
     MemoryConfig,
 )
-from pycachegen.cache_delay_module import CacheDelayModule
-from pycachegen.main_memory import MainMemory
-from pycachegen.memory_bus import MemoryBusSignature
-from pycachegen.write_buffer import WriteBuffer
+from .cache_delay_module import CacheDelayModule
+from .main_memory import MainMemory
+from .memory_bus import MemoryBusSignature
+from .write_buffer import WriteBuffer
 
 
 class CacheWrapper(wiring.Component):

@@ -2,8 +2,8 @@ from amaranth import Array, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.memory_bus import MemoryBusSignature, MemoryRequestLayout
-from pycachegen.utils import is_onehot, one_hot_encode
+from .memory_bus import MemoryBusSignature, MemoryRequestLayout
+from .utils import is_onehot, one_hot_encode
 
 
 def _incr(signal, modulo):
