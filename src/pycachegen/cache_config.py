@@ -14,6 +14,16 @@ class ReplacementPolicies(Enum):
     LRU = "lru"
 
 
+class WritePolicies(Enum):
+    WRITE_THROUGH = "write_through"
+    WRITE_BACK = "write_back"
+
+
+class WriteAllocatePolicies(Enum):
+    WRITE_ALLOCATE = "write_allocate"
+    NO_WRITE_ALLOCATE = "no_write_allocate"
+
+
 class ConfigurationError(ValueError):
     """An error that gets thrown when a module was configured incorrectly."""
 
