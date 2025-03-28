@@ -1,13 +1,7 @@
-from .tb_utils import (
-    CacheWrapperBenchHelper,
-    run_bench,
-)
+from pycachegen.cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config import (
-    CacheConfig,
-    MemoryConfig,
-    ReplacementPolicies,
-)
+
+from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
 # Testbench for testing write buffers
@@ -34,7 +28,7 @@ def test():
             min_address=0,
             max_address=256,
         ),
-        write_buffer_depths=[4]
+        write_buffer_depths=[4],
     )
 
     helper = CacheWrapperBenchHelper(dut)

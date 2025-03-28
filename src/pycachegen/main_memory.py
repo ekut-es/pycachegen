@@ -1,7 +1,8 @@
-from amaranth import *
-from amaranth.lib import wiring, data
+from amaranth import Module, Signal, unsigned
+from amaranth.lib import data, wiring
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
+
 from pycachegen.cache_config import InternalMemoryConfig
 from pycachegen.memory_bus import MemoryBusSignature
 
@@ -11,6 +12,7 @@ class MainMemory(wiring.Component):
     module to simulate a main memory with configurable latency
     used to simulate caches without the need for external memory libraries
     """
+
     def __init__(self, config: InternalMemoryConfig) -> None:
         self.config = config
 

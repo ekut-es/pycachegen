@@ -1,7 +1,16 @@
-from amaranth import *
+from amaranth import (
+    Cat,
+    ClockSignal,
+    Instance,
+    Module,
+    Mux,
+    ResetSignal,
+    Signal,
+    unsigned,
+)
 from amaranth.lib import wiring
-from amaranth.lib.wiring import In, Out
 from amaranth.lib.memory import Memory
+from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
 from pycachegen.cache_config import InternalCacheConfig

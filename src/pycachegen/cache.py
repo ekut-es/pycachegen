@@ -1,20 +1,21 @@
-from math import ceil
 from enum import Enum
-from amaranth import *
-from amaranth.lib import wiring, data
+
+from amaranth import Array, C, Cat, Module, Mux, Signal, unsigned
+from amaranth.lib import data, wiring
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
-from pycachegen.cache_config import InternalCacheConfig
-from pycachegen.memory_bus import MemoryBusSignature
+
 from pycachegen.cache_address import (
     CacheAddressLayout,
     get_blockwise_incremented_address,
 )
-from pycachegen.replacement_policy import ReplacementPolicy
-from pycachegen.utils import one_hot_encode
+from pycachegen.cache_config import InternalCacheConfig
 from pycachegen.data_store import DataStore
+from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.replacement_policy import ReplacementPolicy
 from pycachegen.tag_store import TagStore
+from pycachegen.utils import one_hot_encode
 
 
 class States(Enum):
@@ -397,7 +398,7 @@ class Cache(wiring.Component):
                         with m.If(self.be.port_ready):
                             m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
                         m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + read_block_read_counter * self.config.be_word_multiplier)
-                        
+
                     with m.If(self.be.port_ready):
                         # store the address so that we still have it when writing the words to the cache
                         m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())

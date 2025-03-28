@@ -1,8 +1,10 @@
 from enum import Enum
-from amaranth import *
+
+from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
-from pycachegen.memory_bus import MemoryBusSignature, MemoryBusInterface
+
+from pycachegen.memory_bus import MemoryBusInterface, MemoryBusSignature
 
 
 class ArbitrationScheme(Enum):

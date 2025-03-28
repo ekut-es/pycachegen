@@ -1,4 +1,4 @@
-from amaranth import *
+from amaranth import Cat, Module, Signal
 from amaranth.lib import data
 
 

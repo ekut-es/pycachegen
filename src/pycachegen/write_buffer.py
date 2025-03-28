@@ -1,16 +1,18 @@
-from amaranth import *
+from amaranth import Array, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from pycachegen.memory_bus import MemoryBusSignature, MemoryRequestLayout
-from pycachegen.utils import one_hot_encode, is_onehot
+from pycachegen.utils import is_onehot, one_hot_encode
+
 
 def _incr(signal, modulo):
     if modulo == 2 ** len(signal):
         return signal + 1
     else:
         return Mux(signal == modulo - 1, 0, signal + 1)
-    
+
+
 class WriteBuffer(wiring.Component):
     def __init__(self, *, signature: MemoryBusSignature, depth: int):
         """A write buffer with configurable depth.
@@ -38,7 +40,12 @@ class WriteBuffer(wiring.Component):
         write_ptr = Signal(range(self.depth))
         read_ptr = Signal(range(self.depth))
 
-        storage = Array([Signal(self.request_layout, name=f"storage[{i}]") for i in range(self.depth)])
+        storage = Array(
+            [
+                Signal(self.request_layout, name=f"storage[{i}]")
+                for i in range(self.depth)
+            ]
+        )
 
         addr_match_vec = Signal(unsigned(self.depth))
         for idx, el in enumerate(storage):
@@ -46,7 +53,14 @@ class WriteBuffer(wiring.Component):
             # only look at valid entries of the FIFO!!!
             m.d.comb += addr_match_vec[idx].eq(
                 (el.address == self.fe.address)
-                & ((level == self.depth) | Mux(read_ptr <= write_ptr, (idx >= read_ptr) & (idx < write_ptr), (idx >= read_ptr) | (idx < write_ptr)))
+                & (
+                    (level == self.depth)
+                    | Mux(
+                        read_ptr <= write_ptr,
+                        (idx >= read_ptr) & (idx < write_ptr),
+                        (idx >= read_ptr) | (idx < write_ptr),
+                    )
+                )
             )
         addr_match_idx = Signal(range(self.depth))
         m.d.comb += addr_match_idx.eq(one_hot_encode(m, addr_match_vec))
@@ -55,12 +69,18 @@ class WriteBuffer(wiring.Component):
         read_data_buffer = Signal(unsigned(self.mem_signature.data_width))
         read_data_valid_buffer = Signal()
         # Select where the FE read data comes from
-        read_data_source = Signal() # 0 = BE, 1 = Buffer
+        read_data_source = Signal()  # 0 = BE, 1 = Buffer
         with m.If(read_data_source):
-            m.d.comb += [self.fe.read_data.eq(read_data_buffer), self.fe.read_data_valid.eq(read_data_valid_buffer)]
+            m.d.comb += [
+                self.fe.read_data.eq(read_data_buffer),
+                self.fe.read_data_valid.eq(read_data_valid_buffer),
+            ]
         with m.Else():
-            m.d.comb += [self.fe.read_data.eq(self.be.read_data), self.fe.read_data_valid.eq(self.be.read_data_valid)]
-            
+            m.d.comb += [
+                self.fe.read_data.eq(self.be.read_data),
+                self.fe.read_data_valid.eq(self.be.read_data_valid),
+            ]
+
         fe_read = self.fe.request_valid & ~self.fe.write_strobe.any()
         fe_write = self.fe.request_valid & self.fe.write_strobe.any()
         fifo_read = Signal()
@@ -72,17 +92,25 @@ class WriteBuffer(wiring.Component):
                 self.be.address.eq(self.fe.address),
                 self.be.write_strobe.eq(0),
                 self.be.request_valid.eq(1),
-                self.fe.port_ready.eq(self.be.port_ready)
+                self.fe.port_ready.eq(self.be.port_ready),
             ]
             m.d.sync += read_data_source.eq(0)
         with m.Else():
-            with m.If(fe_read & is_onehot(addr_match_vec) & storage[addr_match_idx].write_strobe.all()):
+            with m.If(
+                fe_read
+                & is_onehot(addr_match_vec)
+                & storage[addr_match_idx].write_strobe.all()
+            ):
                 # Read request can be answered by buffer because there is exactly one request
                 # for that address in the buffer and it has a full write strobe
                 # If fe_read but the other requirements are not met, the request has to wait until the
                 # conflicting writes from the FIFO have been sent
                 m.d.comb += self.fe.port_ready.eq(1)
-                m.d.sync += [read_data_source.eq(1), read_data_buffer.eq(storage[addr_match_idx].write_data), read_data_valid_buffer.eq(1)]
+                m.d.sync += [
+                    read_data_source.eq(1),
+                    read_data_buffer.eq(storage[addr_match_idx].write_data),
+                    read_data_valid_buffer.eq(1),
+                ]
 
             with m.If(fe_write & ((level != self.depth) | fifo_read)):
                 # Put write into buffer
@@ -90,7 +118,7 @@ class WriteBuffer(wiring.Component):
                 m.d.sync += [
                     storage[write_ptr].address.eq(self.fe.address),
                     storage[write_ptr].write_data.eq(self.fe.write_data),
-                    storage[write_ptr].write_strobe.eq(self.fe.write_strobe)
+                    storage[write_ptr].write_strobe.eq(self.fe.write_strobe),
                 ]
 
             with m.If(level > 0):
@@ -101,7 +129,7 @@ class WriteBuffer(wiring.Component):
                     self.be.write_strobe.eq(req.write_strobe),
                     self.be.write_data.eq(req.write_data),
                     self.be.request_valid.eq(1),
-                    fifo_read.eq(self.be.port_ready)
+                    fifo_read.eq(self.be.port_ready),
                 ]
 
         # Update pointers
@@ -117,4 +145,3 @@ class WriteBuffer(wiring.Component):
             m.d.sync += level.eq(level - 1)
 
         return m
-    

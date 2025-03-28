@@ -1,7 +1,8 @@
-from amaranth import *
+from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
+
 from pycachegen.cache_config import ReplacementPolicies
 
 

@@ -1,9 +1,10 @@
-from amaranth import *
+from amaranth import C, Cat, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
+
 
 class TCDMCacheAdapter(wiring.Component):
     def __init__(self, cache_signature: MemoryBusSignature):

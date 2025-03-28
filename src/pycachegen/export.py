@@ -1,12 +1,10 @@
 from pathlib import Path
+
 from amaranth.back import verilog
-from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config import (
-    CacheConfig,
-    MemoryConfig,
-    ReplacementPolicies,
-)
+
 from pycachegen.arbiter import ArbitrationScheme
+from pycachegen.cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
+from pycachegen.cache_wrapper import CacheWrapper
 
 cache_wrapper = CacheWrapper(
     num_ports=1,

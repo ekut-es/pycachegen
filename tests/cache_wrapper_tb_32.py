@@ -1,14 +1,8 @@
-from .tb_utils import (
-    CacheWrapperBenchHelper,
-    run_bench,
-)
-from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config import (
-    CacheConfig,
-    MemoryConfig,
-    ReplacementPolicies,
-)
 from pycachegen.arbiter import ArbitrationScheme
+from pycachegen.cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
+from pycachegen.cache_wrapper import CacheWrapper
+
+from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
 # Testbench for testing a flush with a block size > 1

@@ -1,6 +1,8 @@
 import random
+
 from amaranth import *
 from amaranth.sim import Simulator
+
 from pycachegen import *
 
 
@@ -28,11 +30,11 @@ def random_test(dut: CacheWrapper) -> None:
                 address = (
                     address + random.randint(-rand_interval_size, rand_interval_size)
                 ) % max_address
-            if random.random() < 0.5: # 50%
+            if random.random() < 0.5:  # 50%
                 write_strobe = 0
-            elif random.random() < 0.75: # 37,5%
+            elif random.random() < 0.75:  # 37,5%
                 write_strobe = 2 ** (dut.fe_bytes_per_word) - 1
-            else: # 12,5%
+            else:  # 12,5%
                 write_strobe = random.randrange(0, 2 ** (dut.fe_bytes_per_word))
             write_data = random.randrange(0, 2**dut.fe_data_width)
 
@@ -57,13 +59,15 @@ def random_test(dut: CacheWrapper) -> None:
                 val = memory_dict.get(address, 0)
                 new_val = 0
                 for i in range(dut.fe_bytes_per_word):
-                    byte_in_mem = (val >> (i*dut.byte_size)) % (2**dut.byte_size)
-                    byte_in_req = (write_data >> (i*dut.byte_size)) % (2**dut.byte_size)
+                    byte_in_mem = (val >> (i * dut.byte_size)) % (2**dut.byte_size)
+                    byte_in_req = (write_data >> (i * dut.byte_size)) % (
+                        2**dut.byte_size
+                    )
                     if write_strobe & (1 << i):
                         new_byte = byte_in_req
                     else:
                         new_byte = byte_in_mem
-                    new_val += new_byte << (i*dut.byte_size)
+                    new_val += new_byte << (i * dut.byte_size)
                 memory_dict[address] = new_val
             else:
                 # check if read data is correct

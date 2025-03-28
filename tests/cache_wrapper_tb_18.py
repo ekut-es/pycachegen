@@ -1,11 +1,7 @@
-from .tb_utils import (
-    CacheWrapperBenchHelper,
-    run_bench,
-)
+from pycachegen.cache_config import MemoryConfig
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config import (
-    MemoryConfig,
-)
+
+from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
 # Testbench for testing that the cache wrapper can generate architectures without caches

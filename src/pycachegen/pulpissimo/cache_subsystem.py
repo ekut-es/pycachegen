@@ -1,17 +1,17 @@
 from typing import Optional
 
-from amaranth import *
+from amaranth import Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import ceil_log2
 
 from pycachegen.cache import Cache
-from pycachegen.delay_unit import DelayUnit
-from pycachegen.pulpissimo.tcdm_cache_router import TCDMCacheRouter
-from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
-from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.cache_config import CacheConfig, InternalCacheConfig
+from pycachegen.delay_unit import DelayUnit
 from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
+from pycachegen.pulpissimo.tcdm_cache_router import TCDMCacheRouter
+from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters
 from pycachegen.write_buffer import WriteBuffer
 
@@ -81,7 +81,7 @@ class CacheSubsystem(wiring.Component):
             )
             # useless signal so that clk and rst get generated...
             x = Signal(unsigned(4))
-            m.d.sync += x.eq(x+1)
+            m.d.sync += x.eq(x + 1)
             return m
 
         m.submodules.adapter = adapter = TCDMCacheAdapter(self.cache_signature)
@@ -108,7 +108,7 @@ class CacheSubsystem(wiring.Component):
             )
             fes.append(write_buffer.fe)
             bes.append(write_buffer.be)
-            # write buffer ready is 
+            # write buffer ready is
 
         # Create a delay unit if needed
         if use_delay:

@@ -1,18 +1,19 @@
-from amaranth import *
+from amaranth import Module
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
+
+from pycachegen.arbiter import Arbiter, ArbitrationScheme
+from pycachegen.cache import Cache
 from pycachegen.cache_config import (
-    MemoryConfig,
     CacheConfig,
     InternalCacheConfig,
     InternalMemoryConfig,
+    MemoryConfig,
 )
-from pycachegen.cache import Cache
+from pycachegen.cache_delay_module import CacheDelayModule
 from pycachegen.main_memory import MainMemory
 from pycachegen.memory_bus import MemoryBusSignature
-from pycachegen.cache_delay_module import CacheDelayModule
-from pycachegen.arbiter import Arbiter, ArbitrationScheme
 from pycachegen.write_buffer import WriteBuffer
 
 
@@ -25,7 +26,7 @@ class CacheWrapper(wiring.Component):
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
-        write_buffer_depths: list[int] = []
+        write_buffer_depths: list[int] = [],
     ) -> None:
         """Generates a top level module containing an arbitrary amount of caches and a main memory.
         There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
@@ -140,8 +141,13 @@ class CacheWrapper(wiring.Component):
                 wiring.connect(delay_module.be, cache.fe)
                 m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
-            if self.write_buffer_depths != [] and (depth := self.write_buffer_depths[i]) != 0:
-                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = WriteBuffer(signature=cache_config.be_signature, depth=depth)
+            if (
+                self.write_buffer_depths != []
+                and (depth := self.write_buffer_depths[i]) != 0
+            ):
+                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = WriteBuffer(
+                    signature=cache_config.be_signature, depth=depth
+                )
                 wiring.connect(cache.be, write_buffer.fe)
                 memory_hierarchy.append(write_buffer)
 

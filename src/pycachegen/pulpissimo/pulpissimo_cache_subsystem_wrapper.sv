@@ -23,7 +23,7 @@ module pulpissimo_cache_subsystem_wrapper #(
   localparam int unsigned REQ_AGG_DATA_WIDTH  = 1+BE_WIDTH+ADDR_WIDTH+DATA_WIDTH; // +1 is for wen
 
   logic outstanding_cache_response; // Whether we're awaiting a response from the cache
-  
+
   // indices of the next request (as outputted by the arbiter) and of the previously granted request
   logic [$clog2(NR_MASTER_PORTS)-1:0] arb_next_idx;
   logic [$clog2(NR_MASTER_PORTS)-1:0] arb_curr_idx;

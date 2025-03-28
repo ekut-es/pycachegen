@@ -1,7 +1,6 @@
-from amaranth import *
-from amaranth.lib import wiring
+from amaranth import unsigned
+from amaranth.lib import data, wiring
 from amaranth.lib.wiring import In, Out
-from amaranth.lib import data
 
 
 class MemoryBusSignature(wiring.Signature):
@@ -43,7 +42,7 @@ class MemoryBusInterface(wiring.PureInterface):
 
     def is_write_request(self):
         return self.request_valid & (self.write_strobe != 0)
-    
+
 
 class MemoryRequestLayout(data.StructLayout):
     def __init__(self, signature: MemoryBusSignature):
@@ -54,8 +53,10 @@ class MemoryRequestLayout(data.StructLayout):
         Args:
             signature (MemoryBusSignature): The memory bus signature whose parameters will be used for the layout.
         """
-        super().__init__({
-            "address": unsigned(signature.address_width),
-            "write_data": unsigned(signature.data_width),
-            "write_strobe": unsigned(signature.bytes_per_word)
-        })
+        super().__init__(
+            {
+                "address": unsigned(signature.address_width),
+                "write_data": unsigned(signature.data_width),
+                "write_strobe": unsigned(signature.bytes_per_word),
+            }
+        )

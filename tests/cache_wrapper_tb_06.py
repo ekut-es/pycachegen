@@ -1,13 +1,7 @@
-from .tb_utils import (
-    CacheWrapperBenchHelper,
-    run_bench,
-)
+from pycachegen.cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config import (
-    CacheConfig,
-    MemoryConfig,
-    ReplacementPolicies,
-)
+
+from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
 # Testbench for testing the write through, write allocate policy

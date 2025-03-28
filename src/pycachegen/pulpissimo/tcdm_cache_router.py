@@ -1,6 +1,6 @@
 from enum import Enum
 
-from amaranth import *
+from amaranth import Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import ceil_log2
@@ -22,7 +22,7 @@ class TCDMCacheRouter(wiring.Component):
     ):
         """Routes TCDM requests to a cache or a main memory (target) based on address ranges. This
         module also handles the connection between the cache and the target.
-        
+
         It will also subtract/add the lowest_address from the addresses to the cache/to the addresses from the cache
         so that the addresses for the cache start at 0 and so it can store shorter tags.
 

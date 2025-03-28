@@ -1,6 +1,7 @@
 from enum import Enum
-from math import floor, ceil
-from amaranth.utils import exact_log2, ceil_log2
+
+from amaranth.utils import ceil_log2, exact_log2
+
 from pycachegen.cache_address import CacheAddressLayout
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.utils import log_parameters
@@ -15,8 +16,6 @@ class ReplacementPolicies(Enum):
 
 class ConfigurationError(ValueError):
     """An error that gets thrown when a module was configured incorrectly."""
-
-    pass
 
 
 def is_power_of_two(i: int) -> bool:
@@ -168,6 +167,7 @@ def assert_cache_latencies_valid(hit_latency: int, miss_latency: int) -> None:
             f"The hit and miss latencies must either both be 0 or greater than 0, but they are configured to be {hit_latency} and {miss_latency}"
         )
 
+
 @log_parameters
 class CacheConfig:
     def __init__(
@@ -215,7 +215,8 @@ class CacheConfig:
     # def __repr__(self):
     #     params_str = ", ".join(f"{k}={v!r}" for k, v in self._params.items())
     #     return f"{self.__class__.__name__}({params_str})"
-    
+
+
 if __name__ == "__main__":
     cc = CacheConfig(32, 4, 16, ReplacementPolicies.FIFO, False, True, 2, 0, 0, "")
     print(repr(cc))

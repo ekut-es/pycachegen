@@ -1,6 +1,7 @@
-from amaranth import *
-from functools import wraps
 import inspect
+from functools import wraps
+
+from amaranth import Module, Signal
 
 
 def one_hot_encode(module: Module, input: Signal) -> Signal:
@@ -26,6 +27,7 @@ def one_hot_encode(module: Module, input: Signal) -> Signal:
             # but i'll make it more explicit here
             m.d.comb += output.eq(0)
     return output
+
 
 def is_onehot(sig: Signal):
     """Returns 1 if exactly 1 bit is set.

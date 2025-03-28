@@ -6,12 +6,12 @@ module reset_synchronizer (
     logic reset_ff1, reset_ff2;
 
     assign rst_o = reset_ff2;
-    
+
     always_ff @(posedge clk_i or negedge arst_ni) begin
         if (!arst_ni)
             {reset_ff1, reset_ff2} <= 2'b11;
         else
-            {reset_ff1, reset_ff2} <= {reset_ff2, 1'b0};  
+            {reset_ff1, reset_ff2} <= {reset_ff2, 1'b0};
     end
 
 endmodule
