@@ -11,7 +11,21 @@ repos:
         exclude: '^.vscode/.*'
     -   id: check-ast
     -   id: check-merge-conflict
+-   repo: https://github.com/PyCQA/autoflake
+    rev: v1.5.3
+    hooks:
+    -   id: autoflake
+-   repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ["--profile", "black", "--filter-files"]
 -   repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
     - id: black
+-   repo: https://github.com/pryorda/dockerfilelint-precommit-hooks
+    rev: v0.1.0
+    hooks:
+    - id: dockerfilelint

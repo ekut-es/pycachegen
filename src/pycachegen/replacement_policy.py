@@ -2,7 +2,7 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
-from pycachegen.cache_config_validation import ReplacementPolicies
+from pycachegen.cache_config import ReplacementPolicies
 
 
 class ReplacementPolicy(wiring.Component):

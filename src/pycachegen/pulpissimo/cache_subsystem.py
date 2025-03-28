@@ -10,7 +10,7 @@ from pycachegen.delay_unit import DelayUnit
 from pycachegen.pulpissimo.tcdm_cache_router import TCDMCacheRouter
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
-from pycachegen.cache_config_validation import CacheConfig, InternalCacheConfig
+from pycachegen.cache_config import CacheConfig, InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.utils import log_parameters
 from pycachegen.write_buffer import WriteBuffer

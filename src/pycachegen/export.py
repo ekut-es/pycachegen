@@ -1,7 +1,7 @@
 from pathlib import Path
 from amaranth.back import verilog
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import (
+from pycachegen.cache_config import (
     CacheConfig,
     MemoryConfig,
     ReplacementPolicies,

@@ -3,7 +3,7 @@ from .tb_utils import (
     run_bench,
 )
 from pycachegen.cache_wrapper import CacheWrapper
-from pycachegen.cache_config_validation import (
+from pycachegen.cache_config import (
     CacheConfig,
     MemoryConfig,
     ReplacementPolicies,

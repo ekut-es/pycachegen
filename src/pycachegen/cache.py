@@ -5,7 +5,7 @@ from amaranth.lib import wiring, data
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
-from pycachegen.cache_config_validation import InternalCacheConfig
+from pycachegen.cache_config import InternalCacheConfig
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.cache_address import (
     CacheAddressLayout,

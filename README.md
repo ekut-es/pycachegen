@@ -1,6 +1,6 @@
 # PyCacheGen
 
-PyCacheGen is a python package for generating data caches written in the [Amaranth HDL](https://github.com/amaranth-lang/amaranth). It can also be converted to Verilog.
+PyCacheGen is a python package for generating data caches written in the [Amaranth HDL](https://github.com/amaranth-lang/amaranth). The generated caches can be converted into synthesizable Verilog code. 
 
 ## Feature overview
 
@@ -23,6 +23,9 @@ To install it for development, run the following from within this repository:
 
     python -m pip install -e .\[dev\]
 
+
+## Example Usage
+
 ## Creating a Cache Wrapper
 
 The `CacheWrapper` class can generate a top level module containing an arbitrary number of caches in a linear hierarchy as well as a simple data memory. It also supports multiple ports using an arbiter. See the internal documentation of the `CacheWrapper`, `CacheConfig` and `MemoryConfig` classes for more information.
@@ -35,7 +38,7 @@ Note that multiple ports get generated using an arbiter. This arbiter includes i
 
 ## Creating only a Cache
 
-Caches can also be created individually using the `Cache` class. It can be configured using the `pycachegen.cache_config_validation.InternalCacheConfig` class, which is created using the standard `CacheConfig` class as well as some additional parameters. These parameters usually get inferred by the configuration of the `CacheWrapper` class. Also note that the latency parameters of the `CacheConfig` class only get processed by the `CacheWrapper` class and don't do anything otherwise.
+Caches can also be created individually using the `Cache` class. It can be configured using the `pycachegen.cache_config.InternalCacheConfig` class, which is created using the standard `CacheConfig` class as well as some additional parameters. These parameters usually get inferred by the configuration of the `CacheWrapper` class. Also note that the latency parameters of the `CacheConfig` class only get processed by the `CacheWrapper` class and don't do anything otherwise.
 
 The `Cache` uses one front end and one back end memory interface, prefixed with `fe__` and `be__` respectively.
 
