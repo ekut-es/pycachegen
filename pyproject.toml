@@ -43,5 +43,5 @@ push = true
 "src/pycachegen/__init__.py" = ['__version__ = "{version}"']
 
 [tool.pytest.ini_options]
-testpaths = "testbenches/"
+testpaths = "tests/"
 python_files = "*_tb_*.py"

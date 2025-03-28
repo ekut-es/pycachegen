@@ -7,6 +7,10 @@ from pycachegen.memory_bus import MemoryBusSignature
 
 
 class MainMemory(wiring.Component):
+    """
+    module to simulate a main memory with configurable latency
+    used to simulate caches without the need for external memory libraries
+    """
     def __init__(self, config: InternalMemoryConfig) -> None:
         self.config = config
 
