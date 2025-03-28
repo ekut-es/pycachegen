@@ -1,0 +1,34 @@
+stages:
+    - docker
+    - install
+
+variables:
+    LC_ALL: C.UTF-8
+    GIT_SUBMODULE_STRATEGY: recursive
+
+docker:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}:$DOCKER_TAG"
+      --cache=true
+      --cache-ttl=672h
+  tags:
+    - docker
+
+test_build:
+    stage: install
+    image: ${CI_REGISTRY_IMAGE}
+    script:
+        - pip install --verbose -e .
+        - pip install pytest
+        - python -m pytest
+    interruptible: true
+    tags:
+        - docker
+

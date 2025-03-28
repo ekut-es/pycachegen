@@ -21,7 +21,7 @@ The package can simply be installed using
 
 To install it for development, run the following from within this repository:
 
-    python -m pip install -e .\[dev\]g
+    python -m pip install -e .\[dev\]
 
 ## Creating a Cache Wrapper
 
