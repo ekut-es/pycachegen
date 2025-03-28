@@ -1,6 +1,5 @@
-from amaranth.sim import Simulator
-
-from pycachegen.cache_config import InternalMemoryConfig, MemoryConfig
+from pycachegen import MemoryConfig
+from pycachegen.cache_config import InternalMemoryConfig
 from pycachegen.main_memory import MainMemory
 
 from .tb_utils import run_bench

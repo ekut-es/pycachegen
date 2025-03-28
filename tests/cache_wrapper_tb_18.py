@@ -1,5 +1,4 @@
-from pycachegen.cache_config import MemoryConfig
-from pycachegen.cache_wrapper import CacheWrapper
+from pycachegen import CacheWrapper, MemoryConfig
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 

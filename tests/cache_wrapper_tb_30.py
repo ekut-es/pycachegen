@@ -1,6 +1,10 @@
-from pycachegen.arbiter import ArbitrationScheme
-from pycachegen.cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
-from pycachegen.cache_wrapper import CacheWrapper
+from pycachegen import (
+    ArbitrationScheme,
+    CacheConfig,
+    CacheWrapper,
+    MemoryConfig,
+    ReplacementPolicies,
+)
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 

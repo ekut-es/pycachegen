@@ -5,7 +5,7 @@ from pathlib import Path
 
 from amaranth.sim import Simulator
 
-from pycachegen.cache_wrapper import CacheWrapper
+from pycachegen import CacheWrapper
 
 
 class CacheWrapperBenchHelper:
