@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 
 from amaranth.utils import ceil_log2, exact_log2
 
@@ -17,11 +18,6 @@ class ReplacementPolicies(Enum):
 class WritePolicies(Enum):
     WRITE_THROUGH = "write_through"
     WRITE_BACK = "write_back"
-
-
-class WriteAllocatePolicies(Enum):
-    WRITE_ALLOCATE = "write_allocate"
-    NO_WRITE_ALLOCATE = "no_write_allocate"
 
 
 class ConfigurationError(ValueError):
@@ -326,7 +322,8 @@ class MemoryConfig:
         self,
         data_width: int,
         min_address: int,
-        max_address: int,
+        max_address: Optional[int] = None,
+        size: Optional[int] = None,
         read_latency: int = 10,
         write_latency: int = 15,
     ) -> None:
@@ -334,16 +331,24 @@ class MemoryConfig:
 
         Args:
             data_width (int): Width of one data word in bits.
+            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
+            max_address (Optional[int]): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset. When set to None size must be set
+            size (Optional[int]): size of the memory in bytes. This parameter is overriden when max_address is set. When max_adress is not set this parameter determines it using data_width and min_address.
             read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
             write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
-            max_address (int): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset.
         """
+
+        if max_address is None and size is None:
+            raise ValueError("Either max_address or size must be set.")
+        elif max_address is not None:
+            self.max_address = max_address
+        elif max_address is None and size is not None:
+            self.max_address = min_address + size // data_width
+
         self.data_width = data_width
         self.read_latency = read_latency
         self.write_latency = write_latency
         self.min_address = min_address
-        self.max_address = max_address
 
 
 class InternalMemoryConfig:

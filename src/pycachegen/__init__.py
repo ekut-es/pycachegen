@@ -4,7 +4,6 @@ from pycachegen.cache_config import (
     CacheConfig,
     MemoryConfig,
     ReplacementPolicies,
-    WriteAllocatePolicies,
     WritePolicies,
 )
 from pycachegen.cache_wrapper import CacheWrapper

@@ -21,12 +21,12 @@ class CacheWrapper(wiring.Component):
     def __init__(
         self,
         num_ports: int,
-        byte_size: int,
         address_width: int,
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         write_buffer_depths: list[int] = [],
+        byte_size: int = 8,
     ) -> None:
         """Generates a top level module containing an arbitrary amount of caches and a main memory.
         There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
