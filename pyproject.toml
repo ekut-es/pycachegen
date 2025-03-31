@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 keywords = ["verilog", "cache"]
-dependencies = ["amaranth[builtin-yosys]==0.5.0"]
+dependencies = ["amaranth==0.5.0", "amaranth-yosys==0.40.0.0.post97"]
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
