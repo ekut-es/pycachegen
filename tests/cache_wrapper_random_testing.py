@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 num_sets=8,
                 block_size=1,
                 replacement_policy=ReplacementPolicies.PLRU_TREE,
-                write_through=True,
+                write_policy=WritePolicies.WRITE_THROUGH,
                 write_allocate=False,
                 hit_latency=0,
                 miss_latency=0,

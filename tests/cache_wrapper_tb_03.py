@@ -1,4 +1,10 @@
-from pycachegen import CacheConfig, CacheWrapper, MemoryConfig, ReplacementPolicies
+from pycachegen import (
+    CacheConfig,
+    CacheWrapper,
+    MemoryConfig,
+    ReplacementPolicies,
+    WritePolicies,
+)
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
@@ -15,7 +21,7 @@ def test():
                 num_ways=4,
                 num_sets=2,
                 replacement_policy=ReplacementPolicies.FIFO,
-                write_through=True,
+                write_policy=WritePolicies.WRITE_THROUGH,
                 write_allocate=False,
                 block_size=1,
             )

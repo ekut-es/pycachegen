@@ -2,7 +2,6 @@ from pathlib import Path
 
 from amaranth.back import verilog
 
-from .arbiter import ArbitrationScheme
 from .cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
 from .cache_wrapper import CacheWrapper
 

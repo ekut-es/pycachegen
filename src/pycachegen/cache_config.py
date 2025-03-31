@@ -186,7 +186,7 @@ class CacheConfig:
         num_ways: int,
         num_sets: int,
         replacement_policy: ReplacementPolicies,
-        write_through: bool,
+        write_policy: WritePolicies,
         write_allocate: bool,
         block_size: int,
         hit_latency: int = 0,
@@ -215,7 +215,7 @@ class CacheConfig:
         self.num_ways = num_ways
         self.num_sets = num_sets
         self.replacement_policy = replacement_policy
-        self.write_through = write_through
+        self.write_through = write_policy == WritePolicies.WRITE_THROUGH
         self.write_allocate = write_allocate
         self.block_size = block_size
         self.hit_latency = hit_latency
