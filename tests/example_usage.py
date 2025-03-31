@@ -1,10 +1,10 @@
-from pycachegen.cache_config import (
+from pycachegen import (
     CacheConfig,
+    CacheWrapper,
     MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
-from pycachegen.cache_wrapper import CacheWrapper
 
 if __name__ == "__main__":
     cache_wrapper = CacheWrapper(
@@ -24,8 +24,6 @@ if __name__ == "__main__":
         ],
         memory_config=MemoryConfig(
             data_width=64,
-            read_latency=10,
-            write_latency=15,
             min_address=0,
             max_address=512,
         ),

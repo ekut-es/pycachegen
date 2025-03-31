@@ -325,10 +325,10 @@ class MemoryConfig:
     def __init__(
         self,
         data_width: int,
-        read_latency: int,
-        write_latency: int,
         min_address: int,
         max_address: int,
+        read_latency: int = 10,
+        write_latency: int = 15,
     ) -> None:
         """Class for end users to create configurations for memories.
 
