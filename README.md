@@ -28,13 +28,13 @@ To install it for development, run the following from within this repository:
 
 ## Creating a Cache Wrapper
 
-The `CacheWrapper` class can generate a top level module containing an arbitrary number of caches in a linear hierarchy as well as a simple data memory. It also supports multiple ports using an arbiter. See the internal documentation of the `CacheWrapper`, `CacheConfig` and `MemoryConfig` classes for more information.
+The `CacheWrapper` class can generate a top-level module containing an arbitrary number of caches in a linear hierarchy as well as a simple data memory. It also supports multiple ports using an arbiter. See the internal documentation of the `CacheWrapper`, `CacheConfig` and `MemoryConfig` classes for more information.
 
 The cache wrapper has one memory interface (see section *Memory Interface*) per port. Each signal is prefixed with `fe_x__`, *x* being the respective port index. It also has one signal `hit_o_x` per port, indicating whether the request yielded a hit or a miss.
 
 Note that multiple ports get generated using an arbiter. This arbiter includes input buffers, meaning that requests can be issued even while the cache is busy from a request of another port. The arbiter also includes output buffers, meaning that requests from other ports also won't affect outgoing signals of the other ports.
 
-`src/pycachegen/export.py` shows an example on how to configure a `CacheWrapper`. It also shows how to generate the Verilog code for a module (this can be done similarly for other modules like the `Cache`).
+`example_usage.py` shows an example on how to configure a `CacheWrapper`. It also shows how to generate the Verilog code for a module (this can be done similarly for other modules like the `Cache`).
 
 ## Creating only a Cache
 
@@ -54,7 +54,3 @@ All modules share a common memory interface composed of the following signals:
 - `read_data` (Out): The requested data.
 - `read_data_valid` (Out): Whether the `read_data` Signal holds valid data.
 - `port_ready` (Out): Whether the port is ready to accept a new request.
-
-## FPGA
-
-Synthesis of the cache has been tested on a Xilinx XCZU3EG-1SFVA625I on a Avnet UltraZed-3EG IO Carrier Card using Vivado 2023.2. The project files are located at `vivado/amaranth_cache`. It has a block design that instantiates the cache inside an AXI Lite slave that is connected to the programmable system (PS). There is also small program for testing the synthesized cache that runs on the PS. The program was tested using Vitis 2023.2 and it is located at `vitis/`.
