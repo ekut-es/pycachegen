@@ -20,6 +20,7 @@ cache_wrapper = CacheWrapper(
             replacement_policy=ReplacementPolicies.PLRU_TREE,
             write_policy=WritePolicies.WRITE_BACK,
             write_allocate=True,
+            write_buffer_size=4,
         ),
         CacheConfig(
             data_width=32,
@@ -29,6 +30,7 @@ cache_wrapper = CacheWrapper(
             replacement_policy=ReplacementPolicies.FIFO,
             write_policy=WritePolicies.WRITE_BACK,
             write_allocate=True,
+            write_buffer_size=8,
         ),
     ],
     memory_config=MemoryConfig(
