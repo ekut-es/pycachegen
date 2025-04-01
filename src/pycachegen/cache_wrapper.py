@@ -25,7 +25,6 @@ class CacheWrapper(wiring.Component):
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
-        write_buffer_depths: list[int] = [],
         byte_size: int = 8,
     ) -> None:
         """Generates a top level module containing an arbitrary amount of caches and a main memory.
@@ -46,7 +45,11 @@ class CacheWrapper(wiring.Component):
         self.byte_size = byte_size
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
-        self.write_buffer_depths = write_buffer_depths
+
+        self.write_buffer_depths = list()
+
+        for cache_config in cache_configs:
+            self.write_buffer_depths.append(cache_config.write_buffer_size)
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width

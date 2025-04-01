@@ -187,6 +187,7 @@ class CacheConfig:
         block_size: int,
         hit_latency: int = 0,
         miss_latency: int = 0,
+        write_buffer_size: int = 0,
         data_memory_module: str = "",
     ) -> None:
         """Class for end users to create configurations for caches.
@@ -216,6 +217,7 @@ class CacheConfig:
         self.block_size = block_size
         self.hit_latency = hit_latency
         self.miss_latency = miss_latency
+        self.write_buffer_size = 0
         self.data_memory_module = data_memory_module
 
     # def __repr__(self):

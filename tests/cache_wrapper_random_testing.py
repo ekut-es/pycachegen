@@ -117,8 +117,8 @@ if __name__ == "__main__":
                 write_allocate=False,
                 hit_latency=0,
                 miss_latency=0,
+                write_buffer_size=16,
             )
         ],
-        write_buffer_depths=[16],
     )
     random_test(cache)

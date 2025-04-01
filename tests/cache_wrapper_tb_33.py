@@ -24,6 +24,7 @@ def test():
                 write_policy=WritePolicies.WRITE_THROUGH,
                 write_allocate=False,
                 block_size=1,
+                write_buffer_size=4,
             )
         ],
         memory_config=MemoryConfig(
@@ -33,7 +34,6 @@ def test():
             min_address=0,
             max_address=256,
         ),
-        write_buffer_depths=[4],
     )
 
     helper = CacheWrapperBenchHelper(dut)
