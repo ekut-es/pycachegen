@@ -191,3 +191,4 @@ vivado/*/*.ip_user_files
 vivado/*/*.sim
 vivado/*/*.xsa
 *.xsa
+*.v
