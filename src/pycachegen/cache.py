@@ -7,6 +7,7 @@ from .cache_controller import CacheController
 from .cache_directory import CacheDirectory
 from .data_store import CacheStore
 from .replacement_policy import ReplacementPolicy
+from .write_buffer import WriteBuffer
 
 
 class Cache(wiring.Component):
@@ -24,17 +25,28 @@ class Cache(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        m.submodules.cache_store = cache_store = CacheStore(self.config)
-        m.submodules.directory = directory = CacheDirectory(self.config)
-        m.submodules.repl_pol = repl_pol = ReplacementPolicy(self.config)
+        # Create CacheController and connect FE
         m.submodules.cache_controller = cache_controller = CacheController(self.config)
+        wiring.connect(m, wiring.flipped(self.fe), cache_controller.fe)
+        m.d.comb += self.hit_o.eq(cache_controller.hit_o)
 
+        # Create CacheStore, CacheDirectory, ReplacementPolicy
+        m.submodules.cache_store = cache_store = CacheStore(self.config)
         wiring.connect(m, cache_controller.store, cache_store.port)
+        m.submodules.directory = directory = CacheDirectory(self.config)
         wiring.connect(m, cache_controller.directory, directory.port)
+        m.submodules.repl_pol = repl_pol = ReplacementPolicy(self.config)
         wiring.connect(m, cache_controller.repl_pol, repl_pol.port)
 
-        wiring.connect(m, wiring.flipped(self.fe), cache_controller.fe)
-        wiring.connect(m, cache_controller.be, wiring.flipped(self.be))
-        m.d.comb += self.hit_o.eq(cache_controller.hit_o)
+        if self.config.write_buffer_size:
+            # Create WriteBuffer and connect it to the CacheController and the BE
+            m.submodules.write_buffer = write_buffer = WriteBuffer(
+                signature=self.config.be_signature, depth=self.config.write_buffer_size
+            )
+            wiring.connect(m, cache_controller.be, write_buffer.fe)
+            wiring.connect(m, write_buffer.be, wiring.flipped(self.be))
+        else:
+            # Connect the CacheController to the BE
+            wiring.connect(m, cache_controller.be, wiring.flipped(self.be))
 
         return m

@@ -46,11 +46,6 @@ class CacheWrapper(wiring.Component):
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
 
-        self.write_buffer_depths = list()
-
-        for cache_config in cache_configs:
-            self.write_buffer_depths.append(cache_config.write_buffer_size)
-
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
         else:
@@ -144,15 +139,6 @@ class CacheWrapper(wiring.Component):
                 wiring.connect(m, delay_module.be, cache.fe)
                 m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
-            if (
-                self.write_buffer_depths != []
-                and (depth := self.write_buffer_depths[i]) != 0
-            ):
-                m.submodules[f"l{i+1}_write_buffer"] = write_buffer = WriteBuffer(
-                    signature=cache_config.be_signature, depth=depth
-                )
-                wiring.connect(m, cache.be, write_buffer.fe)
-                memory_hierarchy.append(write_buffer)
 
         # connect the hit signal of the first cache to the l1_hit output
         if len(memory_hierarchy):

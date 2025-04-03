@@ -320,6 +320,7 @@ class InternalCacheConfig:
         self.store_address_width = exact_log2(self.num_sets) + exact_log2(
             self.block_size
         )
+        self.write_buffer_size = cache_config.write_buffer_size
 
 
 class MemoryConfig:
