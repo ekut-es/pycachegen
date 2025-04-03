@@ -217,7 +217,7 @@ class CacheConfig:
         self.block_size = block_size
         self.hit_latency = hit_latency
         self.miss_latency = miss_latency
-        self.write_buffer_size = 0
+        self.write_buffer_size = write_buffer_size
         self.data_memory_module = data_memory_module
 
     # def __repr__(self):
