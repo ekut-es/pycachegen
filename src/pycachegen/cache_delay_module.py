@@ -2,7 +2,7 @@ from amaranth import Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from .memory_bus import MemoryBusSignature
+from .interfaces import MemoryBusSignature
 
 
 class CacheDelayModule(wiring.Component):

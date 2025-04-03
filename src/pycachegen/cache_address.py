@@ -10,8 +10,6 @@ class CacheAddressLayout(data.StructLayout):
             {"word_offset": word_offset_width, "index": index_width, "tag": tag_width}
         )
 
-    # def get_blockwise_incremented_address(self, )
-
 
 def get_blockwise_incremented_address(
     address, counter, m: Module, read_block_wc_width: int

@@ -2,7 +2,7 @@ from amaranth import C, Cat, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.interfaces import MemoryBusSignature
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 
 

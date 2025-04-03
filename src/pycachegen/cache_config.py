@@ -4,7 +4,7 @@ from typing import Optional
 from amaranth.utils import ceil_log2, exact_log2
 
 from .cache_address import CacheAddressLayout
-from .memory_bus import MemoryBusSignature
+from .interfaces import MemoryBusSignature
 from .utils import log_parameters
 
 
@@ -317,6 +317,9 @@ class InternalCacheConfig:
             word_offset_width=self.word_offset_width,
         )
         self.data_memory_module = cache_config.data_memory_module
+        self.store_address_width = exact_log2(self.num_sets) + exact_log2(
+            self.block_size
+        )
 
 
 class MemoryConfig:

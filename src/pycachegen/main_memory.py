@@ -4,7 +4,7 @@ from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
 
 from .cache_config import InternalMemoryConfig
-from .memory_bus import MemoryBusSignature
+from .interfaces import MemoryBusSignature
 
 
 class MainMemory(wiring.Component):

@@ -8,7 +8,7 @@ from amaranth.utils import ceil_log2
 from pycachegen.cache import Cache
 from pycachegen.cache_config import CacheConfig, InternalCacheConfig
 from pycachegen.delay_unit import DelayUnit
-from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.interfaces import MemoryBusSignature
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters

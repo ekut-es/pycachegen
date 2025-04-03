@@ -10,33 +10,25 @@ from pycachegen import (
 
 cache_wrapper = CacheWrapper(
     num_ports=1,
-    address_width=25,
+    byte_size=8,
+    address_width=8,
     cache_configs=[
         CacheConfig(
-            data_width=32,
-            num_ways=2,
-            num_sets=1,
-            block_size=2,
-            replacement_policy=ReplacementPolicies.PLRU_TREE,
-            write_policy=WritePolicies.WRITE_BACK,
-            write_allocate=True,
-            write_buffer_size=4,
-        ),
-        CacheConfig(
-            data_width=32,
-            num_ways=2,
-            num_sets=2,
-            block_size=4,
+            data_width=16,
+            num_ways=1,
+            num_sets=4,
             replacement_policy=ReplacementPolicies.FIFO,
-            write_policy=WritePolicies.WRITE_BACK,
-            write_allocate=True,
-            write_buffer_size=8,
-        ),
+            write_policy=WritePolicies.WRITE_THROUGH,
+            write_allocate=False,
+            block_size=1,
+        )
     ],
     memory_config=MemoryConfig(
-        data_width=128,
+        data_width=16,
+        read_latency=10,
+        write_latency=15,
         min_address=0,
-        size=512,
+        max_address=256,
     ),
 )
 

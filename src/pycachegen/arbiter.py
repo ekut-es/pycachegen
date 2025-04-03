@@ -4,7 +4,7 @@ from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from .memory_bus import MemoryBusSignature
+from .interfaces import MemoryBusSignature
 
 
 class ArbitrationScheme(Enum):

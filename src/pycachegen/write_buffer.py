@@ -2,7 +2,7 @@ from amaranth import Array, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from .memory_bus import MemoryBusSignature, MemoryRequestLayout
+from .interfaces import MemoryBusSignature, MemoryRequestLayout
 from .utils import one_hot_encode
 
 
