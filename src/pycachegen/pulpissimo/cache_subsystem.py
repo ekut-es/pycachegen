@@ -10,7 +10,6 @@ from pycachegen.cache_config import CacheConfig, InternalCacheConfig
 from pycachegen.delay_unit import DelayUnit
 from pycachegen.memory_bus import MemoryBusSignature
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
-from pycachegen.pulpissimo.tcdm_cache_router import TCDMCacheRouter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters
 from pycachegen.write_buffer import WriteBuffer
@@ -26,14 +25,14 @@ class CacheSubsystem(wiring.Component):
         read_delay: int,
         write_delay: int,
     ):
-        """Cache subsytem for the pulpissimo SoC which includes a router, an adapter,
-        the cache itself and optionally a delay unit. This module is basically ready
-        to be on a TCDM interface in the pulpissimo SoC. If you want to connect several
+        """Cache subsytem for the pulpissimo SoC which includes an adapter, the cache itself
+        and optionally a write buffer and a delay unit. This module is basically ready
+        to be used on a TCDM interface in the pulpissimo SoC. If you want to connect several
         masters to the cache, you should use the subsystem wrapper.
 
         Args:
             cache_config (Optional[CacheConfig]): Configuration for the cache. Can be set to None if no cache should be used.
-            address_ranges (list[tuple[int, int]]): List of tuples of lower (inclusive) and upper (exclusive) bounds which represent address ranges for which the cache should be used. Requests with other addresses will bypass the cache.
+            address_ranges (list[tuple[int, int]]): List of tuples of lower (inclusive) and upper (exclusive) bounds which represent address ranges for which the cache should be used.
             write_buffer_depth (int): Depth of the write buffer. Can be set to 0 if no write buffer should be used. A write buffer can only be used together with a cache.
             read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0 if write_delay is also 0.
             write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to 0 if read_delay is also 0.
@@ -85,10 +84,6 @@ class CacheSubsystem(wiring.Component):
             return m
 
         m.submodules.adapter = adapter = TCDMCacheAdapter(self.cache_signature)
-        m.submodules.router = router = TCDMCacheRouter(
-            address_ranges=self.address_ranges,
-            lowest_address=self.lower_address,
-        )
 
         cache_ready = 1
 
