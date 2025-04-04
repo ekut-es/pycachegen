@@ -1,68 +1,41 @@
-from typing import Optional
-
-from amaranth import Module, Signal, unsigned
+from amaranth import Module
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
-from amaranth.utils import ceil_log2
 
-from pycachegen.cache import Cache
-from pycachegen.cache_config import CacheConfig, InternalCacheConfig
-from pycachegen.delay_unit import DelayUnit
-from pycachegen.interfaces import MemoryBusSignature
+from pycachegen.cache_config import CacheConfig
+from pycachegen.cache_wrapper import CacheWrapper
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters
-from pycachegen.write_buffer import WriteBuffer
 
 
+# TODO subtract / add lower address bound to ingoing/outgoing addresses
 @log_parameters
 class CacheSubsystem(wiring.Component):
     def __init__(
         self,
-        cache_config: Optional[CacheConfig],
-        address_ranges: list[tuple[int, int]],
-        write_buffer_depth: int,
+        cache_address_width: int,
+        cache_configs: list[CacheConfig],
         read_delay: int,
         write_delay: int,
     ):
-        """Cache subsytem for the pulpissimo SoC which includes an adapter, the cache itself
-        and optionally a write buffer and a delay unit. This module is basically ready
-        to be used on a TCDM interface in the pulpissimo SoC. If you want to connect several
-        masters to the cache, you should use the subsystem wrapper.
+        """Cache subsytem for the pulpissimo SoC which includes an adapter, and a CacheWrapper.
+
+        You should look at the README in this folder for how to integrate this module into the Pulpissimo.
 
         Args:
-            cache_config (Optional[CacheConfig]): Configuration for the cache. Can be set to None if no cache should be used.
-            address_ranges (list[tuple[int, int]]): List of tuples of lower (inclusive) and upper (exclusive) bounds which represent address ranges for which the cache should be used.
-            write_buffer_depth (int): Depth of the write buffer. Can be set to 0 if no write buffer should be used. A write buffer can only be used together with a cache.
+            cache_address_width: Address width of the cache(s) in bits. Note that this module has a TCDM interface with 32 bit addresses, this parameter only describes the address width of the caches. It should match the depth of the memory that is connected to the BE of the cache(s).
+            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
             read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0 if write_delay is also 0.
             write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to 0 if read_delay is also 0.
         """
-        if write_buffer_depth:
-            assert cache_config is not None
-        self.write_buffer_depth = write_buffer_depth
+        for cache_config in cache_configs:
+            assert cache_config.data_width == 32
+
+        self.cache_address_width = cache_address_width
+        self.cache_configs = cache_configs
         self.read_delay = read_delay
         self.write_delay = write_delay
-        self.use_delay = bool(read_delay) or bool(write_delay)
-        self.address_ranges = address_ranges
-        self.lower_address = min([lower for lower, _ in self.address_ranges])
-        self.upper_address = max([upper for _, upper in self.address_ranges])
-        self.cache_address_width = (
-            ceil_log2(self.upper_address - self.lower_address) - 2
-        )
-        self.cache_signature = MemoryBusSignature(
-            address_width=self.cache_address_width, data_width=32, bytes_per_word=4
-        )
-        self.use_cache = False
-        if cache_config is not None:
-            assert cache_config.data_width == 32
-            self.cache_config = InternalCacheConfig(
-                cache_config=cache_config,
-                address_width=self.cache_address_width,
-                be_data_width=32,
-                be_address_width=self.cache_address_width,
-                byte_size=8,
-            )
-            self.use_cache = True
         super().__init__(
             {"requestor": In(TCDMSignature()), "target": Out(TCDMSignature())}
         )
@@ -70,57 +43,27 @@ class CacheSubsystem(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        use_cache = self.use_cache
-        use_delay = self.use_delay
+        # Create a CacheWrapper
+        m.submodules.cache_wrapper = cache_wrapper = CacheWrapper(
+            address_width=self.cache_address_width,
+            cache_configs=self.cache_configs,
+            main_memory_data_width=32,
+            create_main_memory=False,
+            num_ports=1,
+            read_delay=self.read_delay,
+            write_delay=self.write_delay,
+            byte_size=8,
+        )
 
-        if (not use_cache) and (not use_delay):
-            # just connect the requestor to the target
-            wiring.connect(
-                m, wiring.flipped(self.requestor), wiring.flipped(self.target)
-            )
-            # useless signal so that clk and rst get generated...
-            x = Signal(unsigned(4))
-            m.d.sync += x.eq(x + 1)
-            return m
+        # The signature of the memory bus between the caches (its the same for all cache FEs and BEs)
+        cache_memory_bus_signature = cache_wrapper.cache_configs[0].fe_signature
 
-        m.submodules.adapter = adapter = TCDMCacheAdapter(self.cache_signature)
+        # Create a TCDM Adapter
+        m.submodules.adapter = adapter = TCDMCacheAdapter(cache_memory_bus_signature)
 
-        cache_ready = 1
-
-        fes, bes = [], []
-
-        # Create a cache if needed
-        if use_cache:
-            m.submodules.cache = cache = Cache(self.cache_config)
-            cache_ready &= cache.fe.port_ready
-            fes.append(cache.fe)
-            bes.append(cache.be)
-
-        # Create a write buffer if needed
-        if self.write_buffer_depth != 0:
-            m.submodules.write_buffer = write_buffer = WriteBuffer(
-                signature=self.cache_config.be_signature, depth=self.write_buffer_depth
-            )
-            fes.append(write_buffer.fe)
-            bes.append(write_buffer.be)
-            # write buffer ready is
-
-        # Create a delay unit if needed
-        if use_delay:
-            m.submodules.delay_unit = delay_unit = DelayUnit(
-                mem_signature=self.cache_signature,
-                read_delay=self.read_delay,
-                write_delay=self.write_delay,
-            )
-            cache_ready &= delay_unit.requestor.port_ready
-            fes.append(delay_unit.requestor)
-            bes.append(delay_unit.target)
-
-        wiring.connect(m, adapter.cache_fe, fes.pop(0))
-        wiring.connect(m, adapter.cache_be, bes.pop())
-
-        for fe, be in zip(fes, bes):
-            wiring.connect(m, fe, be)
+        # Connect CacheWrapper to adapter
+        wiring.connect(m, adapter.cache_fe, cache_wrapper.fe_0)
+        wiring.connect(m, adapter.cache_be, cache_wrapper.be)
 
         # Connect self to adapter
         wiring.connect(m, wiring.flipped(self.requestor), adapter.requestor)
