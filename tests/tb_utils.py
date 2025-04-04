@@ -1,11 +1,14 @@
 import inspect
 import os
+import warnings
 from math import ceil
 from pathlib import Path
 
 from amaranth.sim import Simulator
 
 from pycachegen import CacheWrapper
+
+from .expected_results import expected_results
 
 
 class CacheWrapperBenchHelper:
@@ -71,7 +74,9 @@ class CacheWrapperBenchHelper:
         ctx.set(self._dut.fe_0.request_valid, 0)
         assert ctx.get(self._dut.fe_0.port_ready)
 
-    async def write(self, ctx, address: int, data: int, hit_expected: bool, write_strobe: int = -1):
+    async def write(
+        self, ctx, address: int, data: int, hit_expected: bool, write_strobe: int = -1
+    ):
         print(
             f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}, strobe {write_strobe}"
         )
@@ -120,3 +125,14 @@ def run_bench(dut, bench, vcd_path: str = "vcd", vcd_filename: str = ""):
     # run simulation and save vcd in output directory
     with sim.write_vcd(str(Path(vcd_path, vcd_filename))):
         sim.run()
+    # check the expected result
+    elapsed_time = sim._engine.now
+    if vcd_filename in expected_results:
+        if expected_results[vcd_filename] != elapsed_time:
+            warnings.warn(
+                f"Runtime for {vcd_filename} differs: Expected {expected_results[vcd_filename]}, got {elapsed_time}"
+            )
+    else:
+        warnings.warn(
+            f"Did not find an expected runtime for {vcd_filename}. Runtime: {elapsed_time} "
+        )
