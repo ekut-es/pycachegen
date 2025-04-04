@@ -167,6 +167,7 @@ def assert_address_range_valid(
         )
 
 
+# TODO Remove cache latencies
 def assert_cache_latencies_valid(hit_latency: int, miss_latency: int) -> None:
     if not (hit_latency ^ miss_latency):
         raise ConfigurationError(
@@ -204,10 +205,6 @@ class CacheConfig:
             miss_latency (int): A latency for additionally delaying the port ready and read data valid signals in case of a miss.
             data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be created if this value is an empty string.
         """
-        # init_params = inspect.signature(self.__class__.__init__).parameters
-        # init_params = [p for p in init_params if p != "self"]
-        # local_vars = locals()
-        # self._params = {p: local_vars[p] for p in init_params}
         self.data_width = data_width
         self.num_ways = num_ways
         self.num_sets = num_sets
@@ -219,10 +216,6 @@ class CacheConfig:
         self.miss_latency = miss_latency
         self.write_buffer_size = write_buffer_size
         self.data_memory_module = data_memory_module
-
-    # def __repr__(self):
-    #     params_str = ", ".join(f"{k}={v!r}" for k, v in self._params.items())
-    #     return f"{self.__class__.__name__}({params_str})"
 
 
 if __name__ == "__main__":
@@ -345,7 +338,7 @@ class MemoryConfig:
         """
 
         if max_address is None and size is None:
-            raise ValueError("Either max_address or size must be set.")
+            raise ConfigurationError("Either max_address or size must be set.")
         elif max_address is not None:
             self.max_address = max_address
         elif max_address is None and size is not None:

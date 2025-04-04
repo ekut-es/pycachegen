@@ -10,7 +10,7 @@ from .interfaces import DirectorySignature
 
 class CacheDirectory(wiring.Component):
     def __init__(self, config: InternalCacheConfig):
-        """Module for storing the tags of the cache.
+        """Module for storing the tags, valid and dirty bits of the cache.
 
         Args:
             config (InternalCacheConfig): Config of the cache.
@@ -20,8 +20,6 @@ class CacheDirectory(wiring.Component):
         self.data_width = config.tag_width
         self.num_sets = config.num_sets
 
-        # Don't add read_data to the ports since it is an array
-        # and access will be handled by a method
         super().__init__({"port": In(DirectorySignature(config))})
 
     def elaborate(self, platform):

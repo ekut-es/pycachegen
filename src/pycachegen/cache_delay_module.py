@@ -5,6 +5,7 @@ from amaranth.lib.wiring import In, Out
 from .interfaces import MemoryBusSignature
 
 
+# TODO Remove this module
 class CacheDelayModule(wiring.Component):
     def __init__(
         self, bus_signature: MemoryBusSignature, hit_latency: int, miss_latency: int

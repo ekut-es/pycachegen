@@ -7,13 +7,16 @@ from .cache_config import InternalMemoryConfig
 from .interfaces import MemoryBusSignature
 
 
+# TODO check if this module can be reworked (and if an additional delay of 0 cycles is possible.)
 class MainMemory(wiring.Component):
-    """
-    module to simulate a main memory with configurable latency
-    used to simulate caches without the need for external memory libraries
-    """
-
     def __init__(self, config: InternalMemoryConfig) -> None:
+        """A main memory with configurable delay.
+
+        Requests will be artificially delayed by the configured amount.
+
+        Args:
+            config (InternalMemoryConfig): Configuration of the memory.
+        """
         self.config = config
 
         super().__init__(

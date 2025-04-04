@@ -9,7 +9,7 @@ from .interfaces import ReplacementPolicySignature
 
 class ReplacementPolicy(wiring.Component):
     def __init__(self, config: InternalCacheConfig) -> None:
-        """Replacement policy generator.
+        """A module for handling the state of different replacement policies.
 
         Args:
             num_ways (int): Number of ways. Must be a power of 2.

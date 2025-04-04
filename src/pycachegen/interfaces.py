@@ -13,6 +13,11 @@ if TYPE_CHECKING:
 
 class CacheStoreSignature(wiring.Signature):
     def __init__(self, config: InternalCacheConfig):
+        """Signature of the CacheStore.
+
+        Args:
+            config (InternalCacheConfig): Cache configuration.
+        """
         self.address_width = config.store_address_width
         self.num_ways = config.num_ways
         self.data_width = config.data_width
@@ -43,6 +48,11 @@ class CacheStoreSignature(wiring.Signature):
 
 class DirectorySignature(wiring.Signature):
     def __init__(self, config: InternalCacheConfig):
+        """Signature of the CacheDirectory.
+
+        Args:
+            config (InternalCacheConfig): Cache configuration.
+        """
         self.index_width = config.index_width
         self.num_ways = config.num_ways
         self.data_width = config.tag_width
@@ -92,6 +102,11 @@ class DirectoryInterface(wiring.PureInterface):
 
 class ReplacementPolicySignature(wiring.Signature):
     def __init__(self, config: InternalCacheConfig):
+        """Signature of the replacement policy.
+
+        Args:
+            config (InternalCacheConfig): _description_
+        """
         self.num_sets = config.num_sets
         self.num_ways = config.num_ways
         super().__init__(
@@ -114,6 +129,13 @@ class ReplacementPolicySignature(wiring.Signature):
 
 class MemoryBusSignature(wiring.Signature):
     def __init__(self, address_width: int, data_width: int, bytes_per_word: int):
+        """Signature of the memory bus used by the cache.
+
+        Args:
+            address_width (int): Width of the address (which does not include byte offset bits).
+            data_width (int): Width of the data in bits.
+            bytes_per_word (int): Number of bytes per data word.
+        """
         self.address_width = address_width
         self.data_width = data_width
         self.bytes_per_word = bytes_per_word

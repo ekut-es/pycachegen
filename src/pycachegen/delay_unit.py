@@ -5,6 +5,9 @@ from amaranth.lib.wiring import In, Out
 from .interfaces import MemoryBusSignature
 
 
+# TODO Maybe rework this module so it does not rely on the next level memory responding within 1 cycle
+# It might be a better Idea to just wait until the BE becomes ready, then issue the request and delay
+# the response by the specified amount.
 class DelayUnit(wiring.Component):
     def __init__(
         self, mem_signature: MemoryBusSignature, read_delay: int, write_delay: int

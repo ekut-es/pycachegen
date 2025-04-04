@@ -6,6 +6,13 @@ class CacheAddressLayout(data.StructLayout):
     def __init__(
         self, index_width: int, tag_width: int, word_offset_width: int
     ) -> None:
+        """Layout for accessing cache related parts of a memory address.
+
+        Args:
+            index_width (int): Width of the index.
+            tag_width (int): Width of the tag.
+            word_offset_width (int): Width of the word offset (the bits which select the word within a block).
+        """
         super().__init__(
             {"word_offset": word_offset_width, "index": index_width, "tag": tag_width}
         )

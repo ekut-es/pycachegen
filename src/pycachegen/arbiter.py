@@ -19,6 +19,13 @@ class Arbiter(wiring.Component):
         bus_signature: MemoryBusSignature,
         arbitration_scheme: ArbitrationScheme,
     ):
+        """Arbiter for MemoryBus requests.
+
+        Args:
+            num_ports (int): Number of request ports to generate.
+            bus_signature (MemoryBusSignature): Signature of the memory bus.
+            arbitration_scheme (ArbitrationScheme): Fixed priority or round robin arbitration scheme.
+        """
         self.num_ports = num_ports
         self.bus_signature = bus_signature
         self.arbitration_scheme = arbitration_scheme

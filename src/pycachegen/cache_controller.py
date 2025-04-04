@@ -26,6 +26,11 @@ class States(Enum):
 
 class CacheController(wiring.Component):
     def __init__(self, config: InternalCacheConfig) -> None:
+        """The heart of the cache: It processes requests and interacts with the other cache modules.
+
+        Args:
+            config (InternalCacheConfig): The cache configuration.
+        """
         self.config = config
 
         super().__init__(

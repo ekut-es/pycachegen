@@ -12,6 +12,13 @@ from .write_buffer import WriteBuffer
 
 class Cache(wiring.Component):
     def __init__(self, config: InternalCacheConfig) -> None:
+        """A module for creating and connecting all parts of the cache.
+
+        This includes a CacheController, CacheStore, CacheDirectory, ReplacementPolicy and WriteBuffer.
+
+        Args:
+            config (InternalCacheConfig): Configuration of the cache.
+        """
         self.config = config
 
         super().__init__(

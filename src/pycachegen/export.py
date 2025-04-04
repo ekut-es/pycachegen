@@ -5,6 +5,7 @@ from amaranth.back import verilog
 from .cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
 from .cache_wrapper import CacheWrapper
 
+# TODO delete this file
 cache_wrapper = CacheWrapper(
     num_ports=1,
     byte_size=8,

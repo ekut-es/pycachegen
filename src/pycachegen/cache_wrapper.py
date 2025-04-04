@@ -14,7 +14,6 @@ from .cache_config import (
 from .cache_delay_module import CacheDelayModule
 from .interfaces import MemoryBusSignature
 from .main_memory import MainMemory
-from .write_buffer import WriteBuffer
 
 
 class CacheWrapper(wiring.Component):
@@ -27,18 +26,18 @@ class CacheWrapper(wiring.Component):
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
     ) -> None:
-        """Generates a top level module containing an arbitrary amount of caches and a main memory.
-        There can also be an arbiter infront of the L1 cache. The caches are set up in a linear
-        hierarchy.
+        """The top level module for using caches.
+
+        Generates an arbitrary amount of caches, a main memory and optionally an arbiter infront of the L1 cache.
+        The caches are set up in a linear hierarchy.
 
         Args:
             num_ports (int): Number of access ports.
-            byte_size (int): Number of bits per byte.
             address_width (int): Address width. Note that addresses do not include a byte offset.
             memory_config (MemoryConfig): Configuration for the main memory.
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
             arbitration_scheme (ArbitrationScheme): Scheme for the arbiter in case there is more than one port. Supports priority and round robin scheme.
-            write_buffer_depth (list[int]): List of write the depths of the write buffers for each cache. Can be left empty if no write buffers shall be used. The depth describes the number of BE write requests that can be buffered.
+            byte_size (int): Number of bits per byte.
         """
         self.num_ports = num_ports
         self.arbitration_scheme = arbitration_scheme
