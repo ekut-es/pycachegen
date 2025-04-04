@@ -11,8 +11,6 @@ class DelayUnit(wiring.Component):
         mem_signature: MemoryBusSignature,
         read_delay: int,
         write_delay: int,
-        min_addr,
-        max_addr,
     ):
         """Delays incoming requests by the specified amount of cycles.
 
@@ -36,8 +34,6 @@ class DelayUnit(wiring.Component):
         self.mem_signature = mem_signature
         self.read_delay = read_delay
         self.write_delay = write_delay
-        self.min_addr = min_addr
-        self.max_addr = max_addr
         super().__init__({"requestor": In(mem_signature), "target": Out(mem_signature)})
 
     def elaborate(self, platform):
@@ -67,12 +63,7 @@ class DelayUnit(wiring.Component):
             m.d.comb += requestor.port_ready.eq(1)
             m.d.comb += requestor.read_data.eq(target.read_data)
             m.d.comb += requestor.read_data_valid.eq(target.read_data_valid)
-            with m.If(
-                requestor.request_valid
-                & (requestor.address >= self.min_addr)
-                & (requestor.address < self.max_addr)
-                & ~requestor.flush
-            ):
+            with m.If(requestor.request_valid & ~requestor.flush):
                 m.d.sync += address.eq(requestor.address)
                 m.d.sync += write_data.eq(requestor.write_data)
                 m.d.sync += write_strobe.eq(requestor.write_strobe)

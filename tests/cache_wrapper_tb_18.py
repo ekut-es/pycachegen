@@ -1,4 +1,4 @@
-from pycachegen import CacheWrapper, MemoryConfig
+from pycachegen import CacheWrapper
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
@@ -12,11 +12,7 @@ def test():
         read_delay=9,
         write_delay=14,
         cache_configs=[],
-        memory_config=MemoryConfig(
-            data_width=16,
-            min_address=0,
-            max_address=8,
-        ),
+        main_memory_data_width=16,
     )
 
     helper = CacheWrapperBenchHelper(dut)

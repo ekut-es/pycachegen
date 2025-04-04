@@ -1,8 +1,6 @@
 from pycachegen.arbiter import ArbitrationScheme
-from pycachegen.cache import Cache
 from pycachegen.cache_config import (
     CacheConfig,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )

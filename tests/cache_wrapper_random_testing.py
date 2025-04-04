@@ -99,13 +99,7 @@ if __name__ == "__main__":
         num_ports=1,
         byte_size=8,
         address_width=8,
-        memory_config=MemoryConfig(
-            data_width=32,
-            read_latency=7,
-            write_latency=11,
-            min_address=0,
-            max_address=2**8,
-        ),
+        main_memory_data_width=32,
         cache_configs=[
             CacheConfig(
                 data_width=32,

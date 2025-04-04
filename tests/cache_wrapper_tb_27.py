@@ -1,8 +1,6 @@
 from pycachegen import (
-    ArbitrationScheme,
     CacheConfig,
     CacheWrapper,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -10,11 +8,11 @@ from pycachegen import (
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
-# Testbench for testing a round robin arbiter
+# Testbench for testing a write back cache with block size > 1
+# and BE data width > block size
 def test():
     dut = CacheWrapper(
-        num_ports=4,
-        arbitration_scheme=ArbitrationScheme.ROUND_ROBIN,
+        num_ports=1,
         byte_size=8,
         address_width=8,
         read_delay=4,
@@ -23,107 +21,38 @@ def test():
             CacheConfig(
                 data_width=16,
                 num_ways=2,
-                num_sets=2,
+                num_sets=1,
                 replacement_policy=ReplacementPolicies.LRU,
                 write_policy=WritePolicies.WRITE_BACK,
                 write_allocate=True,
-                block_size=1,
+                block_size=2,
             ),
         ],
-        memory_config=MemoryConfig(
-            data_width=32,
-            min_address=0,
-            max_address=128,
-        ),
+        main_memory_data_width=64,
     )
 
-    CacheWrapperBenchHelper(dut)
+    helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # read request from port 0
-        ctx.set(dut.fe_0.request_valid, 1)
-        ctx.set(dut.fe_0.address, 0)
-        ctx.set(dut.fe_0.write_strobe, 0)
+        await helper.write(ctx, 0, 0x1000, False)
+        await helper.write(ctx, 1, 0x1001, True)
+        await helper.write(ctx, 3, 0x1003, False)
 
-        # Write request from port 1
-        ctx.set(dut.fe_1.request_valid, 1)
-        ctx.set(dut.fe_1.address, 0)
-        ctx.set(dut.fe_1.write_strobe, -1)
-        ctx.set(dut.fe_1.write_data, 0x1000)
+        # This write should now cause a write back of 0 and 1
+        await helper.write(ctx, 4, 0x1004, False)
 
-        # Write request from port 3
-        ctx.set(dut.fe_3.request_valid, 1)
-        ctx.set(dut.fe_3.address, 0)
-        ctx.set(dut.fe_3.write_strobe, 0b01)
-        ctx.set(dut.fe_3.write_data, 0x0010)
+        # Read from 0 and 1 to check that the write back worked
+        # and to write back 2 and 3
+        await helper.read(ctx, 1, 0x1001, False)
+        await helper.read(ctx, 0, 0x1000, True)
 
-        await ctx.tick()
-        # port 1 request should have been processed (because 0 is the initial previous grant)
-        # port 0 & 3 request should have been buffered
-        assert not ctx.get(dut.fe_0.port_ready)
-        assert ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert not ctx.get(dut.fe_3.port_ready)
-        # dont send a new request from port 0 and 3
-        ctx.set(dut.fe_0.request_valid, 0)
-        ctx.set(dut.fe_3.request_valid, 0)
-        # send a new write request from port 1 (should have least priority)
-        ctx.set(dut.fe_1.write_data, 0)
-        # send a read request from port 2 -> should be processed next
-        ctx.set(dut.fe_2.request_valid, 1)
-        ctx.set(dut.fe_2.address, 0)
-        ctx.set(dut.fe_2.write_strobe, 0)
+        # Read from 2 and 3 to check that the write back worked
+        # and to write back 4 and 5
+        await helper.read(ctx, 3, 0x1003, False)
+        await helper.read(ctx, 2, 0, True)
 
-        await ctx.tick()
-        # request 2 should have been processed now.
-        # all others should have been buffered
-        assert not ctx.get(dut.fe_0.port_ready)
-        assert not ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert not ctx.get(dut.fe_3.port_ready)
-        # dont send any new requests
-        ctx.set(dut.fe_1.request_valid, 0)
-        ctx.set(dut.fe_2.request_valid, 0)
-        # check that request 2 was processed correctly
-        assert ctx.get(dut.fe_2.read_data_valid)
-        assert ctx.get(dut.fe_2.read_data) == 0x1000
-
-        await ctx.tick()
-        # write request from port 3 should be done now
-        assert not ctx.get(dut.fe_0.port_ready)
-        assert not ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert ctx.get(dut.fe_3.port_ready)
-
-        await ctx.tick()
-        # read from port 0 should be done
-        assert ctx.get(dut.fe_0.port_ready)
-        assert not ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert ctx.get(dut.fe_3.port_ready)
-        assert ctx.get(dut.fe_0.read_data_valid)
-        assert ctx.get(dut.fe_0.read_data) == 0x1010
-
-        await ctx.tick()
-        # write from port 1 should be done now
-        assert ctx.get(dut.fe_0.port_ready)
-        assert ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert ctx.get(dut.fe_3.port_ready)
-        # send new read request from port 0
-        ctx.set(dut.fe_0.write_strobe, 0)
-        ctx.set(dut.fe_0.request_valid, 1)
-
-        await ctx.tick()
-        # check that the read worked and that the previous write did its thing
-        assert ctx.get(dut.fe_0.port_ready)
-        assert ctx.get(dut.fe_1.port_ready)
-        assert ctx.get(dut.fe_2.port_ready)
-        assert ctx.get(dut.fe_3.port_ready)
-        assert ctx.get(dut.fe_0.read_data_valid)
-        assert ctx.get(dut.fe_0.read_data) == 0
-        # check that port 2 still has its original read data
-        assert ctx.get(dut.fe_2.read_data_valid)
-        assert ctx.get(dut.fe_2.read_data) == 0x1000
+        # read from 4 and 5 to check that the write back worked
+        await helper.read(ctx, 4, 0x1004, False)
+        await helper.read(ctx, 5, 0, True)
 
     run_bench(dut=dut, bench=bench)

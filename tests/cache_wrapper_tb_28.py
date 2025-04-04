@@ -1,7 +1,6 @@
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -9,8 +8,7 @@ from pycachegen import (
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
-# Testbench for testing a write back cache with block size > 1
-# and BE data width > block size
+# Testbench for testing a flush with a block size > 1
 def test():
     dut = CacheWrapper(
         num_ports=1,
@@ -26,38 +24,27 @@ def test():
                 replacement_policy=ReplacementPolicies.LRU,
                 write_policy=WritePolicies.WRITE_BACK,
                 write_allocate=True,
-                block_size=2,
+                block_size=4,
             ),
         ],
-        memory_config=MemoryConfig(
-            data_width=64,
-            min_address=0,
-            max_address=64,
-        ),
+        main_memory_data_width=32,
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
+        # write to both blocks
         await helper.write(ctx, 0, 0x1000, False)
-        await helper.write(ctx, 1, 0x1001, True)
-        await helper.write(ctx, 3, 0x1003, False)
+        await helper.write(ctx, 3, 0x1003, True)
+        await helper.write(ctx, 5, 0x1005, False)
 
-        # This write should now cause a write back of 0 and 1
-        await helper.write(ctx, 4, 0x1004, False)
+        # flush
+        await helper.flush(ctx)
 
-        # Read from 0 and 1 to check that the write back worked
-        # and to write back 2 and 3
-        await helper.read(ctx, 1, 0x1001, False)
-        await helper.read(ctx, 0, 0x1000, True)
-
-        # Read from 2 and 3 to check that the write back worked
-        # and to write back 4 and 5
-        await helper.read(ctx, 3, 0x1003, False)
-        await helper.read(ctx, 2, 0, True)
-
-        # read from 4 and 5 to check that the write back worked
-        await helper.read(ctx, 4, 0x1004, False)
-        await helper.read(ctx, 5, 0, True)
+        # read miss to replace the first block, then read both blocks
+        await helper.read(ctx, 8, 0, False)
+        await helper.read(ctx, 0, 0x1000, False)
+        await helper.read(ctx, 3, 0x1003, True)
+        await helper.read(ctx, 5, 0x1005, False)
 
     run_bench(dut=dut, bench=bench)

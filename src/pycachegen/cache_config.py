@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Optional
 
 from amaranth.utils import ceil_log2, exact_log2
 
@@ -307,58 +306,23 @@ class InternalCacheConfig:
         self.write_buffer_size = cache_config.write_buffer_size
 
 
-class MemoryConfig:
-    def __init__(
-        self,
-        data_width: int,
-        min_address: int,
-        max_address: Optional[int] = None,
-        size: Optional[int] = None,
-    ) -> None:
-        """Class for end users to create configurations for memories.
-
-        Args:
-            data_width (int): Width of one data word in bits.
-            min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
-            max_address (Optional[int]): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset. When set to None size must be set
-            size (Optional[int]): size of the memory in bytes. This parameter is overriden when max_address is set. When max_adress is not set this parameter determines it using data_width and min_address.
-        """
-
-        if max_address is None and size is None:
-            raise ConfigurationError("Either max_address or size must be set.")
-        elif max_address is not None:
-            self.max_address = max_address
-        elif max_address is None and size is not None:
-            self.max_address = min_address + size // data_width
-
-        self.data_width = data_width
-        self.min_address = min_address
-
-
 class InternalMemoryConfig:
     def __init__(
         self,
-        memory_config: MemoryConfig,
+        data_width: int,
         address_width: int,
         byte_size: int,
     ) -> None:
-        """Class for validating memory configs in a cache hierarchy and for passing on all needed
-        arguments to a memory.
+        """Class for configuring the MainMemory.
 
         Args:
+            data_width (int): Width of a data word in bits. Must be of the form (byte_size * 2**n) with n >= 0.
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             byte_size (int): Number of bits per byte.
         """
-        assert_data_width_valid(memory_config.data_width, byte_size)
-        assert_address_range_valid(
-            memory_config.min_address,
-            memory_config.max_address,
-            address_width,
-        )
+        assert_data_width_valid(data_width, byte_size)
 
-        self.data_width = memory_config.data_width
+        self.data_width = data_width
         self.address_width = address_width
         self.byte_size = byte_size
-        self.min_address = memory_config.min_address
-        self.max_address = memory_config.max_address
-        self.bytes_per_word = memory_config.data_width // byte_size
+        self.bytes_per_word = data_width // byte_size

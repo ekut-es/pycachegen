@@ -1,7 +1,6 @@
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -9,7 +8,7 @@ from pycachegen import (
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
-# Testbench for testing big block sizes
+# Testbench for testing the timing of some 1 cycle operations
 def test():
     dut = CacheWrapper(
         num_ports=1,
@@ -20,42 +19,61 @@ def test():
         cache_configs=[
             CacheConfig(
                 data_width=16,
-                num_ways=1,
-                num_sets=1,
+                num_ways=2,
+                num_sets=2,
                 replacement_policy=ReplacementPolicies.LRU,
                 write_policy=WritePolicies.WRITE_BACK,
                 write_allocate=True,
-                block_size=16,
+                block_size=1,
             ),
         ],
-        memory_config=MemoryConfig(
-            data_width=64,
-            min_address=0,
-            max_address=64,
-        ),
+        main_memory_data_width=16,
     )
 
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # Write to some words
-        await helper.write(ctx, 7, 0x1070, False)
-        await helper.write(ctx, 1, 0x1010, True)
-        await helper.write(ctx, 0xF, 0x10F0, True)
+        # Do some write misses
+        await helper.write(ctx, 0, 0x1000, False)
+        assert helper.elapsed_time == 1
+        await helper.write(ctx, 1, 0x1001, False)
+        assert helper.elapsed_time == 2
+        await helper.write(ctx, 3, 0x1003, False)
+        assert helper.elapsed_time == 3
 
-        # Write to 0x17 to cause a write back
-        await helper.write(ctx, 0x17, 0x1170, False)
-        await helper.read(ctx, 0x17, 0x1170, True)
-        await helper.read(ctx, 0x10, 0, True)
-        await helper.read(ctx, 0x1F, 0, True)
+        # Do some write hits
+        await helper.write(ctx, 0, 0x1100, True)
+        assert helper.elapsed_time == 4
+        await helper.write(ctx, 1, 0x1101, True)
+        assert helper.elapsed_time == 5
+        await helper.write(ctx, 3, 0x1103, True)
+        assert helper.elapsed_time == 6
 
-        # check that everything got written back correctly
-        await helper.read(ctx, 0xF, 0x10F0, False)
-        await helper.read(ctx, 0x1, 0x1010, True)
-        await helper.read(ctx, 0x7, 0x1070, True)
+        # Do some read hits
+        await helper.read(ctx, 0, 0x1100, True)
+        assert helper.elapsed_time == 7
+        await helper.read(ctx, 1, 0x1101, True)
+        assert helper.elapsed_time == 8
+        await helper.read(ctx, 3, 0x1103, True)
+        assert helper.elapsed_time == 9
 
-        # check that 0x17 also got writte back correctly
-        await helper.read(ctx, 0x17, 0x1170, False)
-        await helper.read(ctx, 0x17, 0x1170, True)
+        # Do a read miss
+        await helper.read(ctx, 2, 0, False)
+        # Do a read miss with a replacement
+        await helper.read(ctx, 6, 0, False)
+
+        # Do a write with a write back
+        await helper.write(ctx, 5, 0x1005, False)
+
+        # Check whether everything still works by creating read hits
+        elapsed_time = helper.elapsed_time
+        await helper.read(ctx, 2, 0, True)
+        assert helper.elapsed_time - elapsed_time == 1
+        await helper.read(ctx, 6, 0, True)
+        assert helper.elapsed_time - elapsed_time == 2
+        await helper.read(ctx, 3, 0x1103, True)
+        assert helper.elapsed_time - elapsed_time == 3
+        await helper.read(ctx, 5, 0x1005, True)
+        assert helper.elapsed_time - elapsed_time == 4
 
     run_bench(dut=dut, bench=bench)

@@ -1,7 +1,6 @@
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -28,11 +27,7 @@ def test():
                 block_size=2,
             ),
         ],
-        memory_config=MemoryConfig(
-            data_width=26,
-            min_address=0,
-            max_address=8,
-        ),
+        main_memory_data_width=26,
     )
 
     helper = CacheWrapperBenchHelper(dut)

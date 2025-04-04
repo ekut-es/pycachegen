@@ -34,16 +34,10 @@ class MainMemory(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # align address for Amaranth Memory with specified memory range
-        aligned_address = Signal(
-            range(0, self.config.max_address - self.config.min_address)
-        )
-        m.d.comb += aligned_address.eq(self.fe.address - self.config.min_address)
-
         # Create data memory
         m.submodules.data_memory = data_memory = Memory(
             shape=unsigned(self.config.data_width),
-            depth=(self.config.max_address - self.config.min_address),
+            depth=(2**self.config.address_width),
             init=[],
         )
 
@@ -53,6 +47,8 @@ class MainMemory(wiring.Component):
         # Track whether the last request was a read so that we can hand out the read
         # data and it as valid when appropriate
         last_request_was_read = Signal()
+        with m.If(self.fe.request_valid):
+            m.d.sync += last_request_was_read.eq(~self.fe.write_strobe.any())
         with m.If(last_request_was_read):
             m.d.comb += [
                 self.fe.read_data_valid.eq(1),
@@ -60,20 +56,14 @@ class MainMemory(wiring.Component):
             ]
 
         # Connect the inputs of read_port and write_port
-        with m.If(
-            (self.fe.address >= self.config.min_address)
-            & (self.fe.address < self.config.max_address)
-        ):
-            with m.If(self.fe.request_valid):
-                m.d.sync += last_request_was_read.eq(~self.fe.write_strobe.any())
-            m.d.comb += [
-                # always responds within one cycle and is thus always ready
-                self.fe.port_ready.eq(1),
-                read_port.addr.eq(aligned_address),
-                read_port.en.eq(self.fe.is_read_request()),
-                write_port.addr.eq(aligned_address),
-                write_port.data.eq(self.fe.write_data),
-                write_port.en.eq(Mux(self.fe.request_valid, self.fe.write_strobe, 0)),
-            ]
+        m.d.comb += [
+            # always responds within one cycle and is thus always ready
+            self.fe.port_ready.eq(1),
+            read_port.addr.eq(self.fe.address),
+            read_port.en.eq(self.fe.is_read_request()),
+            write_port.addr.eq(self.fe.address),
+            write_port.data.eq(self.fe.write_data),
+            write_port.en.eq(Mux(self.fe.request_valid, self.fe.write_strobe, 0)),
+        ]
 
         return m

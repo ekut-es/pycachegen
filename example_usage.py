@@ -3,7 +3,6 @@ from amaranth.back import verilog
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
-    MemoryConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -23,13 +22,9 @@ cache_wrapper = CacheWrapper(
             block_size=1,
         )
     ],
-    memory_config=MemoryConfig(
-        data_width=16,
-        read_latency=10,
-        write_latency=15,
-        min_address=0,
-        max_address=256,
-    ),
+    main_memory_data_width=16,
+    read_delay=9,
+    write_delay=14,
 )
 
 with open("cache_wrapper.v", "w") as f:

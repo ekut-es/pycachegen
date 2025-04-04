@@ -2,7 +2,7 @@ from pathlib import Path
 
 from amaranth.back import verilog
 
-from .cache_config import CacheConfig, MemoryConfig, ReplacementPolicies
+from .cache_config import CacheConfig, ReplacementPolicies
 from .cache_wrapper import CacheWrapper
 
 # TODO delete this file
@@ -21,9 +21,9 @@ cache_wrapper = CacheWrapper(
             block_size=4,
         )
     ],
-    memory_config=MemoryConfig(
-        data_width=64, read_latency=10, write_latency=15, min_address=0, max_address=512
-    ),
+    main_memory_data_width=64,
+    read_delay=9,
+    write_delay=14,
 )
 
 Path("export").mkdir(parents=True, exist_ok=True)
