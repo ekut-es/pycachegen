@@ -9,7 +9,6 @@ from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters
 
 
-# TODO subtract / add lower address bound to ingoing/outgoing addresses
 @log_parameters
 class CacheSubsystem(wiring.Component):
     def __init__(
@@ -21,7 +20,8 @@ class CacheSubsystem(wiring.Component):
     ):
         """Cache subsytem for the pulpissimo SoC which includes an adapter, and a CacheWrapper.
 
-        You should look at the README in this folder for how to integrate this module into the Pulpissimo.
+        Look at the pulpissimo_cache_subsystem_wrapper.sv in this folder on how to integrate the Cache
+        into the SoC.
 
         Args:
             cache_address_width: Address width of the cache(s) in bits. Note that this module has a TCDM interface with 32 bit addresses, this parameter only describes the address width of the caches. It should match the depth of the memory that is connected to the BE of the cache(s).
