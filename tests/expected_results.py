@@ -30,5 +30,5 @@ expected_results = {
     "cache_wrapper_tb_28.vcd": 73000000000,
     "cache_wrapper_tb_29.vcd": 115000000000,
     "cache_wrapper_tb_30.vcd": 281000000000,
-    "main_memory_tb_01.vcd": 14000000000,
+    "cache_wrapper_tb_31.vcd": 14000000000,
 }
