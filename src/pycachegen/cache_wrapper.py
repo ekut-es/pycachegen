@@ -10,7 +10,9 @@ from .cache_config import (
     InternalCacheConfig,
     InternalMemoryConfig,
     MemoryConfig,
+    assert_delays_valid,
 )
+from .delay_unit import DelayUnit
 from .interfaces import MemoryBusSignature
 from .main_memory import MainMemory
 
@@ -22,6 +24,8 @@ class CacheWrapper(wiring.Component):
         address_width: int,
         memory_config: MemoryConfig,
         cache_configs: list[CacheConfig],
+        read_delay: int = 0,
+        write_delay: int = 0,
         create_main_memory: bool = True,
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
@@ -39,13 +43,18 @@ class CacheWrapper(wiring.Component):
             create_main_memory (bool): Whether a main memory should be created. If False, a BE interface will be created instead. This interface will be configured in the way described by the memory_config.
             arbitration_scheme (ArbitrationScheme): Scheme for the arbiter in case there is more than one port. Supports priority and round robin scheme.
             byte_size (int): Number of bits per byte.
+            read_delay (int): The amount of cycles by which read requests to the main memory should be delayed. Can be set to 0, in which case write_delay must also be 0.
+            write_delay (int): The amount of cycles by which write requests to the main memory should be delayed. Can be set to 0, in which case read_delay must also be 0.
         """
+        assert_delays_valid(read_delay, write_delay)
         self.num_ports = num_ports
         self.arbitration_scheme = arbitration_scheme
         self.byte_size = byte_size
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
         self.create_main_memory = create_main_memory
+        self.read_delay = read_delay
+        self.write_delay = write_delay
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -88,8 +97,14 @@ class CacheWrapper(wiring.Component):
             byte_size=self.byte_size,
         )
 
+        self.be_memory_bus_signature = MemoryBusSignature(
+            address_width=self.memory_config.address_width,
+            data_width=self.memory_config.data_width,
+            bytes_per_word=self.memory_config.bytes_per_word,
+        )
+
         # TODO move creating this signature into the internal config?
-        self.memory_bus_signature = MemoryBusSignature(
+        self.fe_memory_bus_signature = MemoryBusSignature(
             address_width=self.fe_address_width,
             data_width=self.fe_data_width,
             bytes_per_word=self.fe_bytes_per_word,
@@ -98,11 +113,11 @@ class CacheWrapper(wiring.Component):
         ports = {}
 
         for i in range(num_ports):
-            ports[f"fe_{i}"] = In(self.memory_bus_signature)
+            ports[f"fe_{i}"] = In(self.fe_memory_bus_signature)
             ports[f"hit_o_{i}"] = Out(1)
 
         if not create_main_memory:
-            ports["be"] = Out(self.memory_bus_signature)
+            ports["be"] = Out(self.fe_memory_bus_signature)
 
         super().__init__(ports)
 
@@ -116,7 +131,7 @@ class CacheWrapper(wiring.Component):
         if self.num_ports > 1:
             m.submodules.arbiter = arbiter = Arbiter(
                 num_ports=self.num_ports,
-                bus_signature=self.memory_bus_signature,
+                bus_signature=self.fe_memory_bus_signature,
                 arbitration_scheme=self.arbitration_scheme,
             )
             # connect the arbiter to the FE ports
@@ -139,6 +154,18 @@ class CacheWrapper(wiring.Component):
             out_list.append(cache.be)
             if i == 0:
                 m.d.comb += l1_hit.eq(cache.hit_o)
+
+        # optionally create a delay module
+        if self.read_delay:
+            m.submodules.delay_unit = delay_unit = DelayUnit(
+                mem_signature=self.be_memory_bus_signature,
+                read_delay=self.read_delay,
+                write_delay=self.write_delay,
+                min_addr=self.memory_config.min_address,
+                max_addr=self.memory_config.max_address,
+            )
+            in_list.append(delay_unit.requestor)
+            out_list.append(delay_unit.target)
 
         # create the main memory
         if self.create_main_memory:

@@ -167,11 +167,10 @@ def assert_address_range_valid(
         )
 
 
-# TODO Remove cache latencies
-def assert_cache_latencies_valid(hit_latency: int, miss_latency: int) -> None:
-    if not (hit_latency ^ miss_latency):
+def assert_delays_valid(read_delay: int, write_delay: int) -> None:
+    if not (read_delay ^ write_delay):
         raise ConfigurationError(
-            f"The hit and miss latencies must either both be 0 or greater than 0, but they are configured to be {hit_latency} and {miss_latency}"
+            f"The read and write delays must either both be 0 or greater than 0, but they are configured to be {read_delay} and {write_delay}"
         )
 
 
@@ -315,8 +314,6 @@ class MemoryConfig:
         min_address: int,
         max_address: Optional[int] = None,
         size: Optional[int] = None,
-        read_latency: int = 10,
-        write_latency: int = 15,
     ) -> None:
         """Class for end users to create configurations for memories.
 
@@ -325,8 +322,6 @@ class MemoryConfig:
             min_address (int): The smallest address (inclusive) for which to generate memory. Requests to smaller addresses will be ignored. Addresses generally don't include a byte offset.
             max_address (Optional[int]): The greatest address (exclusive) for which to generate memory. Requests to greater or equal addresses will be ignored. Addresses generally don't include a byte offset. When set to None size must be set
             size (Optional[int]): size of the memory in bytes. This parameter is overriden when max_address is set. When max_adress is not set this parameter determines it using data_width and min_address.
-            read_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
-            write_latency (int): The number of clock cycles required for a read operation. Needs to be at least 2.
         """
 
         if max_address is None and size is None:
@@ -337,8 +332,6 @@ class MemoryConfig:
             self.max_address = min_address + size // data_width
 
         self.data_width = data_width
-        self.read_latency = read_latency
-        self.write_latency = write_latency
         self.min_address = min_address
 
 
@@ -356,10 +349,7 @@ class InternalMemoryConfig:
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             byte_size (int): Number of bits per byte.
         """
-        assert_greater_equal(memory_config.read_latency, 2, "read_latency")
-        assert_greater_equal(memory_config.write_latency, 2, "write_latency")
         assert_data_width_valid(memory_config.data_width, byte_size)
-
         assert_address_range_valid(
             memory_config.min_address,
             memory_config.max_address,
@@ -368,8 +358,6 @@ class InternalMemoryConfig:
 
         self.data_width = memory_config.data_width
         self.address_width = address_width
-        self.read_latency = memory_config.read_latency
-        self.write_latency = memory_config.write_latency
         self.byte_size = byte_size
         self.min_address = memory_config.min_address
         self.max_address = memory_config.max_address

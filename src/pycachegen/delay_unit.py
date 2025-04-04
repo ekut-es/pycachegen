@@ -5,24 +5,39 @@ from amaranth.lib.wiring import In, Out
 from .interfaces import MemoryBusSignature
 
 
-# TODO Maybe rework this module so it does not rely on the next level memory responding within 1 cycle
-# It might be a better Idea to just wait until the BE becomes ready, then issue the request and delay
-# the response by the specified amount.
 class DelayUnit(wiring.Component):
     def __init__(
-        self, mem_signature: MemoryBusSignature, read_delay: int, write_delay: int
+        self,
+        mem_signature: MemoryBusSignature,
+        read_delay: int,
+        write_delay: int,
+        min_addr,
+        max_addr,
     ):
         """Delays incoming requests by the specified amount of cycles.
 
+        This module will accept new requests and then buffer and delay them for the specified
+        number of cycles. After that time, the request will be sent to the target. After the target
+        has accepted the request, the response will be forwarded and a new request will be accepted
+        if there is one. Because of this, the target must process each request within one cycle
+        after accepting it. The request to the target will not change until it gets accepted, so
+        the target may delay asserting port_ready until one cycle before it has finished processing
+        the request.
+
+        Also note that the flush signal will not be forwarded to the BE. Instead, the port_ready
+        signal will just stay asserted when this module receives a flush.
+
         Args:
             mem_signature (MemoryBusSignature): Signature of the bus.
-            read_delay (int): Delay for read requests.
-            write_delay (int): Delay for write requests.
+            read_delay (int): Delay for read requests. Must be at least 1.
+            write_delay (int): Delay for write requests. Must be at least 1.
         """
         assert read_delay >= 1 and write_delay >= 1
         self.mem_signature = mem_signature
         self.read_delay = read_delay
         self.write_delay = write_delay
+        self.min_addr = min_addr
+        self.max_addr = max_addr
         super().__init__({"requestor": In(mem_signature), "target": Out(mem_signature)})
 
     def elaborate(self, platform):
@@ -39,7 +54,6 @@ class DelayUnit(wiring.Component):
         write_data = Signal(requestor.write_data.shape())
         write_strobe = Signal(requestor.write_strobe.shape())
         request_valid = Signal()
-        flush = Signal()
 
         delay_reached = Signal()
         m.d.comb += delay_reached.eq(
@@ -53,12 +67,16 @@ class DelayUnit(wiring.Component):
             m.d.comb += requestor.port_ready.eq(1)
             m.d.comb += requestor.read_data.eq(target.read_data)
             m.d.comb += requestor.read_data_valid.eq(target.read_data_valid)
-            with m.If(requestor.request_valid | requestor.flush):
+            with m.If(
+                requestor.request_valid
+                & (requestor.address >= self.min_addr)
+                & (requestor.address < self.max_addr)
+                & ~requestor.flush
+            ):
                 m.d.sync += address.eq(requestor.address)
                 m.d.sync += write_data.eq(requestor.write_data)
                 m.d.sync += write_strobe.eq(requestor.write_strobe)
                 m.d.sync += request_valid.eq(requestor.request_valid)
-                m.d.sync += flush.eq(requestor.flush)
                 m.d.sync += state.eq(1)
         with m.Else():
             with m.If(~delay_reached):
@@ -69,7 +87,6 @@ class DelayUnit(wiring.Component):
                 m.d.comb += target.write_data.eq(write_data)
                 m.d.comb += target.write_strobe.eq(write_strobe)
                 m.d.comb += target.request_valid.eq(request_valid)
-                m.d.comb += target.flush.eq(flush)
                 with m.If(target.port_ready):
                     # target ready to process request, go back to idle
                     m.d.sync += state.eq(0)

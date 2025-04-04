@@ -15,6 +15,8 @@ def test():
         num_ports=1,
         byte_size=8,
         address_width=8,
+        read_delay=4,
+        write_delay=7,
         cache_configs=[
             CacheConfig(
                 data_width=16,
@@ -28,8 +30,6 @@ def test():
         ],
         memory_config=MemoryConfig(
             data_width=32,
-            read_latency=5,
-            write_latency=8,
             min_address=0,
             max_address=128,
         ),

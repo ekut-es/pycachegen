@@ -1,4 +1,4 @@
-from amaranth import Module, Signal, unsigned
+from amaranth import Module, Mux, Signal, unsigned
 from amaranth.lib import data, wiring
 from amaranth.lib.memory import Memory
 from amaranth.lib.wiring import In, Out
@@ -7,12 +7,12 @@ from .cache_config import InternalMemoryConfig
 from .interfaces import MemoryBusSignature
 
 
-# TODO check if this module can be reworked (and if an additional delay of 0 cycles is possible.)
 class MainMemory(wiring.Component):
     def __init__(self, config: InternalMemoryConfig) -> None:
-        """A main memory with configurable delay.
+        """A simple memory with the MemoryBusInterface.
 
-        Requests will be artificially delayed by the configured amount.
+        This memory uses the amaranth.lib.memory.Memory which is well suited for FPGAs
+        (BRAM should usually be inferred from it).
 
         Args:
             config (InternalMemoryConfig): Configuration of the memory.
@@ -34,15 +34,6 @@ class MainMemory(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        # whether a request is currently being processed
-        processing_request = Signal(1)
-        m.d.comb += self.fe.port_ready.eq(~processing_request)
-        # type of current request (read: 0, write: 1)
-        request_type = Signal(1)
-        # counter for counting the execution time of a request
-        latency_counter = Signal(
-            range(max(self.config.read_latency, self.config.write_latency))
-        )
         # align address for Amaranth Memory with specified memory range
         aligned_address = Signal(
             range(0, self.config.max_address - self.config.min_address)
@@ -57,52 +48,32 @@ class MainMemory(wiring.Component):
         )
 
         write_port = data_memory.write_port(granularity=self.config.byte_size)
-
         read_port = data_memory.read_port()
-        m.d.comb += self.fe.read_data.eq(read_port.data)
 
-        with m.If(~processing_request):
-            with m.If(
-                self.fe.request_valid
-                & (self.fe.address >= self.config.min_address)
-                & (self.fe.address < self.config.max_address)
-            ):
-                # Buffer inputs
-                m.d.sync += processing_request.eq(1)
-                m.d.sync += request_type.eq(self.fe.write_strobe.any())
+        # Track whether the last request was a read so that we can hand out the read
+        # data and it as valid when appropriate
+        last_request_was_read = Signal()
+        with m.If(last_request_was_read):
+            m.d.comb += [
+                self.fe.read_data_valid.eq(1),
+                self.fe.read_data.eq(read_port.data),
+            ]
 
-                # Reset response
-                m.d.sync += self.fe.read_data_valid.eq(0)
-
-                # Increment latency counter
-                m.d.sync += latency_counter.eq(latency_counter + 1)
-
-                # Initiate read/write
-                m.d.sync += write_port.en.eq(self.fe.write_strobe)
-                m.d.sync += write_port.addr.eq(aligned_address)
-                m.d.sync += write_port.data.eq(self.fe.write_data)
-                m.d.sync += read_port.en.eq(~self.fe.write_strobe.any())
-                m.d.sync += read_port.addr.eq(aligned_address)
-        with m.Else():
-            # clear enable on read/write ports
-            m.d.sync += read_port.en.eq(0)
-            m.d.sync += write_port.en.eq(0)
-            with m.If(
-                (
-                    (request_type == 0)
-                    & (latency_counter == self.config.read_latency - 1)
-                )
-                | (
-                    (request_type == 1)
-                    & (latency_counter == self.config.write_latency - 1)
-                )
-            ):
-                # Reset internal registers
-                m.d.sync += processing_request.eq(0)
-                m.d.sync += latency_counter.eq(0)
-                # Set correct response
-                m.d.sync += self.fe.read_data_valid.eq(~request_type)
-            with m.Else():
-                m.d.sync += latency_counter.eq(latency_counter + 1)
+        # Connect the inputs of read_port and write_port
+        with m.If(
+            (self.fe.address >= self.config.min_address)
+            & (self.fe.address < self.config.max_address)
+        ):
+            with m.If(self.fe.request_valid):
+                m.d.sync += last_request_was_read.eq(~self.fe.write_strobe.any())
+            m.d.comb += [
+                # always responds within one cycle and is thus always ready
+                self.fe.port_ready.eq(1),
+                read_port.addr.eq(aligned_address),
+                read_port.en.eq(self.fe.is_read_request()),
+                write_port.addr.eq(aligned_address),
+                write_port.data.eq(self.fe.write_data),
+                write_port.en.eq(Mux(self.fe.request_valid, self.fe.write_strobe, 0)),
+            ]
 
         return m

@@ -9,10 +9,10 @@ def test():
     dut = CacheWrapper(
         address_width=3,
         num_ports=1,
+        read_delay=1,
+        write_delay=2,
         memory_config=MemoryConfig(
             data_width=32,
-            read_latency=2,
-            write_latency=3,
             min_address=3,
             max_address=7,
         ),
