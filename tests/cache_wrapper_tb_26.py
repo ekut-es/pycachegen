@@ -1,4 +1,5 @@
 from pycachegen import (
+    ArbitrationScheme,
     CacheConfig,
     CacheWrapper,
     MemoryConfig,
@@ -9,12 +10,11 @@ from pycachegen import (
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
-# Testbench for testing hit latency of 5 and miss latency of 16
+# Testbench for testing a priority arbiter but with longer cache delays
 def test():
-    hit_latency = 5
-    miss_latency = 16
     dut = CacheWrapper(
-        num_ports=1,
+        num_ports=3,
+        arbitration_scheme=ArbitrationScheme.PRIORITY,
         byte_size=8,
         address_width=8,
         cache_configs=[
@@ -25,72 +25,64 @@ def test():
                 replacement_policy=ReplacementPolicies.LRU,
                 write_policy=WritePolicies.WRITE_BACK,
                 write_allocate=True,
-                block_size=1,
-                hit_latency=hit_latency,
-                miss_latency=miss_latency,
+                block_size=4,
             ),
         ],
         memory_config=MemoryConfig(
-            data_width=16,
+            data_width=32,
             read_latency=5,
             write_latency=8,
             min_address=0,
-            max_address=256,
+            max_address=128,
         ),
     )
 
-    helper = CacheWrapperBenchHelper(dut)
-
-    elapsed_time = 0
-
-    def assert_elapsed_time(t):
-        nonlocal elapsed_time
-        assert helper.elapsed_time - elapsed_time == t
-        elapsed_time = helper.elapsed_time
+    CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # Do some write misses
-        await helper.write(ctx, 0, 0x1000, False)
-        assert_elapsed_time(1 + miss_latency)
-        await helper.write(ctx, 1, 0x1001, False)
-        assert_elapsed_time(1 + miss_latency)
-        await helper.write(ctx, 3, 0x1003, False)
-        assert_elapsed_time(1 + miss_latency)
+        # Write request from port 0 to addr 0
+        ctx.set(dut.fe_0.request_valid, 1)
+        ctx.set(dut.fe_0.address, 0)
+        ctx.set(dut.fe_0.write_strobe, -1)
+        ctx.set(dut.fe_0.write_data, 0x1000)
 
-        # Do some write hits
-        await helper.write(ctx, 0, 0x1100, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.write(ctx, 1, 0x1101, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.write(ctx, 3, 0x1103, True)
-        assert_elapsed_time(1 + hit_latency)
+        # Read request from port 1 from addr 6 (which is in another block)
+        ctx.set(dut.fe_1.request_valid, 1)
+        ctx.set(dut.fe_1.address, 6)
+        ctx.set(dut.fe_1.write_strobe, 0)
 
-        # Do some read hits
-        await helper.read(ctx, 0, 0x1100, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.read(ctx, 1, 0x1101, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.read(ctx, 3, 0x1103, True)
-        assert_elapsed_time(1 + hit_latency)
+        # Read request from port 2 from addr 0
+        ctx.set(dut.fe_2.request_valid, 1)
+        ctx.set(dut.fe_2.address, 0)
+        ctx.set(dut.fe_2.write_strobe, 0)
 
-        # Do a read miss
-        await helper.read(ctx, 2, 0, False)
-        # Do a read miss with a replacement
-        await helper.read(ctx, 6, 0, False)
+        await ctx.tick()
+        # all requests buffered, dont send new requests
+        ctx.set(dut.fe_0.request_valid, 0)
+        ctx.set(dut.fe_1.request_valid, 0)
+        ctx.set(dut.fe_2.request_valid, 0)
+        assert not ctx.get(dut.fe_0.port_ready)
+        assert not ctx.get(dut.fe_1.port_ready)
+        assert not ctx.get(dut.fe_2.port_ready)
 
-        # Do a write with a write back
-        await helper.write(ctx, 5, 0x1005, False)
+        # wait until port 1's read data is valid
+        while not ctx.get(dut.fe_1.read_data_valid):
+            await ctx.tick()
+        # check that it's correct
+        assert ctx.get(dut.fe_1.read_data) == 0
+        # check that port 1 is still not ready because the cache is still busy with its request
+        assert ctx.get(dut.fe_0.port_ready)
+        assert not ctx.get(dut.fe_1.port_ready)
+        assert not ctx.get(dut.fe_2.port_ready)
 
-        # Check whether everything still works by creating read hits
-        nonlocal elapsed_time
-        elapsed_time = helper.elapsed_time
-        await helper.read(ctx, 2, 0, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.read(ctx, 6, 0, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.read(ctx, 3, 0x1103, True)
-        assert_elapsed_time(1 + hit_latency)
-        await helper.read(ctx, 5, 0x1005, True)
-        assert_elapsed_time(1 + hit_latency)
+        # now do the same for port 2 read data: wait until valid
+        while not ctx.get(dut.fe_2.read_data_valid):
+            await ctx.tick()
+        # check that the data is correct
+        assert ctx.get(dut.fe_2.read_data) == 0x1000
+        # the cache should be ready again and so all ports should be ready too
+        assert ctx.get(dut.fe_0.port_ready)
+        assert ctx.get(dut.fe_1.port_ready)
+        assert ctx.get(dut.fe_2.port_ready)
 
     run_bench(dut=dut, bench=bench)

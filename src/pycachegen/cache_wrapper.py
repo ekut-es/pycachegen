@@ -11,7 +11,6 @@ from .cache_config import (
     InternalMemoryConfig,
     MemoryConfig,
 )
-from .cache_delay_module import CacheDelayModule
 from .interfaces import MemoryBusSignature
 from .main_memory import MainMemory
 
@@ -127,16 +126,6 @@ class CacheWrapper(wiring.Component):
         memory_hierarchy = []
         for i, cache_config in enumerate(self.cache_configs):
             m.submodules[f"l{i+1}_cache"] = cache = Cache(config=cache_config)
-            if cache_config.hit_latency or cache_config.miss_latency:
-                # Add a delay module if the delays aren't 0
-                m.submodules[f"l{i+1}_delay"] = delay_module = CacheDelayModule(
-                    bus_signature=cache_config.fe_signature,
-                    hit_latency=cache_config.hit_latency,
-                    miss_latency=cache_config.miss_latency,
-                )
-                memory_hierarchy.append(delay_module)
-                wiring.connect(m, delay_module.be, cache.fe)
-                m.d.comb += delay_module.hit_i.eq(cache.hit_o)
             memory_hierarchy.append(cache)
 
         # connect the hit signal of the first cache to the l1_hit output

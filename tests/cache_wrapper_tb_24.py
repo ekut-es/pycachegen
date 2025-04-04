@@ -9,9 +9,8 @@ from pycachegen import (
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
 
-# Testbench for testing hit and miss latencies of 1
+# Testbench for testing the timing of some 1 cycle operations
 def test():
-    latency = 1
     dut = CacheWrapper(
         num_ports=1,
         byte_size=8,
@@ -25,8 +24,6 @@ def test():
                 write_policy=WritePolicies.WRITE_BACK,
                 write_allocate=True,
                 block_size=1,
-                hit_latency=latency,
-                miss_latency=latency,
             ),
         ],
         memory_config=MemoryConfig(
@@ -43,27 +40,27 @@ def test():
     async def bench(ctx):
         # Do some write misses
         await helper.write(ctx, 0, 0x1000, False)
-        assert helper.elapsed_time == (1 + latency)
+        assert helper.elapsed_time == 1
         await helper.write(ctx, 1, 0x1001, False)
-        assert helper.elapsed_time == 2 * (1 + latency)
+        assert helper.elapsed_time == 2
         await helper.write(ctx, 3, 0x1003, False)
-        assert helper.elapsed_time == 3 * (1 + latency)
+        assert helper.elapsed_time == 3
 
         # Do some write hits
         await helper.write(ctx, 0, 0x1100, True)
-        assert helper.elapsed_time == 4 * (1 + latency)
+        assert helper.elapsed_time == 4
         await helper.write(ctx, 1, 0x1101, True)
-        assert helper.elapsed_time == 5 * (1 + latency)
+        assert helper.elapsed_time == 5
         await helper.write(ctx, 3, 0x1103, True)
-        assert helper.elapsed_time == 6 * (1 + latency)
+        assert helper.elapsed_time == 6
 
         # Do some read hits
         await helper.read(ctx, 0, 0x1100, True)
-        assert helper.elapsed_time == 7 * (1 + latency)
+        assert helper.elapsed_time == 7
         await helper.read(ctx, 1, 0x1101, True)
-        assert helper.elapsed_time == 8 * (1 + latency)
+        assert helper.elapsed_time == 8
         await helper.read(ctx, 3, 0x1103, True)
-        assert helper.elapsed_time == 9 * (1 + latency)
+        assert helper.elapsed_time == 9
 
         # Do a read miss
         await helper.read(ctx, 2, 0, False)
@@ -76,12 +73,12 @@ def test():
         # Check whether everything still works by creating read hits
         elapsed_time = helper.elapsed_time
         await helper.read(ctx, 2, 0, True)
-        assert helper.elapsed_time - elapsed_time == (1 + latency)
+        assert helper.elapsed_time - elapsed_time == 1
         await helper.read(ctx, 6, 0, True)
-        assert helper.elapsed_time - elapsed_time == 2 * (1 + latency)
+        assert helper.elapsed_time - elapsed_time == 2
         await helper.read(ctx, 3, 0x1103, True)
-        assert helper.elapsed_time - elapsed_time == 3 * (1 + latency)
+        assert helper.elapsed_time - elapsed_time == 3
         await helper.read(ctx, 5, 0x1005, True)
-        assert helper.elapsed_time - elapsed_time == 4 * (1 + latency)
+        assert helper.elapsed_time - elapsed_time == 4
 
     run_bench(dut=dut, bench=bench)

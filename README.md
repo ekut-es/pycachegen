@@ -6,12 +6,11 @@ PyCacheGen is a python package for generating data caches written in the [Amaran
 
 - Configurable number of sets, block size, associativity, word width, address width, byte size
 - Supports write back and write through which can both be combined with write allocate and write no-allocate
-- Supports the LRU, tree-based PLRU and MRU based PLRU replacement policies
+- Supports the FIFO, LRU, tree-based PLRU and MRU based PLRU replacement policies
 - Read and write hits can be answered within one cycle
 - Uses critical word first for read misses
 - Caches with a block size greater than 1 can take advantage of bigger backend data widths
 - Offers priority and round robin arbiters for generating multiple memory ports
-- Offers a cache delay module for simulating slower caches
 
 ## Installation
 
@@ -38,7 +37,7 @@ Note that multiple ports get generated using an arbiter. This arbiter includes i
 
 ## Creating only a Cache
 
-Caches can also be created individually using the `Cache` class. It can be configured using the `pycachegen.cache_config.InternalCacheConfig` class, which is created using the standard `CacheConfig` class as well as some additional parameters. These parameters usually get inferred by the configuration of the `CacheWrapper` class. Also note that the latency parameters of the `CacheConfig` class only get processed by the `CacheWrapper` class and don't do anything otherwise.
+Caches can also be created individually using the `Cache` class. It can be configured using the `pycachegen.cache_config.InternalCacheConfig` class, which is created using the standard `CacheConfig` class as well as some additional parameters. These parameters usually get inferred by the configuration of the `CacheWrapper` class.
 
 The `Cache` uses one front end and one back end memory interface, prefixed with `fe__` and `be__` respectively.
 
