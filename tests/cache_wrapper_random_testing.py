@@ -11,11 +11,11 @@ def random_test(dut: CacheWrapper) -> None:
         requests_processed = 0
         hits = 0
         memory_dict = dict()
-        data_width_ratio = dut.memory_config.data_width // dut.fe_data_width
         block_size = dut.cache_configs[0].block_size
         rand_interval_size = max(1, block_size // 3)
-        min_address = dut.memory_config.min_address * data_width_ratio
-        max_address = dut.memory_config.max_address * data_width_ratio
+        min_address = 0
+        max_address = 2**dut.fe_address_width
+        bytes_per_word = dut.fe_memory_bus_signature.bytes_per_word
         address = 0
         while True:
             # generate a random request
@@ -33,9 +33,9 @@ def random_test(dut: CacheWrapper) -> None:
             if random.random() < 0.5:  # 50%
                 write_strobe = 0
             elif random.random() < 0.75:  # 37,5%
-                write_strobe = 2 ** (dut.fe_bytes_per_word) - 1
+                write_strobe = 2**bytes_per_word - 1
             else:  # 12,5%
-                write_strobe = random.randrange(0, 2 ** (dut.fe_bytes_per_word))
+                write_strobe = random.randrange(0, 2**bytes_per_word)
             write_data = random.randrange(0, 2**dut.fe_data_width)
 
             # send the request
@@ -58,7 +58,7 @@ def random_test(dut: CacheWrapper) -> None:
                 # write to dict
                 val = memory_dict.get(address, 0)
                 new_val = 0
-                for i in range(dut.fe_bytes_per_word):
+                for i in range(bytes_per_word):
                     byte_in_mem = (val >> (i * dut.byte_size)) % (2**dut.byte_size)
                     byte_in_req = (write_data >> (i * dut.byte_size)) % (
                         2**dut.byte_size
@@ -100,6 +100,9 @@ if __name__ == "__main__":
         byte_size=8,
         address_width=8,
         main_memory_data_width=32,
+        create_main_memory=True,
+        read_delay=3,
+        write_delay=5,
         cache_configs=[
             CacheConfig(
                 data_width=32,
@@ -109,9 +112,8 @@ if __name__ == "__main__":
                 replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_policy=WritePolicies.WRITE_THROUGH,
                 write_allocate=False,
-                hit_latency=0,
-                miss_latency=0,
                 write_buffer_size=16,
+                data_memory_module="",
             )
         ],
     )
