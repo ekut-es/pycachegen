@@ -18,10 +18,9 @@ class CacheSubsystem(wiring.Component):
         read_delay: int,
         write_delay: int,
     ):
-        """Cache subsytem for the pulpissimo SoC which includes an adapter, and a CacheWrapper.
+        """Cache subsytem for the pulpissimo SoC which includes an adapter and a CacheWrapper.
 
-        Look at the pulpissimo_cache_subsystem_wrapper.sv in this folder on how to integrate the Cache
-        into the SoC.
+        Look at the README on how to integrate the Cache into the SoC.
 
         Args:
             cache_address_width: Address width of the cache(s) in bits. Note that this module has a TCDM interface with 32 bit addresses, this parameter only describes the address width of the caches. It should match the depth of the memory that is connected to the BE of the cache(s).
@@ -43,10 +42,16 @@ class CacheSubsystem(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        if (not self.cache_configs) and (not self.read_delay) and (not self.write_delay):
+        if (
+            (not self.cache_configs)
+            and (not self.read_delay)
+            and (not self.write_delay)
+        ):
             # CacheWrapper would be empty, so lets not create one
             # Connect the requestor to the target directly instead
-            wiring.connect(m, wiring.flipped(self.requestor), wiring.flipped(self.target))
+            wiring.connect(
+                m, wiring.flipped(self.requestor), wiring.flipped(self.target)
+            )
             # A useless synchronous statement so that clk and rst ports get generated...
             x = Signal(unsigned(1))
             m.d.sync += x.eq(~x)

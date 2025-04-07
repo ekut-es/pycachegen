@@ -1,11 +1,8 @@
-// Module which integrates a data cache into the pulpissimo SoC.
-// This Module takes all TCDM requesters as inputs on tcdm_in. Requests that are addressed for private bank 0
-// (which is where all data and nothing else should be) are then arbitrated and sent to the cache.
-// If your linker script works differently, you might get poor performance.
-// The cache's own request interface is output as tcdm_priv0. Since all requests for private bank 0
-// will come from this tcdm_priv0, the TCDM Demux should not get a rule for this address range and its
-// output port should be replaced by tcdm_priv0.
-// Requests for other addresses bypass the cache and will simply be output again on tcdm_out.
+// Module for integrating a PyCacheGen data cache into SoCs based on the pulp_soc, like the Pulpissimo
+// This module can take several TCDM requesters as tcdm_in. The request addresses will be used to check
+// whether the request should go to private bank 0. Such requests will go through the cache.
+// The cache's own request interface is output as tcdm_priv0. All other requests are simply output on
+// tcdm_out again.
 module pulpissimo_cache_subsystem_wrapper #(
   parameter int NR_MASTER_PORTS = 4,
   parameter int PRIV_BANK_0_MIN_ADDR = 32'h1C00_0000,
