@@ -1,4 +1,4 @@
-from amaranth import Module
+from amaranth import Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
@@ -43,6 +43,15 @@ class CacheSubsystem(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        if (not self.cache_configs) and (not self.read_delay) and (not self.write_delay):
+            # CacheWrapper would be empty, so lets not create one
+            # Connect the requestor to the target directly instead
+            wiring.connect(m, wiring.flipped(self.requestor), wiring.flipped(self.target))
+            # A useless synchronous statement so that clk and rst ports get generated...
+            x = Signal(unsigned(1))
+            m.d.sync += x.eq(~x)
+            return m
+
         # Create a CacheWrapper
         m.submodules.cache_wrapper = cache_wrapper = CacheWrapper(
             address_width=self.cache_address_width,
@@ -56,7 +65,7 @@ class CacheSubsystem(wiring.Component):
         )
 
         # The signature of the memory bus between the caches (its the same for all cache FEs and BEs)
-        cache_memory_bus_signature = cache_wrapper.cache_configs[0].fe_signature
+        cache_memory_bus_signature = cache_wrapper.fe_memory_bus_signature
 
         # Create a TCDM Adapter
         m.submodules.adapter = adapter = TCDMCacheAdapter(cache_memory_bus_signature)

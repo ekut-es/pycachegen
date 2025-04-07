@@ -167,7 +167,7 @@ def assert_address_range_valid(
 
 
 def assert_delays_valid(read_delay: int, write_delay: int) -> None:
-    if not (read_delay ^ write_delay):
+    if (read_delay == 0) ^ (write_delay == 0):
         raise ConfigurationError(
             f"The read and write delays must either both be 0 or greater than 0, but they are configured to be {read_delay} and {write_delay}"
         )
