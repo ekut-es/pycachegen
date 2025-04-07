@@ -76,7 +76,8 @@ def assert_data_width_valid(data_width: int, byte_size: int) -> None:
     """
     if data_width % byte_size != 0 or not is_power_of_two(data_width // byte_size):
         raise ConfigurationError(
-            f"Data width must have the form (byte_size * 2**n) with n >= 0 (data width {data_width}, byte size {byte_size})"
+            "Data width must have the form (byte_size * 2**n) with n >= 0 "
+            + f"(data width {data_width}, byte size {byte_size})"
         )
 
 
@@ -97,14 +98,16 @@ def assert_address_config_valid(address_width: int, num_sets: int, num_ways: int
     bits_required = exact_log2(num_sets) + exact_log2(block_size)
     if bits_required > address_width:
         raise ConfigurationError(
-            f"The number of sets and the block size require {bits_required} bits in the address, but the address is only {address_width} bits wide"
+            f"The number of sets and the block size require {bits_required} bits in the address,"
+            + f" but the address is only {address_width} bits wide"
         )
 
     # Check that there are not more ways than data words that would be stored in one set
     tag_width = address_width - bits_required
     if exact_log2(num_ways) > tag_width:
         raise ConfigurationError(
-            f"The tag is only {tag_width} bits wide but the cache has {num_ways} ways, so there are more ways than data words that would be stored in the same set"
+            f"The tag is only {tag_width} bits wide but the cache has {num_ways} ways, so there are more ways than data"
+            + " words that would be stored in the same set"
         )
 
 
@@ -163,7 +166,8 @@ def assert_address_range_valid(min_address: int, max_address: int, address_width
 def assert_delays_valid(read_delay: int, write_delay: int) -> None:
     if (read_delay == 0) ^ (write_delay == 0):
         raise ConfigurationError(
-            f"The read and write delays must either both be 0 or greater than 0, but they are configured to be {read_delay} and {write_delay}"
+            "The read and write delays must either both be 0 or greater than 0, but they are configured to be"
+            + f" {read_delay} and {write_delay}"
         )
 
 
@@ -191,8 +195,11 @@ class CacheConfig:
             write_policy (WritePolicies): Can be set to write-through or write-back.
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
-            write_buffer_size (int): The number of words that can be stored in the write buffer. If set to 0, no write buffer will be created.
-            data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be created if this value is an empty string.
+            write_buffer_size (int): The number of words that can be stored in the write buffer. If set to 0, no write
+                buffer will be created.
+            data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data
+                memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be
+                created if this value is an empty string.
         """
         self.data_width = data_width
         self.num_ways = num_ways
@@ -226,7 +233,8 @@ class InternalCacheConfig:
 
             cache_config (CacheConfig): The normal CacheConfig on which this InternalCacheConfig should be based.
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
-            be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
+            be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n)
+                where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
             byte_size (int): Number of bits per byte.
         """

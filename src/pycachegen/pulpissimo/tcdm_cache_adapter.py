@@ -11,7 +11,8 @@ class TCDMCacheAdapter(wiring.Component):
         """Adapts a cache to the pulpissimo TCDM interface.
 
         Args:
-            cache_signature (MemoryBusSignature): Signature of the cache interface. Note that the FE and BE interfaces use the same signature.
+            cache_signature (MemoryBusSignature): Signature of the cache interface. Note that the FE and BE interfaces
+                use the same signature.
         """
         self.cache_signature = cache_signature
         super().__init__(
@@ -35,7 +36,7 @@ class TCDMCacheAdapter(wiring.Component):
         requestor = self.requestor
         target = self.target
 
-        ## State of the adapter
+        # State of the adapter
         # Whether the adapter is currently processing a read or a write request.
         processing_read = Signal()
         processing_write = Signal()
@@ -46,7 +47,7 @@ class TCDMCacheAdapter(wiring.Component):
         # Buffer for the read data requested by the cache from the target
         read_data_buffer = Signal(unsigned(32))
 
-        ## Connect requestor and cache_fe
+        # Connect requestor and cache_fe
 
         with m.If(processing_read):
             # When processing a read, set r_valid to read_data_valid.
@@ -82,7 +83,7 @@ class TCDMCacheAdapter(wiring.Component):
         m.d.comb += requestor.r_opc.eq(0)  # Errors are not supported by the cache
         m.d.comb += cache_fe.flush.eq(0)  # Core doesn't use flush
 
-        ## Connect cache_be and target
+        # Connect cache_be and target
 
         with m.If(read_sent & target.r_valid):
             # Set read_answered if read_sent and rvalid

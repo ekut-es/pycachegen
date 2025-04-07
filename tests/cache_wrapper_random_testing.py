@@ -27,9 +27,7 @@ def random_test(dut: CacheWrapper) -> None:
                 )
             else:
                 # jump to a nearby address
-                address = (
-                    address + random.randint(-rand_interval_size, rand_interval_size)
-                ) % max_address
+                address = (address + random.randint(-rand_interval_size, rand_interval_size)) % max_address
             if random.random() < 0.5:  # 50%
                 write_strobe = 0
             elif random.random() < 0.75:  # 37,5%
@@ -60,9 +58,7 @@ def random_test(dut: CacheWrapper) -> None:
                 new_val = 0
                 for i in range(bytes_per_word):
                     byte_in_mem = (val >> (i * dut.byte_size)) % (2**dut.byte_size)
-                    byte_in_req = (write_data >> (i * dut.byte_size)) % (
-                        2**dut.byte_size
-                    )
+                    byte_in_req = (write_data >> (i * dut.byte_size)) % (2**dut.byte_size)
                     if write_strobe & (1 << i):
                         new_byte = byte_in_req
                     else:
@@ -74,16 +70,16 @@ def random_test(dut: CacheWrapper) -> None:
                 try:
                     assert ctx.get(dut.fe_0.read_data_valid)
                     assert ctx.get(dut.fe_0.read_data) == memory_dict.get(address, 0)
-                except:
+                except AssertionError:
                     raise RuntimeError(
-                        f"Request {requests_processed} failed: Tried reading from {address} expecting {memory_dict.get(address, 0)}, got {ctx.get(dut.fe_0.read_data)} (valid: {ctx.get(dut.fe_0.read_data_valid)})"
+                        f"Request {requests_processed} failed: Tried reading from {address} expecting"
+                        + f" {memory_dict.get(address, 0)}, got {ctx.get(dut.fe_0.read_data)}"
+                        + f" (valid: {ctx.get(dut.fe_0.read_data_valid)})"
                     )
 
             # print statistics
             if requests_processed % 100 == 0:
-                print(
-                    f"Requests processed: {requests_processed}, hit rate: {'{:.3f}'.format(hits/requests_processed)}"
-                )
+                print(f"Requests processed: {requests_processed}, hit rate: {'{:.3f}'.format(hits/requests_processed)}")
 
     # setup simulator
     sim = Simulator(dut)

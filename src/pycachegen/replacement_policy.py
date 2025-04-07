@@ -1,6 +1,6 @@
 from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
-from amaranth.lib.wiring import In, Out
+from amaranth.lib.wiring import In
 from amaranth.utils import exact_log2
 
 from .cache_config import InternalCacheConfig, ReplacementPolicies
@@ -79,12 +79,12 @@ class ReplacementPolicy(wiring.Component):
                     m.d.sync += plru_bits[self.port.set].bit_select(total_bit_index, 1).eq(new_bit)
 
             # Compute the next way to replace
-            # To do this, we basically do the opposite of what we did when a way gets accessed
-            # Walk from the root down to the leaf. Each layer will add one bit the the way to replace (next_replacement_o).
-            # At the first layer, the next_replacement bit simply gets set to plru_bits[...][0]
-            # At the following layers, use the previous bits (next_replacement_o[self.num_ways_width-i:]) to compute
-            # the position we're currently at. Then use that current position to compute the position of the left/right child,
-            # depending on what the current bit is. With this new position, we can lookup the new bit for next_replacement_o[self.num_ways_width - 1 - i].
+            # To do this, we basically do the opposite of what we did when a way gets accessed walk from the root down
+            # to the leaf. Each layer will add one bit the the way to replace (next_replacement_o). At the first layer,
+            # the next_replacement bit simply gets set to plru_bits[...][0]. At the following layers, use the previous
+            # bits (next_replacement_o[self.num_ways_width-i:]) to compute the position we're currently at. Then use
+            # that current position to compute the position of the left/right child, depending on what the current bit
+            # is. With this new position, we can lookup the new bit for next_replacement_o[self.num_ways_width - 1 - i].
             for i in range(self.num_ways_width):
                 # the previous next_replacement bits indicate the index of the current bit within the current row/layer
                 index_within_layer = self.port.next_replacement[self.num_ways_width - i :]

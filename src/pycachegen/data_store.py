@@ -10,7 +10,7 @@ from amaranth import (
 )
 from amaranth.lib import wiring
 from amaranth.lib.memory import Memory
-from amaranth.lib.wiring import In, Out
+from amaranth.lib.wiring import In
 from amaranth.utils import exact_log2
 
 from .cache_config import InternalCacheConfig

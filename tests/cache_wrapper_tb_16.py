@@ -4,7 +4,6 @@ from pycachegen import (
     ReplacementPolicies,
     WritePolicies,
 )
-from pycachegen.cache_config import WritePolicies
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 

@@ -1,10 +1,9 @@
 from amaranth import Module, Mux, Signal, unsigned
-from amaranth.lib import data, wiring
+from amaranth.lib import wiring
 from amaranth.lib.memory import Memory
-from amaranth.lib.wiring import In, Out
+from amaranth.lib.wiring import In
 
 from .cache_config import InternalMemoryConfig
-from .interfaces import MemoryBusSignature
 
 
 class MainMemory(wiring.Component):

@@ -1,8 +1,7 @@
 from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.memory import Memory
-from amaranth.lib.wiring import In, Out
-from amaranth.utils import exact_log2
+from amaranth.lib.wiring import In
 
 from .cache_config import InternalCacheConfig
 from .interfaces import DirectorySignature

@@ -48,29 +48,29 @@ class CacheController(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
-        ## replacement policy things
+        # replacement policy things
         # block to be replaced next for the set of the current fe_buffer_address
         next_block_replacement = Signal(range(self.config.num_ways))
 
-        ## frontend input buffers
+        # frontend input buffers
         fe_buffer_address = Signal(self.config.address_layout)
         fe_buffer_write_data = Signal(self.config.data_width)
         fe_buffer_write_strobe = Signal(self.config.bytes_per_word)
 
-        ## backend output buffers
+        # backend output buffers
         # Create be buffers that use our own data/address/write strobe widths
         # Then "shift" the data/write strobe into place in the real be interface
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(self.config.data_width))
         be_buffer_write_strobe = Signal(unsigned(self.config.bytes_per_word))
         be_buffer_address = Signal(self.config.address_layout)
-        m.d.comb += self.be.address.eq(be_buffer_address.as_value()[-self.config.be_address_width : ])
+        m.d.comb += self.be.address.eq(be_buffer_address.as_value()[-self.config.be_address_width :])
         m.d.comb += self.be.write_data.eq(0)
         m.d.comb += self.be.write_strobe.eq(0)
         m.d.comb += self.be.write_data.word_select(be_buffer_address.as_value()[:-self.config.be_address_width], self.config.data_width).eq(be_buffer_write_data)
         m.d.comb += self.be.write_strobe.word_select(be_buffer_address.as_value()[:-self.config.be_address_width], self.config.bytes_per_word).eq(be_buffer_write_strobe)
 
-        ## internal registers
+        # internal registers
         # FSM state
         state = Signal(States)
         # one bit per way to indicate a hit in that way
@@ -91,7 +91,7 @@ class CacheController(wiring.Component):
         with m.Else():
             m.d.comb += self.fe.read_data.eq(fe_read_data_buffer)
 
-        ## States.READ_BLOCK
+        # States.READ_BLOCK
         # counter for how many read operations have been done so far
         read_block_read_counter = Signal(range(self.config.read_block_requests_needed + 1))
         # counter for how many words of the be read data have been written back so far
@@ -107,7 +107,7 @@ class CacheController(wiring.Component):
         # state that read block should take next
         read_block_next_state = Signal(States)
 
-        ## States.FLUSH_CACHE / States.FLUSH_BACKEND
+        # States.FLUSH_CACHE / States.FLUSH_BACKEND
         # index of the set to be flushed next
         flush_set_index = Signal(self.config.index_width)
         # index of the block that is currently being flushed
@@ -115,7 +115,7 @@ class CacheController(wiring.Component):
         # whether we already told the backend to flush itself
         be_flush_requested = Signal()
 
-        ## States.WRITE_BACK_BLOCK
+        # States.WRITE_BACK_BLOCK
         # address and way to identify the block to be written back
         write_back_address = Signal(self.config.address_layout)
         # source of the data to write back.
@@ -127,11 +127,11 @@ class CacheController(wiring.Component):
         # state to take after the WRITE_BACK state
         write_back_next_state = Signal(States)
 
-        ## States.SEND_MEM_REQUEST
+        # States.SEND_MEM_REQUEST
         # state to go to afterwards
         send_mem_request_next_state = Signal(States)
 
-        ## Evict operation reads one block of the data store and writes it to a buffer.
+        # Evict operation reads one block of the data store and writes it to a buffer.
         # evict block operation puts data to be written back in this buffer
         evicted_block_buffer = Array([Signal(unsigned(self.config.data_width), name=f"evicted_block_buffer_{i}") for i in range(self.config.block_size)])
         # Enable signal to start the operation. Will get disabled once it's done.
@@ -467,9 +467,9 @@ class CacheController(wiring.Component):
 
                     # determine if we should hand out the read data to the FE
                     with m.If(
-                        (read_block_read_counter == 1) # it was the first read request to the BE
-                        & (~fe_buffer_write_strobe.any()) # the FE sent a read request
-                        & (read_block_write_counter == 0) # This is the first cycle after the read data is valid
+                        (read_block_read_counter == 1)  # it was the first read request to the BE
+                        & (~fe_buffer_write_strobe.any())  # the FE sent a read request
+                        & (read_block_write_counter == 0)  # This is the first cycle after the read data is valid
                     ):
                         m.d.sync += fe_read_data_select_buffer.eq(1)
                         m.d.sync += fe_read_data_buffer.eq(read_block_write_data)
@@ -522,7 +522,7 @@ class CacheController(wiring.Component):
                     with m.If(self.directory.dirty_bits.bit_select(flush_block_index, 1) & self.directory.valid_bits.bit_select(flush_block_index, 1)):
                         # Start a evict block operation so that the write back state can take multiple words out of the evict data buffer
                         m.d.sync += evict_block_enable.eq(1)
-                        m.d.sync += evict_block_address.index.eq(flush_set_index) # tag is not needed for evict block
+                        m.d.sync += evict_block_address.index.eq(flush_set_index)  # tag is not needed for evict block
                         m.d.sync += evict_block_address.word_offset.eq(0)
                         m.d.sync += evict_block_way.eq(flush_block_index)
                         # Prepare things for the Write Back State

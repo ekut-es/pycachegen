@@ -20,12 +20,8 @@ class CacheWrapperBenchHelper:
 
     def __init__(self, cache_wrapper: CacheWrapper):
         self._dut = cache_wrapper
-        self._address_format_spec = (
-            "{:0=" + str(ceil(cache_wrapper.fe_address_width / 4)) + "X}"
-        )
-        self._data_format_spec = (
-            "{:0=" + str(ceil(cache_wrapper.fe_data_width / 4)) + "X}"
-        )
+        self._address_format_spec = "{:0=" + str(ceil(cache_wrapper.fe_address_width / 4)) + "X}"
+        self._data_format_spec = "{:0=" + str(ceil(cache_wrapper.fe_data_width / 4)) + "X}"
         self.elapsed_time = 0
         self.max_time = 1000
 
@@ -74,11 +70,10 @@ class CacheWrapperBenchHelper:
         ctx.set(self._dut.fe_0.request_valid, 0)
         assert ctx.get(self._dut.fe_0.port_ready)
 
-    async def write(
-        self, ctx, address: int, data: int, hit_expected: bool, write_strobe: int = -1
-    ):
+    async def write(self, ctx, address: int, data: int, hit_expected: bool, write_strobe: int = -1):
         print(
-            f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)}, strobe {write_strobe}"
+            f"{self._get_timestamp()}: W addr {self._addr_to_str(address)}, data {self._data_to_str(data)},"
+            + f" strobe {write_strobe}"
         )
         ctx.set(self._dut.fe_0.address, address)
         ctx.set(self._dut.fe_0.write_data, data)
@@ -86,9 +81,7 @@ class CacheWrapperBenchHelper:
         ctx.set(self._dut.fe_0.request_valid, 1)
         await self._tick(ctx)
         ctx.set(self._dut.fe_0.request_valid, 0)
-        while not ctx.get(
-            self._dut.fe_0.port_ready
-        ):  # NOTE waiting for port ready might not always be desired
+        while not ctx.get(self._dut.fe_0.port_ready):  # NOTE waiting for port ready might not always be desired
             await self._tick(ctx)
         assert not ctx.get(
             self._dut.fe_0.read_data_valid
@@ -133,6 +126,4 @@ def run_bench(dut, bench, vcd_path: str = "vcd", vcd_filename: str = ""):
                 f"Runtime for {vcd_filename} differs: Expected {expected_results[vcd_filename]}, got {elapsed_time}"
             )
     else:
-        warnings.warn(
-            f"Did not find an expected runtime for {vcd_filename}. Runtime: {elapsed_time} "
-        )
+        warnings.warn(f"Did not find an expected runtime for {vcd_filename}. Runtime: {elapsed_time} ")

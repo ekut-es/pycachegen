@@ -23,10 +23,15 @@ class CacheSubsystem(wiring.Component):
         Look at the README on how to integrate the Cache into the SoC.
 
         Args:
-            cache_address_width: Address width of the cache(s) in bits. Note that this module has a TCDM interface with 32 bit addresses, this parameter only describes the address width of the caches. It should match the depth of the memory that is connected to the BE of the cache(s).
-            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be left empty if no caches shall be generated.
-            read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0 if write_delay is also 0.
-            write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to 0 if read_delay is also 0.
+            cache_address_width: Address width of the cache(s) in bits. Note that this module has a TCDM interface with
+                32 bit addresses, this parameter only describes the address width of the caches. It should match the
+                depth of the memory that is connected to the BE of the cache(s).
+            cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be
+                left empty if no caches shall be generated.
+            read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0
+                if write_delay is also 0.
+            write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to
+                0 if read_delay is also 0.
         """
         for cache_config in cache_configs:
             assert cache_config.data_width == 32
