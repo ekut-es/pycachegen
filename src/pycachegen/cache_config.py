@@ -194,9 +194,10 @@ class CacheConfig:
             num_ways (int): Number of ways. Must be a power of 2.
             num_sets (int): Number of sets. Must be a power of 2.
             replacement_policy (ReplacementPolicies): The replacement policy to use.
-            write_through (bool): Use write-through or write-back policy
+            write_policy (WritePolicies): Can be set to write-through or write-back.
             write_allocate (bool): Use write-allocate or write-no-allocate policy
             block_size (int): Number of words per block. Must be a power of 2.
+            write_buffer_size (int): The number of words that can be stored in the write buffer. If set to 0, no write buffer will be created.
             data_memory_module (str): Can be used to specify the name of an external Verilog module to be used as data memory. This memory must be a dual port memory with the correct interface. An Amaranth memory will be created if this value is an empty string.
         """
         self.data_width = data_width
@@ -229,6 +230,7 @@ class InternalCacheConfig:
 
         Args:
 
+            cache_config (CacheConfig): The normal CacheConfig on which this InternalCacheConfig should be based.
             address_width (int): Width of the addresses in bits. Addresses do not include a byte offset.
             be_data_width (int): Data width of the next level cache in bits. Must be of the form (byte_size * 2**n) where n>=0. Must be greater or equal to the cache's own data_width.
             be_address_width (int): Address width of the next level cache.
