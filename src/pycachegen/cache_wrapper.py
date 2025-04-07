@@ -60,8 +60,6 @@ class CacheWrapper(wiring.Component):
         else:
             self.fe_data_width = main_memory_data_width
 
-        self.fe_bytes_per_word = self.fe_data_width // self.byte_size
-
         # create internal cache configs
         self.cache_configs: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
@@ -96,27 +94,21 @@ class CacheWrapper(wiring.Component):
             byte_size=self.byte_size,
         )
 
-        self.be_memory_bus_signature = MemoryBusSignature(
-            address_width=self.memory_config.address_width,
-            data_width=self.memory_config.data_width,
-            bytes_per_word=self.memory_config.bytes_per_word,
-        )
-
-        # TODO move creating this signature into the internal config?
-        self.fe_memory_bus_signature = MemoryBusSignature(
-            address_width=self.fe_address_width,
-            data_width=self.fe_data_width,
-            bytes_per_word=self.fe_bytes_per_word,
-        )
-
         ports = {}
 
+        # Get signature of BE port and create it if needed
+        if not create_main_memory:
+            ports["be"] = Out(self.be_memory_bus_signature)
+        self.be_memory_bus_signature = self.memory_config.memory_bus_signature
+
+        # Get signatures of the FE ports and create them
+        if self.cache_configs:
+            self.fe_memory_bus_signature = self.cache_configs[0].fe_signature
+        else:
+            self.fe_memory_bus_signature = self.be_memory_bus_signature
         for i in range(num_ports):
             ports[f"fe_{i}"] = In(self.fe_memory_bus_signature)
             ports[f"hit_o_{i}"] = Out(1)
-
-        if not create_main_memory:
-            ports["be"] = Out(self.fe_memory_bus_signature)
 
         super().__init__(ports)
 
@@ -124,7 +116,7 @@ class CacheWrapper(wiring.Component):
         m = Module()
 
         # lists of Out() and In() of MemoryBusInterfaces that will be connected together
-        out_list, in_list = [], []
+        out_ports, in_ports = [], []
 
         # create an arbiter if necessary
         if self.num_ports > 1:
@@ -140,17 +132,17 @@ class CacheWrapper(wiring.Component):
                     wiring.flipped(getattr(self, f"fe_{i}")),
                     getattr(arbiter, f"fe_{i}"),
                 )
-            out_list.append(arbiter.be)
+            out_ports.append(arbiter.be)
             l1_hit = arbiter.hit_i
         else:
-            out_list.append(wiring.flipped(self.fe_0))
+            out_ports.append(wiring.flipped(self.fe_0))
             l1_hit = self.hit_o_0
 
         # create the actual caches
         for i, cache_config in enumerate(self.cache_configs):
             m.submodules[f"l{i+1}_cache"] = cache = Cache(config=cache_config)
-            in_list.append(cache.fe)
-            out_list.append(cache.be)
+            in_ports.append(cache.fe)
+            out_ports.append(cache.be)
             if i == 0:
                 m.d.comb += l1_hit.eq(cache.hit_o)
 
@@ -161,21 +153,22 @@ class CacheWrapper(wiring.Component):
                 read_delay=self.read_delay,
                 write_delay=self.write_delay,
             )
-            in_list.append(delay_unit.requestor)
-            out_list.append(delay_unit.target)
+            in_ports.append(delay_unit.requestor)
+            out_ports.append(delay_unit.target)
 
-        # create the main memory
         if self.create_main_memory:
+            # create the main memory
             m.submodules.main_memory = main_memory = MainMemory(
                 config=self.memory_config
             )
-            in_list.append(main_memory.fe)
+            in_ports.append(main_memory.fe)
         else:
-            in_list.append(wiring.flipped(self.be))
+            # else add the flipped BE port to the in_ports
+            in_ports.append(wiring.flipped(self.be))
 
-        # connect the caches/memory/cachewrapper with each other
-        assert len(out_list) == len(in_list)
-        for out_if, in_if in zip(out_list, in_list):
+        # connect the cachewrapper/arbiter/caches/delayunit/memory with each other
+        assert len(out_ports) == len(in_ports)
+        for out_if, in_if in zip(out_ports, in_ports):
             wiring.connect(m, out_if, in_if)
 
         return m

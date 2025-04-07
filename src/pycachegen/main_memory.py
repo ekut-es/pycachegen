@@ -19,17 +19,7 @@ class MainMemory(wiring.Component):
         """
         self.config = config
 
-        super().__init__(
-            {
-                "fe": In(
-                    MemoryBusSignature(
-                        address_width=config.address_width,
-                        data_width=config.data_width,
-                        bytes_per_word=config.bytes_per_word,
-                    )
-                )
-            }
-        )
+        super().__init__({"fe": In(config.memory_bus_signature)})
 
     def elaborate(self, platform) -> Module:
         m = Module()

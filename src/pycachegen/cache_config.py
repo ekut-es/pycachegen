@@ -326,3 +326,8 @@ class InternalMemoryConfig:
         self.address_width = address_width
         self.byte_size = byte_size
         self.bytes_per_word = data_width // byte_size
+        self.memory_bus_signature = MemoryBusSignature(
+            address_width=self.address_width,
+            data_width=self.data_width,
+            bytes_per_word=self.bytes_per_word,
+        )
