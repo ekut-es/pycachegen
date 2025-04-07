@@ -45,3 +45,6 @@ push = true
 [tool.pytest.ini_options]
 testpaths = "tests/"
 python_files = "*_tb_*.py"
+
+[tool.black]
+line-length = 120

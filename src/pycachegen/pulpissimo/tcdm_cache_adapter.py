@@ -115,9 +115,7 @@ class TCDMCacheAdapter(wiring.Component):
         # Connect the other, simpler signals
         m.d.comb += cache_be.port_ready.eq(target.gnt)
         m.d.comb += target.req.eq(cache_be.request_valid)
-        m.d.comb += target.be.eq(
-            Mux(cache_be.write_strobe.any(), cache_be.write_strobe, -1)
-        )
+        m.d.comb += target.be.eq(Mux(cache_be.write_strobe.any(), cache_be.write_strobe, -1))
         m.d.comb += target.wen.eq(~cache_be.write_strobe.any())
         m.d.comb += target.add.eq(Cat(C(0, unsigned(2)), cache_be.address))
         m.d.comb += target.wdata.eq(cache_be.write_data)

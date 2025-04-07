@@ -3,9 +3,7 @@ from amaranth.lib import data
 
 
 class CacheAddressLayout(data.StructLayout):
-    def __init__(
-        self, index_width: int, tag_width: int, word_offset_width: int
-    ) -> None:
+    def __init__(self, index_width: int, tag_width: int, word_offset_width: int) -> None:
         """Layout for accessing cache related parts of a memory address.
 
         Args:
@@ -13,14 +11,10 @@ class CacheAddressLayout(data.StructLayout):
             tag_width (int): Width of the tag.
             word_offset_width (int): Width of the word offset (the bits which select the word within a block).
         """
-        super().__init__(
-            {"word_offset": word_offset_width, "index": index_width, "tag": tag_width}
-        )
+        super().__init__({"word_offset": word_offset_width, "index": index_width, "tag": tag_width})
 
 
-def get_blockwise_incremented_address(
-    address, counter, m: Module, read_block_wc_width: int
-):
+def get_blockwise_incremented_address(address, counter, m: Module, read_block_wc_width: int):
     """Increments the given address by the given counter.
     When adding the counter, overflow will first occur within the address bits that stay
     the same for one be word. So the incremented address will first iterate through all words

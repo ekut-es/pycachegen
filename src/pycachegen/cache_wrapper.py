@@ -64,16 +64,12 @@ class CacheWrapper(wiring.Component):
         self.cache_configs: list[InternalCacheConfig] = []
         for i in range(len(cache_configs)):
             config = cache_configs[i]
-            cache_address_width = self.fe_address_width - exact_log2(
-                config.data_width // self.fe_data_width
-            )
+            cache_address_width = self.fe_address_width - exact_log2(config.data_width // self.fe_data_width)
             if i < len(cache_configs) - 1:
                 be_data_width = cache_configs[i + 1].data_width
             else:
                 be_data_width = main_memory_data_width
-            be_address_width = self.fe_address_width - exact_log2(
-                be_data_width // self.fe_data_width
-            )
+            be_address_width = self.fe_address_width - exact_log2(be_data_width // self.fe_data_width)
             self.cache_configs.append(
                 InternalCacheConfig(
                     cache_config=config,
@@ -85,9 +81,7 @@ class CacheWrapper(wiring.Component):
             )
 
         # create internal memory config
-        memory_address_width = self.fe_address_width - exact_log2(
-            main_memory_data_width // self.fe_data_width
-        )
+        memory_address_width = self.fe_address_width - exact_log2(main_memory_data_width // self.fe_data_width)
         self.memory_config = InternalMemoryConfig(
             data_width=main_memory_data_width,
             address_width=memory_address_width,
@@ -158,9 +152,7 @@ class CacheWrapper(wiring.Component):
 
         if self.create_main_memory:
             # create the main memory
-            m.submodules.main_memory = main_memory = MainMemory(
-                config=self.memory_config
-            )
+            m.submodules.main_memory = main_memory = MainMemory(config=self.memory_config)
             in_ports.append(main_memory.fe)
         else:
             # else add the flipped BE port to the in_ports

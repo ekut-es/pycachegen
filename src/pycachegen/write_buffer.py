@@ -41,12 +41,7 @@ class WriteBuffer(wiring.Component):
         write_ptr = Signal(range(self.depth))
         read_ptr = Signal(range(self.depth))
 
-        storage = Array(
-            [
-                Signal(self.request_layout, name=f"storage[{i}]")
-                for i in range(self.depth)
-            ]
-        )
+        storage = Array([Signal(self.request_layout, name=f"storage[{i}]") for i in range(self.depth)])
 
         addr_match_vec = Signal(unsigned(self.depth))
         for idx, el in enumerate(storage):
@@ -97,11 +92,7 @@ class WriteBuffer(wiring.Component):
             ]
             m.d.sync += read_data_source.eq(0)
         with m.Else():
-            with m.If(
-                fe_read
-                & addr_match_vec.any()
-                & storage[addr_match_idx].write_strobe.all()
-            ):
+            with m.If(fe_read & addr_match_vec.any() & storage[addr_match_idx].write_strobe.all()):
                 # Read request can be answered by buffer because the address is in the buffer and
                 # the write strobe there is all ones
                 # if the write strobe is not all ones, the read has to wait until that request has left the buffer
@@ -113,23 +104,17 @@ class WriteBuffer(wiring.Component):
                 ]
 
             with m.If(fe_write):
-                with m.If(
-                    addr_match_vec.any() & ((~fifo_read) | (read_ptr != addr_match_idx))
-                ):
+                with m.If(addr_match_vec.any() & ((~fifo_read) | (read_ptr != addr_match_idx))):
                     # Write to an address thats already in the buffer and the element in
                     # the buffer is not currently being sent to the main memory
                     # Merge the two writes
                     fifo_req = storage[addr_match_idx]
                     # Merge write strobe
-                    m.d.sync += fifo_req.write_strobe.eq(
-                        fifo_req.write_strobe | self.fe.write_strobe
-                    )
+                    m.d.sync += fifo_req.write_strobe.eq(fifo_req.write_strobe | self.fe.write_strobe)
                     # Merge write data
                     for idx, new_strobe_bit in enumerate(self.fe.write_strobe):
                         new_byte = self.fe.write_data.word_select(idx, self.byte_size)
-                        data_byte_in_fifo = fifo_req.write_data.word_select(
-                            idx, self.byte_size
-                        )
+                        data_byte_in_fifo = fifo_req.write_data.word_select(idx, self.byte_size)
                         with m.If(new_strobe_bit):
                             m.d.sync += data_byte_in_fifo.eq(new_byte)
                     # Accept FE request

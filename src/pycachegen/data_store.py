@@ -41,21 +41,15 @@ class CacheStore(wiring.Component):
         # include any information about the way to be accessed
         # Concatenate the address and the way to get the total address for the memory
         total_read_address = Signal(unsigned(self.total_address_width))
-        m.d.comb += total_read_address.eq(
-            Cat(self.port.read_address, self.port.read_way)
-        )
+        m.d.comb += total_read_address.eq(Cat(self.port.read_address, self.port.read_way))
         total_write_address = Signal(unsigned(self.total_address_width))
-        m.d.comb += total_write_address.eq(
-            Cat(self.port.write_address, self.port.write_way)
-        )
+        m.d.comb += total_write_address.eq(Cat(self.port.write_address, self.port.write_way))
 
         if self.module_name:
             # Extend byte strobe to bit strobe
             bit_strobe = Signal(self.data_width)
             for i, bit in enumerate(self.port.byte_strobe):
-                m.d.comb += bit_strobe.word_select(i, self.byte_size).eq(
-                    Mux(bit, -1, 0)
-                )
+                m.d.comb += bit_strobe.word_select(i, self.byte_size).eq(Mux(bit, -1, 0))
 
             # Use an external Memory module
             m.submodules.memory = Instance(
@@ -72,9 +66,7 @@ class CacheStore(wiring.Component):
             )
         else:
             # Create an Amaranth Memory
-            m.submodules.memory = memory = Memory(
-                shape=unsigned(self.data_width), depth=self.depth, init=[]
-            )
+            m.submodules.memory = memory = Memory(shape=unsigned(self.data_width), depth=self.depth, init=[])
             read_port = memory.read_port()
             m.d.comb += read_port.addr.eq(total_read_address)
             m.d.comb += self.port.read_data.eq(read_port.data)
@@ -83,8 +75,6 @@ class CacheStore(wiring.Component):
             write_port = memory.write_port(granularity=self.byte_size)
             m.d.comb += write_port.addr.eq(total_write_address)
             m.d.comb += write_port.data.eq(self.port.write_data)
-            m.d.comb += write_port.en.eq(
-                Mux(self.port.write_request_valid, self.port.byte_strobe, 0)
-            )
+            m.d.comb += write_port.en.eq(Mux(self.port.write_request_valid, self.port.byte_strobe, 0))
 
         return m

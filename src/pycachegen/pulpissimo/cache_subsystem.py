@@ -35,23 +35,15 @@ class CacheSubsystem(wiring.Component):
         self.cache_configs = cache_configs
         self.read_delay = read_delay
         self.write_delay = write_delay
-        super().__init__(
-            {"requestor": In(TCDMSignature()), "target": Out(TCDMSignature())}
-        )
+        super().__init__({"requestor": In(TCDMSignature()), "target": Out(TCDMSignature())})
 
     def elaborate(self, platform):
         m = Module()
 
-        if (
-            (not self.cache_configs)
-            and (not self.read_delay)
-            and (not self.write_delay)
-        ):
+        if (not self.cache_configs) and (not self.read_delay) and (not self.write_delay):
             # CacheWrapper would be empty, so lets not create one
             # Connect the requestor to the target directly instead
-            wiring.connect(
-                m, wiring.flipped(self.requestor), wiring.flipped(self.target)
-            )
+            wiring.connect(m, wiring.flipped(self.requestor), wiring.flipped(self.target))
             # A useless synchronous statement so that clk and rst ports get generated...
             x = Signal(unsigned(1))
             m.d.sync += x.eq(~x)

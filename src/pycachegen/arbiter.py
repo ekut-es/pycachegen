@@ -42,30 +42,22 @@ class Arbiter(wiring.Component):
         m = Module()
 
         # An array of the fe interfaces
-        fe_interface_array = Array(
-            [getattr(self, f"fe_{i}") for i in range(self.num_ports)]
-        )
+        fe_interface_array = Array([getattr(self, f"fe_{i}") for i in range(self.num_ports)])
 
         # a buffer for each port so that we can buffer one request per port
         # while the BE is busy with the request of another port
         fe_buffers = Array(
             [
                 {
-                    "address": Signal(
-                        self.bus_signature.address_width, name=f"fe_buffer_{i}_address"
-                    ),
+                    "address": Signal(self.bus_signature.address_width, name=f"fe_buffer_{i}_address"),
                     "request_valid": Signal(name=f"fe_buffer_{i}_request_valid"),
                     "write_strobe": Signal(
                         self.bus_signature.bytes_per_word,
                         name=f"fe_buffer_{i}_write_strobe",
                     ),
-                    "write_data": Signal(
-                        self.bus_signature.data_width, name=f"fe_buffer_{i}_write_data"
-                    ),
+                    "write_data": Signal(self.bus_signature.data_width, name=f"fe_buffer_{i}_write_data"),
                     "flush": Signal(name=f"fe_buffer_{i}_flush"),
-                    "read_data": Signal(
-                        self.bus_signature.data_width, name=f"fe_buffer_{i}_read_data"
-                    ),
+                    "read_data": Signal(self.bus_signature.data_width, name=f"fe_buffer_{i}_read_data"),
                     "read_data_valid": Signal(name=f"fe_buffer_{i}_read_data_valid"),
                     "hit": Signal(name=f"fe_buffer_{i}_hit"),
                 }
@@ -95,9 +87,7 @@ class Arbiter(wiring.Component):
 
             # This port has a valid request if the buffer contains a valid request
             # or if there is an incoming request
-            m.d.comb += request_vector[i].eq(
-                fe_interface.request_valid | fe_buffer["request_valid"]
-            )
+            m.d.comb += request_vector[i].eq(fe_interface.request_valid | fe_buffer["request_valid"])
 
             # assign the output buffers to the FE interface by default
             m.d.comb += fe_interface.read_data.eq(fe_buffer["read_data"])
@@ -130,24 +120,14 @@ class Arbiter(wiring.Component):
             # valid buffered request
             with m.If(fe_interface_array[grant_index].request_valid):
                 m.d.comb += self.be.address.eq(fe_interface_array[grant_index].address)
-                m.d.comb += self.be.request_valid.eq(
-                    fe_interface_array[grant_index].request_valid
-                )
-                m.d.comb += self.be.write_strobe.eq(
-                    fe_interface_array[grant_index].write_strobe
-                )
-                m.d.comb += self.be.write_data.eq(
-                    fe_interface_array[grant_index].write_data
-                )
+                m.d.comb += self.be.request_valid.eq(fe_interface_array[grant_index].request_valid)
+                m.d.comb += self.be.write_strobe.eq(fe_interface_array[grant_index].write_strobe)
+                m.d.comb += self.be.write_data.eq(fe_interface_array[grant_index].write_data)
                 m.d.comb += self.be.flush.eq(fe_interface_array[grant_index].flush)
             with m.Else():
                 m.d.comb += self.be.address.eq(fe_buffers[grant_index]["address"])
-                m.d.comb += self.be.request_valid.eq(
-                    fe_buffers[grant_index]["request_valid"]
-                )
-                m.d.comb += self.be.write_strobe.eq(
-                    fe_buffers[grant_index]["write_strobe"]
-                )
+                m.d.comb += self.be.request_valid.eq(fe_buffers[grant_index]["request_valid"])
+                m.d.comb += self.be.write_strobe.eq(fe_buffers[grant_index]["write_strobe"])
                 m.d.comb += self.be.write_data.eq(fe_buffers[grant_index]["write_data"])
                 m.d.comb += self.be.flush.eq(fe_buffers[grant_index]["flush"])
 

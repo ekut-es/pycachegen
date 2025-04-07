@@ -62,9 +62,7 @@ def assert_same_address_space(dw1: int, aw1: int, dw2: int, aw2: int) -> None:
         ConfigurationError: Error that gets thrown if the two configurations do not cover the same address space
     """
     if (own := dw1 * 2**aw1) != (other := dw2 * 2**aw2):
-        raise ConfigurationError(
-            f"First address space spans {own} bits while second address space spans {other} bits"
-        )
+        raise ConfigurationError(f"First address space spans {own} bits while second address space spans {other} bits")
 
 
 def assert_data_width_valid(data_width: int, byte_size: int) -> None:
@@ -82,9 +80,7 @@ def assert_data_width_valid(data_width: int, byte_size: int) -> None:
         )
 
 
-def assert_address_config_valid(
-    address_width: int, num_sets: int, num_ways: int, block_size: int
-) -> None:
+def assert_address_config_valid(address_width: int, num_sets: int, num_ways: int, block_size: int) -> None:
     """Check that the number of sets, number of ways and the block size are valid with regards
     to the address width.
 
@@ -143,9 +139,7 @@ def assert_greater_equal(i: int, threshold: int, name: str) -> None:
         raise ConfigurationError(f"{name} is {i} but needs to be at least {threshold}")
 
 
-def assert_address_range_valid(
-    min_address: int, max_address: int, address_width: int
-) -> None:
+def assert_address_range_valid(min_address: int, max_address: int, address_width: int) -> None:
     """Throws an error if the given address range has size 0 or if it is not within the boundaries
     set by the address width. Note that addresses generally don't include any byte offset bits.
 
@@ -237,9 +231,7 @@ class InternalCacheConfig:
             byte_size (int): Number of bits per byte.
         """
         assert_data_width_valid(cache_config.data_width, byte_size)
-        assert_data_width_valid(
-            be_data_width, byte_size
-        )  # technically this is checked in the BE config too
+        assert_data_width_valid(be_data_width, byte_size)  # technically this is checked in the BE config too
         assert_is_power_of_two(cache_config.num_ways, "num_ways")
         assert_is_power_of_two(cache_config.num_sets, "num_sets")
         assert_is_power_of_two(cache_config.block_size, "block_size")
@@ -280,9 +272,7 @@ class InternalCacheConfig:
         # This variable specifies how many words of a block fit into one BE word
         self.be_word_multiplier = min(self.be_byte_multiplier, cache_config.block_size)
         self.be_word_multiplier_width = exact_log2(self.be_word_multiplier)
-        self.read_block_requests_needed = (
-            cache_config.block_size // self.be_word_multiplier
-        )
+        self.read_block_requests_needed = cache_config.block_size // self.be_word_multiplier
         # width difference between own and BE address
         self.address_width_difference = address_width - be_address_width
 
@@ -302,9 +292,7 @@ class InternalCacheConfig:
             word_offset_width=self.word_offset_width,
         )
         self.data_memory_module = cache_config.data_memory_module
-        self.store_address_width = exact_log2(self.num_sets) + exact_log2(
-            self.block_size
-        )
+        self.store_address_width = exact_log2(self.num_sets) + exact_log2(self.block_size)
         self.write_buffer_size = cache_config.write_buffer_size
 
 

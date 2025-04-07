@@ -31,20 +31,13 @@ class ReplacementPolicy(wiring.Component):
         if self.policy == ReplacementPolicies.FIFO:
             # Array of the way indices that were accessed last for each set
             next_replacement_regs = Array(
-                [
-                    Signal(range(self.num_ways), name=f"next_replacement_{i}")
-                    for i in range(self.num_sets)
-                ]
+                [Signal(range(self.num_ways), name=f"next_replacement_{i}") for i in range(self.num_sets)]
             )
             # Update the policy state if a block gets replaced
             with m.If(self.port.replace):
-                m.d.sync += next_replacement_regs[self.port.set].eq(
-                    next_replacement_regs[self.port.set] + 1
-                )
+                m.d.sync += next_replacement_regs[self.port.set].eq(next_replacement_regs[self.port.set] + 1)
 
-            m.d.comb += self.port.next_replacement.eq(
-                next_replacement_regs[self.port.set]
-            )
+            m.d.comb += self.port.next_replacement.eq(next_replacement_regs[self.port.set])
         elif self.policy == ReplacementPolicies.PLRU_TREE:
             # Array of the tree bits. Store one tree per set.
             # Imagine that the leaves of a tree are the blocks, so there are num_ways leaves per tree.
@@ -60,10 +53,7 @@ class ReplacementPolicy(wiring.Component):
             #    to the oldest block, at each layer we can compute the position we're currently at by looking at the
             #    bits we've already visited.
             plru_bits = Array(
-                [
-                    Signal(unsigned(self.num_ways - 1), name=f"plru_bits_{i}")
-                    for i in range(self.num_sets)
-                ]
+                [Signal(unsigned(self.num_ways - 1), name=f"plru_bits_{i}") for i in range(self.num_sets)]
             )
 
             # For each access, update the tree bits
@@ -86,11 +76,7 @@ class ReplacementPolicy(wiring.Component):
                     new_bit = ~self.port.way[i - 1]
 
                     # finally update the bit
-                    m.d.sync += (
-                        plru_bits[self.port.set]
-                        .bit_select(total_bit_index, 1)
-                        .eq(new_bit)
-                    )
+                    m.d.sync += plru_bits[self.port.set].bit_select(total_bit_index, 1).eq(new_bit)
 
             # Compute the next way to replace
             # To do this, we basically do the opposite of what we did when a way gets accessed
@@ -101,9 +87,7 @@ class ReplacementPolicy(wiring.Component):
             # depending on what the current bit is. With this new position, we can lookup the new bit for next_replacement_o[self.num_ways_width - 1 - i].
             for i in range(self.num_ways_width):
                 # the previous next_replacement bits indicate the index of the current bit within the current row/layer
-                index_within_layer = self.port.next_replacement[
-                    self.num_ways_width - i :
-                ]
+                index_within_layer = self.port.next_replacement[self.num_ways_width - i :]
                 # the index of the first bit inside this layer is just the number of nodes in the previous layers
                 index_of_first_bit = 2**i - 1
                 # if we add those two together, we get the total index
@@ -123,9 +107,7 @@ class ReplacementPolicy(wiring.Component):
                     m.d.sync += mru_bits[self.port.set].eq(1 << self.port.way)
                 with m.Else():
                     # Else just set this bit
-                    m.d.sync += mru_bits[self.port.set].eq(
-                        mru_bits[self.port.set] | (1 << self.port.way)
-                    )
+                    m.d.sync += mru_bits[self.port.set].eq(mru_bits[self.port.set] | (1 << self.port.way))
 
             # Compute the next way to replace
             # Simply priority encode the negated bits
@@ -140,12 +122,7 @@ class ReplacementPolicy(wiring.Component):
             # initialize the ages so that way 0 has the highest age
             lru_fields = Array(
                 [
-                    Array(
-                        [
-                            Signal(range(self.num_ways), init=(self.num_ways - 1 - j))
-                            for j in range(self.num_ways)
-                        ]
-                    )
+                    Array([Signal(range(self.num_ways), init=(self.num_ways - 1 - j)) for j in range(self.num_ways)])
                     for i in range(self.num_sets)
                 ]
             )

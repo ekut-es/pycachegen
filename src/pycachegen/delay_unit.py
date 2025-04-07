@@ -52,9 +52,7 @@ class DelayUnit(wiring.Component):
         request_valid = Signal()
 
         delay_reached = Signal()
-        m.d.comb += delay_reached.eq(
-            delay == (Mux(write_strobe.any(), self.write_delay, self.read_delay) - 1)
-        )
+        m.d.comb += delay_reached.eq(delay == (Mux(write_strobe.any(), self.write_delay, self.read_delay) - 1))
 
         with m.If(state == 0):
             # idle
