@@ -22,8 +22,9 @@ class DelayUnit(wiring.Component):
         the target may delay asserting port_ready until one cycle before it has finished processing
         the request.
 
-        Also note that the flush signal will not be forwarded to the BE. Instead, the port_ready
-        signal will just stay asserted when this module receives a flush.
+        Also note that the flushes will not be delayed by this module. The flush and flush done signals
+        will just pass through this module while it is in the idle state (not delaying any requests or
+        waiting for a delayed request to be accepted by the target).
 
         Args:
             mem_signature (MemoryBusSignature): Signature of the bus.
@@ -58,9 +59,14 @@ class DelayUnit(wiring.Component):
             # idle
             # accept new requests and pass the response
             # from the target on to the requestor
-            m.d.comb += requestor.port_ready.eq(1)
-            m.d.comb += requestor.read_data.eq(target.read_data)
-            m.d.comb += requestor.read_data_valid.eq(target.read_data_valid)
+            m.d.comb += [
+                requestor.port_ready.eq(1),
+                requestor.read_data.eq(target.read_data),
+                requestor.read_data_valid.eq(target.read_data_valid),
+                # flushes will not be delayed by this module
+                requestor.flush_done.eq(target.flush_done),
+                target.flush.eq(requestor.flush),
+            ]
             with m.If(requestor.request_valid & ~requestor.flush):
                 m.d.sync += address.eq(requestor.address)
                 m.d.sync += write_data.eq(requestor.write_data)

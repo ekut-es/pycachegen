@@ -43,7 +43,9 @@ class CacheWrapper(wiring.Component):
                 must be at lest as big as the last cache's data width.
             create_main_memory (bool): Whether a main memory should be created. If False, a BE interface will be
                 created instead. The specified main_memory_data_width will be used for configuring this interface, so
-                you must still specify it even if you set this parameter to False.
+                you must still specify it even if you set this parameter to False. Also note that you can just ignore
+                the be__flush signal and always assign be__flush_done to 1 unless you want to do something specific
+                with them.
             num_ports (int): Number of request ports.
             read_delay (int): The amount of cycles by which read requests to the main memory should be delayed. Can be
                 set to 0, in which case write_delay must also be 0.

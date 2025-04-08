@@ -1,6 +1,7 @@
 from amaranth.back import verilog
 
 from pycachegen import (
+    ArbitrationScheme,
     CacheConfig,
     CacheWrapper,
     ReplacementPolicies,
@@ -8,8 +9,6 @@ from pycachegen import (
 )
 
 cache_wrapper = CacheWrapper(
-    num_ports=1,
-    byte_size=8,
     address_width=8,
     cache_configs=[
         CacheConfig(
@@ -23,8 +22,12 @@ cache_wrapper = CacheWrapper(
         )
     ],
     main_memory_data_width=16,
+    create_main_memory=True,
+    num_ports=1,
     read_delay=9,
     write_delay=14,
+    arbitration_scheme=ArbitrationScheme.PRIORITY,
+    byte_size=8,
 )
 
 with open("cache_wrapper.v", "w") as f:

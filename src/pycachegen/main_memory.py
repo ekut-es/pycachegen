@@ -23,6 +23,8 @@ class MainMemory(wiring.Component):
     def elaborate(self, platform) -> Module:
         m = Module()
 
+        m.d.comb += self.fe.flush_done.eq(1)
+
         # Create data memory
         m.submodules.data_memory = data_memory = Memory(
             shape=unsigned(self.config.data_width),

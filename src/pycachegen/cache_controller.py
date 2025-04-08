@@ -245,10 +245,16 @@ class CacheController(wiring.Component):
                 with m.If(self.fe.flush):
                     m.d.sync += state.eq(States.FLUSH_CACHE)
                     # Reset fe outputs
-                    m.d.sync += self.fe.read_data_valid.eq(0)
+                    m.d.sync += [
+                        self.fe.flush_done.eq(0),
+                        self.fe.read_data_valid.eq(0),
+                    ]
                 with m.Elif(self.fe.request_valid):
                     # Reset fe outputs
-                    m.d.sync += self.fe.read_data_valid.eq(0)
+                    m.d.sync += [
+                        self.fe.flush_done.eq(0),
+                        self.fe.read_data_valid.eq(0),
+                    ]
                     # buffer inputs
                     m.d.sync += [
                         fe_buffer_address.eq(self.fe.address),
@@ -602,18 +608,27 @@ class CacheController(wiring.Component):
                         # Block doesn't need to be written back
                         m.d.sync += state.eq(next_state)
             with m.Case(States.FLUSH_BACKEND):
-                # TODO Make flush not rely on readiness of port since a request-grant based memory does not work like
-                # that
-                with m.If(self.be.port_ready):
-                    with m.If(~be_flush_requested):
-                        # Send flush signal to BE once it gets ready
-                        m.d.comb += self.be.flush.eq(1)
-                        m.d.sync += be_flush_requested.eq(1)
+                with m.If(~be_flush_requested):
+                    with m.If(self.be.flush_done):
+                        # We haven't yet requested a flush, but the BE is already done flushing. This means that we
+                        # either didn't write anything to the BE (in which case nothing is dirty) or the BE is not a
+                        # cache (in which case nothing ever needs to be flushed in the BE), so we're done
+                        m.d.sync += [
+                            state.eq(States.READY),
+                            self.fe.flush_done.eq(1),
+                        ]
                     with m.Else():
-                        # If the port is ready and we've already sent the request, then
-                        # the backend must be done flushing
-                        m.d.sync += state.eq(States.READY)
-                        # reset flush requested register
-                        m.d.sync += be_flush_requested.eq(0)
+                        # request a flush from the BE
+                        m.d.comb += self.be.flush.eq(1)
+                        with m.If(self.be.port_ready):
+                            # the BE accepted the flush request
+                            m.d.sync += be_flush_requested.eq(1)
+                with m.Elif(self.be.flush_done):
+                    # the BE is done flushing
+                    m.d.sync += [
+                        state.eq(States.READY),
+                        be_flush_requested.eq(0),
+                        self.fe.flush_done.eq(1),
+                    ]
 
         return m

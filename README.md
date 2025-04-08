@@ -43,7 +43,7 @@ All modules share a common memory interface composed of the following signals:
 - `flush` (In): Used to request a write back of all data in the cache that is both valid and dirty. The flush action does not require the `request_valid` signal to be set. The cache will request a flush of the next level cache after it is done to ensure that the whole cache hierarchy gets flushed.
 - `read_data` (Out): The requested data. Note that this signal may not change until the next request gets sent.
 - `read_data_valid` (Out): Whether the `read_data` Signal holds valid data. Note that this signal may not change until the next request gets sent.
-- `port_ready` (Out): Whether the port is ready to accept a new request. The requester assumes that his request was accepted if he set `request_valid` (or `flush`) and `port_ready` is also set. If a target is not ready to accept a new request, it must either set this signal to 0 or it must buffer the accepted request. This port is also allowed to be used like a grant signal which only gets set to 1 if there is an incoming request. Note that flushes currently don't work if you do so though.
+- `port_ready` (Out): Whether the port is ready to accept a new request. The requester assumes that his request was accepted if he set `request_valid` (or `flush`) and `port_ready` is also set. If a target is not ready to accept a new request, it must either set this signal to 0 or it must buffer the accepted request. This port is also allowed to be used like a grant signal which only gets set to 1 if there is an incoming request.
 
 ## pulp_soc integration
 
