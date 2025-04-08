@@ -101,9 +101,9 @@ class CacheWrapper(wiring.Component):
         ports = {}
 
         # Get signature of BE port and create it if needed
+        self.be_memory_bus_signature = self.memory_config.memory_bus_signature
         if not create_main_memory:
             ports["be"] = Out(self.be_memory_bus_signature)
-        self.be_memory_bus_signature = self.memory_config.memory_bus_signature
 
         # Get signatures of the FE ports and create them
         if self.cache_configs:
