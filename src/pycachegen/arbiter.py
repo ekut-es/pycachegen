@@ -1,15 +1,9 @@
-from enum import Enum
-
 from amaranth import Array, Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
+from .cache_config import ArbitrationScheme
 from .interfaces import MemoryBusSignature
-
-
-class ArbitrationScheme(Enum):
-    PRIORITY = 0
-    ROUND_ROBIN = 1
 
 
 class Arbiter(wiring.Component):

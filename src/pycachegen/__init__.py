@@ -1,6 +1,5 @@
-# TODO move ArbitrationScheme into cache_config as well
-from pycachegen.arbiter import ArbitrationScheme
 from pycachegen.cache_config import (
+    ArbitrationScheme,
     CacheConfig,
     ReplacementPolicies,
     WritePolicies,

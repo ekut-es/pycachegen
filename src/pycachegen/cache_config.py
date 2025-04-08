@@ -19,6 +19,11 @@ class WritePolicies(Enum):
     WRITE_BACK = "write_back"
 
 
+class ArbitrationScheme(Enum):
+    PRIORITY = "priority"
+    ROUND_ROBIN = "round_robin"
+
+
 class ConfigurationError(ValueError):
     """An error that gets thrown when a module was configured incorrectly."""
 
