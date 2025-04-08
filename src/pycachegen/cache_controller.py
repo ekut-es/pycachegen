@@ -59,8 +59,8 @@ class CacheController(wiring.Component):
         fe_buffer_write_strobe = Signal(config.bytes_per_word)
 
         # backend output buffers
-        # Create be buffers that use our own data/address/write strobe widths
-        # Then "shift" the data/write strobe into place in the real be interface
+        # Create BE buffers that use our own data/address/write strobe widths
+        # Then "shift" the data/write strobe into place in the real BE interface
         # according to the bits we cut off from the address
         be_buffer_write_data = Signal(unsigned(config.data_width))
         be_buffer_write_strobe = Signal(unsigned(config.bytes_per_word))
@@ -85,17 +85,17 @@ class CacheController(wiring.Component):
         fe_address_view = data.View(config.address_layout, self.fe.address)
         # Output port ready status based on current state
         m.d.comb += self.fe.port_ready.eq(state == States.READY)
-        # Whether to hand the data in the buffer out or the data from the data store
+        # Whether to hand the data in the buffer out or the data from the cache store
         fe_read_data_select_buffer = Signal()
         # Buffer that contains the data requested by the frontend
         fe_read_data_buffer = Signal(unsigned(config.data_width))
-        # Use that index to assign the correct read data to the fe port
+        # Use that index to assign the correct read data to the FE port
         m.d.comb += self.fe.read_data.eq(Mux(fe_read_data_select_buffer, fe_read_data_buffer, self.store.read_data))
 
         # States.READ_BLOCK
         # counter for how many read operations have been done so far
         read_block_read_counter = Signal(range(config.read_block_requests_needed + 1))
-        # counter for how many words of the be read data have been written back so far
+        # counter for how many words of the BE read data have been written back so far
         read_block_write_counter = Signal(config.be_word_multiplier_width)
         # the address for which a read request was issued
         read_block_previous_address = Signal(config.address_layout)
@@ -128,7 +128,7 @@ class CacheController(wiring.Component):
         write_back_address = Signal(config.address_layout)
         write_back_way = Signal(range(config.num_ways))
         # source of the data to write back.
-        # 0: from data store (read needs to be initiated before entering this state. way must also be specified)
+        # 0: from cache store (read needs to be initiated before entering this state. way must also be specified)
         # 1: from write back buffer
         write_back_data_from_buffer = Signal()
         # state to take after the WRITE_BACK state
@@ -163,7 +163,7 @@ class CacheController(wiring.Component):
         # the actual logic of the evict block operation
         with m.If(evict_block_enable):
             with m.If(evict_block_counter < config.block_size):
-                # Send read request to data store
+                # Send read request to cache store
                 m.d.comb += [
                     self.store.read_request_valid.eq(1),
                     self.store.read_address.eq(evict_block_incremented_address),
@@ -184,7 +184,7 @@ class CacheController(wiring.Component):
                 m.d.sync += evict_block_counter.eq(0)
 
         def send_fe_buffer_request_to_lower_mem(next_state):
-            """Send the request from the fe buffers to the lower memory."""
+            """Send the request from the FE buffers to the lower memory."""
             m.d.comb += [
                 self.be.request_valid.eq(1),
                 be_buffer_address.eq(fe_buffer_address),
@@ -198,7 +198,7 @@ class CacheController(wiring.Component):
                 m.d.sync += send_mem_request_next_state.eq(next_state)
 
         def send_fe_request_to_lower_mem(next_state):
-            """Send the request from the fe to the lower memory."""
+            """Send the request from the FE to the lower memory."""
             m.d.comb += [
                 self.be.request_valid.eq(1),
                 be_buffer_address.eq(self.fe.address),
@@ -244,13 +244,13 @@ class CacheController(wiring.Component):
             with m.Case(States.READY):
                 with m.If(self.fe.flush):
                     m.d.sync += state.eq(States.FLUSH_CACHE)
-                    # Reset fe outputs
+                    # Reset FE outputs
                     m.d.sync += [
                         self.fe.flush_done.eq(0),
                         self.fe.read_data_valid.eq(0),
                     ]
                 with m.Elif(self.fe.request_valid):
-                    # Reset fe outputs
+                    # Reset FE outputs
                     m.d.sync += [
                         self.fe.flush_done.eq(0),
                         self.fe.read_data_valid.eq(0),
@@ -381,7 +381,7 @@ class CacheController(wiring.Component):
                                                 # the EXECUTE_FE_WRITE_REQUEST State will write the data to the cache
                                                 write_back_next_state.eq(States.EXECUTE_FE_WRITE_REQUEST),
                                             ]
-                                            # Query data store so that the write back state can use its data
+                                            # Query cache store so that the write back state can use its data
                                             # clear the word offset so that the actual first word gets read.
                                             m.d.comb += [
                                                 self.store.read_request_valid.eq(1),
@@ -450,7 +450,7 @@ class CacheController(wiring.Component):
                             << (config.bytes_per_word * write_back_address.as_value()[: -config.be_address_width])
                         )
                     with m.Else():
-                        # take the data from the data store and write it and the write strobe to the BE buffers
+                        # take the data from the cache store and write it and the write strobe to the BE buffers
                         m.d.comb += [
                             be_buffer_write_data.eq(self.store.read_data),
                             be_buffer_write_strobe.eq(-1),
@@ -487,14 +487,14 @@ class CacheController(wiring.Component):
                     with m.If(
                         fe_buffer_write_strobe.all() & (read_block_read_counter == 0) & (config.be_word_multiplier == 1)
                     ):
-                        # If the fe completely overwrites all the words that we'd get from the current request, we can
+                        # If the FE completely overwrites all the words that we'd get from the current request, we can
                         # skip it. (this is only the case if write strobe is all ones, we'd only get one word out of
-                        # the request and the current request targets the same word as the fe address)
+                        # the request and the current request targets the same word as the FE address)
                         with m.If(self.be.port_ready):
                             m.d.sync += read_block_read_counter.eq(read_block_read_counter + 2)
                         m.d.comb += be_buffer_address.word_offset.eq(fe_buffer_address.as_value() + 1)
                     with m.Else():
-                        # Else just increment the word offset by the amount of words we can retrieve from one be word
+                        # Else just increment the word offset by the amount of words we can retrieve from one BE word
                         with m.If(self.be.port_ready):
                             m.d.sync += read_block_read_counter.eq(read_block_read_counter + 1)
                         m.d.comb += be_buffer_address.word_offset.eq(
@@ -540,7 +540,7 @@ class CacheController(wiring.Component):
                         m.d.sync += read_block_read_counter.eq(0)
             with m.Case(States.EXECUTE_FE_WRITE_REQUEST):
                 # Handle write request - this state is used after write back/read block operations
-                # Write data to data store
+                # Write data to cache store
                 m.d.comb += [
                     self.store.write_request_valid.eq(1),
                     self.store.write_address.eq(fe_buffer_address),

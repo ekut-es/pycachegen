@@ -5,7 +5,7 @@ from amaranth.lib.wiring import In, Out
 from .cache_config import InternalCacheConfig
 from .cache_controller import CacheController
 from .cache_directory import CacheDirectory
-from .data_store import CacheStore
+from .cache_store import CacheStore
 from .replacement_policy import ReplacementPolicy
 from .write_buffer import WriteBuffer
 
