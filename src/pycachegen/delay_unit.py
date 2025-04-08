@@ -68,23 +68,29 @@ class DelayUnit(wiring.Component):
                 target.flush.eq(requestor.flush),
             ]
             with m.If(requestor.request_valid & ~requestor.flush):
-                m.d.sync += address.eq(requestor.address)
-                m.d.sync += write_data.eq(requestor.write_data)
-                m.d.sync += write_strobe.eq(requestor.write_strobe)
-                m.d.sync += request_valid.eq(requestor.request_valid)
-                m.d.sync += state.eq(1)
+                m.d.sync += [
+                    address.eq(requestor.address),
+                    write_data.eq(requestor.write_data),
+                    write_strobe.eq(requestor.write_strobe),
+                    request_valid.eq(requestor.request_valid),
+                    state.eq(1),
+                ]
         with m.Else():
             with m.If(~delay_reached):
                 m.d.sync += delay.eq(delay + 1)
             with m.Else():
                 # delay reached, send the request
-                m.d.comb += target.address.eq(address)
-                m.d.comb += target.write_data.eq(write_data)
-                m.d.comb += target.write_strobe.eq(write_strobe)
-                m.d.comb += target.request_valid.eq(request_valid)
+                m.d.comb += [
+                    target.address.eq(address),
+                    target.write_data.eq(write_data),
+                    target.write_strobe.eq(write_strobe),
+                    target.request_valid.eq(request_valid),
+                ]
                 with m.If(target.port_ready):
                     # target ready to process request, go back to idle
-                    m.d.sync += state.eq(0)
-                    m.d.sync += delay.eq(0)
+                    m.d.sync += [
+                        state.eq(0),
+                        delay.eq(0),
+                    ]
 
         return m
