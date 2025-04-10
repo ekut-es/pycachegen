@@ -1,16 +1,18 @@
-from amaranth import *
+from amaranth import C, Cat, Module, Mux, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.memory_bus import MemoryBusSignature
+from pycachegen.interfaces import MemoryBusSignature
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
+
 
 class TCDMCacheAdapter(wiring.Component):
     def __init__(self, cache_signature: MemoryBusSignature):
         """Adapts a cache to the pulpissimo TCDM interface.
 
         Args:
-            cache_signature (MemoryBusSignature): Signature of the cache interface. Note that the FE and BE interfaces use the same signature.
+            cache_signature (MemoryBusSignature): Signature of the cache interface. Note that the FE and BE interfaces
+                use the same signature.
         """
         self.cache_signature = cache_signature
         super().__init__(
@@ -34,7 +36,7 @@ class TCDMCacheAdapter(wiring.Component):
         requestor = self.requestor
         target = self.target
 
-        ## State of the adapter
+        # State of the adapter
         # Whether the adapter is currently processing a read or a write request.
         processing_read = Signal()
         processing_write = Signal()
@@ -45,7 +47,7 @@ class TCDMCacheAdapter(wiring.Component):
         # Buffer for the read data requested by the cache from the target
         read_data_buffer = Signal(unsigned(32))
 
-        ## Connect requestor and cache_fe
+        # Connect requestor and cache_fe
 
         with m.If(processing_read):
             # When processing a read, set r_valid to read_data_valid.
@@ -81,7 +83,7 @@ class TCDMCacheAdapter(wiring.Component):
         m.d.comb += requestor.r_opc.eq(0)  # Errors are not supported by the cache
         m.d.comb += cache_fe.flush.eq(0)  # Core doesn't use flush
 
-        ## Connect cache_be and target
+        # Connect cache_be and target
 
         with m.If(read_sent & target.r_valid):
             # Set read_answered if read_sent and rvalid
@@ -114,9 +116,7 @@ class TCDMCacheAdapter(wiring.Component):
         # Connect the other, simpler signals
         m.d.comb += cache_be.port_ready.eq(target.gnt)
         m.d.comb += target.req.eq(cache_be.request_valid)
-        m.d.comb += target.be.eq(
-            Mux(cache_be.write_strobe.any(), cache_be.write_strobe, -1)
-        )
+        m.d.comb += target.be.eq(Mux(cache_be.write_strobe.any(), cache_be.write_strobe, -1))
         m.d.comb += target.wen.eq(~cache_be.write_strobe.any())
         m.d.comb += target.add.eq(Cat(C(0, unsigned(2)), cache_be.address))
         m.d.comb += target.wdata.eq(cache_be.write_data)

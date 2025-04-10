@@ -1,11 +1,8 @@
-// Module which integrates a data cache into the pulpissimo SoC.
-// This Module takes all TCDM requesters as inputs on tcdm_in. Requests that are addressed for private bank 0
-// (which is where all data and nothing else should be) are then arbitrated and sent to the cache.
-// If your linker script works differently, you might get poor performance.
-// The cache's own request interface is output as tcdm_priv0. Since all requests for private bank 0
-// will come from this tcdm_priv0, the TCDM Demux should not get a rule for this address range and its
-// output port should be replaced by tcdm_priv0.
-// Requests for other addresses bypass the cache and will simply be output again on tcdm_out.
+// Module for integrating a PyCacheGen data cache into SoCs based on the pulp_soc, like the Pulpissimo
+// This module can take several TCDM requesters as tcdm_in. The request addresses will be used to check
+// whether the request should go to private bank 0. Such requests will go through the cache.
+// The cache's own request interface is output as tcdm_priv0. All other requests are simply output on
+// tcdm_out again.
 module pulpissimo_cache_subsystem_wrapper #(
   parameter int NR_MASTER_PORTS = 4,
   parameter int PRIV_BANK_0_MIN_ADDR = 32'h1C00_0000,
@@ -23,7 +20,7 @@ module pulpissimo_cache_subsystem_wrapper #(
   localparam int unsigned REQ_AGG_DATA_WIDTH  = 1+BE_WIDTH+ADDR_WIDTH+DATA_WIDTH; // +1 is for wen
 
   logic outstanding_cache_response; // Whether we're awaiting a response from the cache
-  
+
   // indices of the next request (as outputted by the arbiter) and of the previously granted request
   logic [$clog2(NR_MASTER_PORTS)-1:0] arb_next_idx;
   logic [$clog2(NR_MASTER_PORTS)-1:0] arb_curr_idx;
@@ -136,19 +133,16 @@ module pulpissimo_cache_subsystem_wrapper #(
       .mem_req_o      (tcdm_priv0.req)
   );
 
-  logic rst;
-  reset_synchronizer reset_synchronizer_i (
-    .clk_i(clk_i),
-    .arst_ni(rst_ni),
-    .rst_o(rst)
-  );
+  logic [ADDR_WIDTH-1:0] arb_2_cache_addr_remapped, tcdm_priv0_add;
+  assign arb_2_cache_addr_remapped = arb_2_cache_addr - PRIV_BANK_0_MIN_ADDR;
+  assign tcdm_priv0.add = tcdm_priv0_add + PRIV_BANK_0_MIN_ADDR;
 
   // Create the cache subsystem. Connect it to the arbiter and the priv0 output.
   pulpissimo_cache_subsystem cache_subsystem (
-      .rst                (rst),
+      .rst                (~rst_ni),
       .clk                (clk_i),
       .requestor__req       (arb_2_cache_req),
-      .requestor__add      (arb_2_cache_addr),
+      .requestor__add      (arb_2_cache_addr_remapped),
       .requestor__wen       (arb_2_cache_wen),
       .requestor__wdata     (arb_2_cache_wdata),
       .requestor__be        (arb_2_cache_be),
@@ -157,7 +151,7 @@ module pulpissimo_cache_subsystem_wrapper #(
       .requestor__r_rdata     (arb_2_cache_rdata),
       .requestor__r_opc       (arb_2_cache_err),
       .target__req     (tcdm_priv0_req),
-      .target__add    (tcdm_priv0.add),
+      .target__add    (tcdm_priv0_add),
       .target__wen      (tcdm_priv0.wen),
       .target__wdata   (tcdm_priv0.wdata),
       .target__be      (tcdm_priv0.be),
