@@ -1,6 +1,7 @@
 from pycachegen.cache_config import (
     ArbitrationScheme,
     CacheConfig,
+    DelayConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -17,4 +18,5 @@ __all__ = [
     "WritePolicies",
     "CacheWrapper",
     "PulpissimoCacheSubsystem",
+    "DelayConfig",
 ]

@@ -1,6 +1,4 @@
-from pycachegen import (
-    CacheWrapper,
-)
+from pycachegen import CacheWrapper, DelayConfig
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
@@ -11,11 +9,13 @@ def test():
         num_ports=1,
         byte_size=4,
         address_width=8,
-        read_delay=9,
-        write_delay=14,
-        burst_block_size=4,
-        burst_read_delay=3,
-        burst_write_delay=5,
+        delay_config=DelayConfig(
+            read_delay=9,
+            write_delay=14,
+            burst_block_size=4,
+            burst_read_delay=3,
+            burst_write_delay=5,
+        ),
         cache_configs=[],
         main_memory_data_width=16,
     )

@@ -9,9 +9,9 @@ from .arbiter import Arbiter, ArbitrationScheme
 from .cache import Cache
 from .cache_config import (
     CacheConfig,
+    DelayConfig,
     InternalCacheConfig,
     InternalMemoryConfig,
-    assert_delays_valid,
 )
 from .delay_unit import DelayUnit
 from .main_memory import MainMemory
@@ -25,13 +25,9 @@ class CacheWrapper(wiring.Component):
         main_memory_data_width: int,
         create_main_memory: bool = True,
         num_ports: int = 1,
-        read_delay: int = 0,
-        write_delay: int = 0,
+        delay_config: Optional[DelayConfig] = None,
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
-        burst_read_delay: Optional[int] = None,
-        burst_write_delay: Optional[int] = None,
-        burst_block_size: Optional[int] = None,
     ) -> None:
         """The top level module for using caches.
 
@@ -52,28 +48,21 @@ class CacheWrapper(wiring.Component):
                 the be__flush signal and always assign be__flush_done to 1 unless you want to do something specific
                 with them.
             num_ports (int): Number of request ports.
-            read_delay (int): The amount of cycles by which read requests to the main memory should be delayed. Can be
-                set to 0, in which case write_delay must also be 0.
-            write_delay (int): The amount of cycles by which write requests to the main memory should be delayed. Can
-                be set to 0, in which case read_delay must also be 0.
+            delay_config (DelayConfig, optional): Can be used to configure a delay for the main memory to simulate a
+                slower main memory. When set to None, no delay will be used.
             arbitration_scheme (ArbitrationScheme): Scheme for the arbiter in case there is more than one port.
                 Supports priority and round robin scheme.
             byte_size (int): Number of bits per byte. A byte is the smallest unit that can be individually written to
                 with the write strobe. If you only need to write to whole words, you can set the byte_size to be equal
                 to the data_width.
         """
-        assert_delays_valid(read_delay, write_delay)
         self.num_ports = num_ports
         self.arbitration_scheme = arbitration_scheme
         self.byte_size = byte_size
         self.num_caches = len(cache_configs)
         self.fe_address_width = address_width
         self.create_main_memory = create_main_memory
-        self.read_delay = read_delay
-        self.write_delay = write_delay
-        self.burst_read_delay = burst_read_delay
-        self.burst_write_delay = burst_write_delay
-        self.burst_block_size = burst_block_size
+        self.delay_config = delay_config
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -161,14 +150,9 @@ class CacheWrapper(wiring.Component):
                 m.d.comb += l1_hit.eq(cache.hit_o)
 
         # optionally create a delay module
-        if self.read_delay:
+        if self.delay_config is not None:
             m.submodules.delay_unit = delay_unit = DelayUnit(
-                mem_signature=self.be_memory_bus_signature,
-                read_delay=self.read_delay,
-                write_delay=self.write_delay,
-                burst_read_delay=self.burst_read_delay,
-                burst_write_delay=self.burst_write_delay,
-                burst_block_size=self.burst_block_size,
+                mem_signature=self.be_memory_bus_signature, delay_config=self.delay_config
             )
             in_ports.append(delay_unit.requestor)
             out_ports.append(delay_unit.target)

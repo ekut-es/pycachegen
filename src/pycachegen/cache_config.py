@@ -168,12 +168,29 @@ def assert_address_range_valid(min_address: int, max_address: int, address_width
         )
 
 
-def assert_delays_valid(read_delay: int, write_delay: int) -> None:
-    if (read_delay == 0) ^ (write_delay == 0):
+def assert_delays_valid(
+    read_delay: int, write_delay: int, use_burst_mode: bool, burst_read_delay: int, burst_write_delay: int
+) -> None:
+    if read_delay < 1 or write_delay < 1:
         raise ConfigurationError(
-            "The read and write delays must either both be 0 or greater than 0, but they are configured to be"
-            + f" {read_delay} and {write_delay}"
+            f"The read and write delays have to be at least 1, but they're set to {read_delay} and {write_delay}"
         )
+    if use_burst_mode:
+        if burst_read_delay < 1 or burst_write_delay < 1:
+            raise ConfigurationError(
+                "The burst read and write delays have to be at least 1, but they're set to "
+                + f"{burst_read_delay} and {burst_write_delay}"
+            )
+        if burst_read_delay > read_delay:
+            raise ConfigurationError(
+                "The burst read delay cannot be larger than the read delay, but they're set to "
+                + f"{burst_read_delay} and {read_delay}."
+            )
+        if burst_write_delay > write_delay:
+            raise ConfigurationError(
+                "The burst write delay cannot be larger than the write delay, but they're set to "
+                + f"{burst_write_delay} and {write_delay}."
+            )
 
 
 @log_parameters
@@ -334,3 +351,41 @@ class InternalMemoryConfig:
             data_width=self.data_width,
             bytes_per_word=self.bytes_per_word,
         )
+
+
+class DelayConfig:
+    def __init__(
+        self,
+        read_delay: int,
+        write_delay: int,
+        burst_block_size=0,
+        burst_read_delay=1,
+        burst_write_delay=1,
+    ):
+        """Class for configuring the delay unit.
+
+        The delay unit supports a simple burst mode: The memory is divided into blocks of size burst_block_size. When
+            the previous request used an address from the same block, the current request will use the burst timing.
+            When the current request uses an address from another block, it will use the normal delays and the current
+            burstable block will be the new block.
+
+        Args:
+            read_delay (int): Delay for read requests. Must be at least 1.
+            write_delay (int): Delay for write requests. Must be at least 1.
+            burst_block_size (int, optional): The size of a burst block. When set to 0, burst mode will not be used.
+            burst_read_delay (int, optional): Delay for burst reads. Must be at least 1 and at most read_delay.
+            burst_write_delay (int, optional): Delay for burst writes. Must be at least 1 and at most write_delay.
+        """
+        self.use_burst_mode = burst_block_size != 0
+        assert_delays_valid(
+            read_delay=read_delay,
+            write_delay=write_delay,
+            use_burst_mode=self.use_burst_mode,
+            burst_read_delay=burst_read_delay,
+            burst_write_delay=burst_write_delay,
+        )
+        self.read_delay = read_delay
+        self.write_delay = write_delay
+        self.burst_block_size = burst_block_size
+        self.burst_read_delay = burst_read_delay
+        self.burst_write_delay = burst_write_delay
