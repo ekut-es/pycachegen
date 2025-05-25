@@ -1,6 +1,9 @@
+from typing import Optional
+
 from amaranth import Module, Mux, Signal
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
+from amaranth.utils import exact_log2
 
 from .interfaces import MemoryBusSignature
 
@@ -11,6 +14,9 @@ class DelayUnit(wiring.Component):
         mem_signature: MemoryBusSignature,
         read_delay: int,
         write_delay: int,
+        burst_read_delay: Optional[int] = None,
+        burst_write_delay: Optional[int] = None,
+        burst_block_size: Optional[int] = None,
     ):
         """Delays incoming requests by the specified amount of cycles.
 
@@ -35,6 +41,15 @@ class DelayUnit(wiring.Component):
         self.mem_signature = mem_signature
         self.read_delay = read_delay
         self.write_delay = write_delay
+        self.use_burst_mode = burst_block_size is not None
+        self.burst_block_size = burst_block_size
+        if self.use_burst_mode:
+            assert burst_read_delay is not None and burst_write_delay is not None
+            assert burst_read_delay <= read_delay
+            assert burst_write_delay <= write_delay
+            self.burst_read_delay = burst_read_delay
+            self.burst_write_delay = burst_write_delay
+            self.burst_block_address_width = self.mem_signature.address_width - exact_log2(self.burst_block_size)
         super().__init__({"requestor": In(mem_signature), "target": Out(mem_signature)})
 
     def elaborate(self, platform):
@@ -53,7 +68,20 @@ class DelayUnit(wiring.Component):
         request_valid = Signal()
 
         delay_reached = Signal()
-        m.d.comb += delay_reached.eq(delay == (Mux(write_strobe.any(), self.write_delay, self.read_delay) - 1))
+        if self.use_burst_mode:
+            address_in_burst_block = Signal()
+            burst_block_address = Signal(self.burst_block_address_width)
+            m.d.comb += address_in_burst_block.eq(address[-self.burst_block_address_width :] == burst_block_address)
+            with m.If(write_strobe.any()):
+                m.d.comb += delay_reached.eq(
+                    delay == (Mux(address_in_burst_block, self.burst_write_delay, self.write_delay) - 1)
+                )
+            with m.Else():
+                m.d.comb += delay_reached.eq(
+                    delay == (Mux(address_in_burst_block, self.burst_read_delay, self.read_delay) - 1)
+                )
+        else:
+            m.d.comb += delay_reached.eq(delay == (Mux(write_strobe.any(), self.write_delay, self.read_delay) - 1))
 
         with m.If(state == 0):
             # idle
@@ -86,6 +114,8 @@ class DelayUnit(wiring.Component):
                     target.write_strobe.eq(write_strobe),
                     target.request_valid.eq(request_valid),
                 ]
+                if self.use_burst_mode:
+                    m.d.sync += burst_block_address.eq(address[-self.burst_block_address_width :])
                 with m.If(target.port_ready):
                     # target ready to process request, go back to idle
                     m.d.sync += [
