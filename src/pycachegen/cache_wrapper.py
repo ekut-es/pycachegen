@@ -1,3 +1,5 @@
+from typing import Optional
+
 from amaranth import Module
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
@@ -27,6 +29,9 @@ class CacheWrapper(wiring.Component):
         write_delay: int = 0,
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
+        burst_read_delay: Optional[int] = None,
+        burst_write_delay: Optional[int] = None,
+        burst_block_size: Optional[int] = None,
     ) -> None:
         """The top level module for using caches.
 
@@ -66,6 +71,9 @@ class CacheWrapper(wiring.Component):
         self.create_main_memory = create_main_memory
         self.read_delay = read_delay
         self.write_delay = write_delay
+        self.burst_read_delay = burst_read_delay
+        self.burst_write_delay = burst_write_delay
+        self.burst_block_size = burst_block_size
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -158,6 +166,9 @@ class CacheWrapper(wiring.Component):
                 mem_signature=self.be_memory_bus_signature,
                 read_delay=self.read_delay,
                 write_delay=self.write_delay,
+                burst_read_delay=self.burst_read_delay,
+                burst_write_delay=self.burst_write_delay,
+                burst_block_size=self.burst_block_size,
             )
             in_ports.append(delay_unit.requestor)
             out_ports.append(delay_unit.target)
