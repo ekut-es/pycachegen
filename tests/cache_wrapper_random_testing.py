@@ -97,8 +97,7 @@ if __name__ == "__main__":
         address_width=8,
         main_memory_data_width=32,
         create_main_memory=True,
-        read_delay=3,
-        write_delay=5,
+        delay_config=DelayConfig(read_delay=3, write_delay=5),
         cache_configs=[
             CacheConfig(
                 data_width=32,

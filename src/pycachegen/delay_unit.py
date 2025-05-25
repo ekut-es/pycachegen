@@ -1,23 +1,14 @@
-from typing import Optional
-
 from amaranth import Module, Mux, Signal
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.utils import exact_log2
 
+from .cache_config import DelayConfig
 from .interfaces import MemoryBusSignature
 
 
 class DelayUnit(wiring.Component):
-    def __init__(
-        self,
-        mem_signature: MemoryBusSignature,
-        read_delay: int,
-        write_delay: int,
-        burst_read_delay: Optional[int] = None,
-        burst_write_delay: Optional[int] = None,
-        burst_block_size: Optional[int] = None,
-    ):
+    def __init__(self, mem_signature: MemoryBusSignature, delay_config: DelayConfig):
         """Delays incoming requests by the specified amount of cycles.
 
         This module will accept new requests and then buffer and delay them for the specified
@@ -34,22 +25,17 @@ class DelayUnit(wiring.Component):
 
         Args:
             mem_signature (MemoryBusSignature): Signature of the bus.
-            read_delay (int): Delay for read requests. Must be at least 1.
-            write_delay (int): Delay for write requests. Must be at least 1.
+            delay_config (DelayConfig): The configuration of the delay unit
         """
-        assert read_delay >= 1 and write_delay >= 1
         self.mem_signature = mem_signature
-        self.read_delay = read_delay
-        self.write_delay = write_delay
-        self.use_burst_mode = burst_block_size is not None
-        self.burst_block_size = burst_block_size
+        self.read_delay = delay_config.read_delay
+        self.write_delay = delay_config.write_delay
+        self.use_burst_mode = delay_config.use_burst_mode
         if self.use_burst_mode:
-            assert burst_read_delay is not None and burst_write_delay is not None
-            assert burst_read_delay <= read_delay
-            assert burst_write_delay <= write_delay
-            self.burst_read_delay = burst_read_delay
-            self.burst_write_delay = burst_write_delay
-            self.burst_block_address_width = self.mem_signature.address_width - exact_log2(self.burst_block_size)
+            self.burst_block_size = delay_config.burst_block_size
+            self.burst_read_delay = delay_config.burst_read_delay
+            self.burst_write_delay = delay_config.burst_write_delay
+            self.burst_block_address_width = mem_signature.address_width - exact_log2(self.burst_block_size)
         super().__init__({"requestor": In(mem_signature), "target": Out(mem_signature)})
 
     def elaborate(self, platform):
@@ -67,6 +53,7 @@ class DelayUnit(wiring.Component):
         write_strobe = Signal(requestor.write_strobe.shape())
         request_valid = Signal()
 
+        # Determine whether the desired delay was reached, which depends on whether burst mode is used or not
         delay_reached = Signal()
         if self.use_burst_mode:
             address_in_burst_block = Signal()

@@ -1,6 +1,7 @@
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
+    DelayConfig,
     ReplacementPolicies,
     WritePolicies,
 )
@@ -14,8 +15,7 @@ def test():
         num_ports=1,
         byte_size=8,
         address_width=3,
-        read_delay=2,
-        write_delay=4,
+        delay_config=DelayConfig(read_delay=2, write_delay=4),
         cache_configs=[
             CacheConfig(
                 data_width=8,

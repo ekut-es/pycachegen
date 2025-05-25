@@ -1,4 +1,4 @@
-from pycachegen import CacheWrapper
+from pycachegen import CacheWrapper, DelayConfig
 
 from .tb_utils import CacheWrapperBenchHelper, run_bench
 
@@ -8,8 +8,7 @@ def test():
     dut = CacheWrapper(
         address_width=3,
         num_ports=1,
-        read_delay=1,
-        write_delay=2,
+        delay_config=DelayConfig(read_delay=1, write_delay=2),
         main_memory_data_width=32,
         cache_configs=[],
         create_main_memory=True,
