@@ -44,16 +44,19 @@ class DelayUnit(wiring.Component):
         requestor = self.requestor
         target = self.target
 
+        # state 0: waiting for the next request
+        # state 1: is currently delaying a request or waiting for the backend to get ready
         state = Signal()
-        delay = Signal(range(max(self.read_delay, self.write_delay)))
 
         # Input buffers
         address = Signal(requestor.address.shape())
         write_data = Signal(requestor.write_data.shape())
         write_strobe = Signal(requestor.write_strobe.shape())
-        request_valid = Signal()
 
-        # Determine whether the desired delay was reached, which depends on whether burst mode is used or not
+        # Counter for the delay
+        delay = Signal(range(max(self.read_delay, self.write_delay)))
+
+        # Determine whether we've reached the delay, which also depends on whether we're using burst mode or not
         delay_reached = Signal()
         if self.use_burst_mode:
             address_in_burst_block = Signal()
@@ -71,9 +74,15 @@ class DelayUnit(wiring.Component):
             m.d.comb += delay_reached.eq(delay == (Mux(write_strobe.any(), self.write_delay, self.read_delay) - 1))
 
         with m.If(state == 0):
-            # idle
-            # accept new requests and pass the response
-            # from the target on to the requestor
+            # Reset the delay when waiting for the next request
+            m.d.sync += delay.eq(0)
+        with m.Elif((state == 1) & ~delay_reached):
+            # Increment the delay while delaying a request
+            m.d.sync += delay.eq(delay + 1)
+
+        # Output the response to the requestor and forward flush requests
+        # The requestor should not send the next request before having received the response
+        with m.If(state == 0):
             m.d.comb += [
                 requestor.port_ready.eq(1),
                 requestor.read_data.eq(target.read_data),
@@ -82,32 +91,37 @@ class DelayUnit(wiring.Component):
                 requestor.flush_done.eq(target.flush_done),
                 target.flush.eq(requestor.flush),
             ]
-            with m.If(requestor.request_valid & ~requestor.flush):
-                m.d.sync += [
-                    address.eq(requestor.address),
-                    write_data.eq(requestor.write_data),
-                    write_strobe.eq(requestor.write_strobe),
-                    request_valid.eq(requestor.request_valid),
-                    state.eq(1),
-                ]
-        with m.Else():
-            with m.If(~delay_reached):
-                m.d.sync += delay.eq(delay + 1)
-            with m.Else():
-                # delay reached, send the request
-                m.d.comb += [
-                    target.address.eq(address),
-                    target.write_data.eq(write_data),
-                    target.write_strobe.eq(write_strobe),
-                    target.request_valid.eq(request_valid),
-                ]
-                if self.use_burst_mode:
-                    m.d.sync += burst_block_address.eq(address[-self.burst_block_address_width :])
-                with m.If(target.port_ready):
-                    # target ready to process request, go back to idle
-                    m.d.sync += [
-                        state.eq(0),
-                        delay.eq(0),
-                    ]
+
+        # Determine whether we're accepting the next request
+        accepting_request = Signal()
+        m.d.comb += accepting_request.eq((state == 0) & requestor.request_valid & ~requestor.flush)
+
+        # Buffer the inputs when accepting a request
+        with m.If(accepting_request):
+            m.d.sync += [
+                address.eq(requestor.address),
+                write_data.eq(requestor.write_data),
+                write_strobe.eq(requestor.write_strobe),
+            ]
+
+        # Send the request to the backend when the delay is reached
+        with m.If(state == 1 & delay_reached):
+            m.d.comb += [
+                target.address.eq(address),
+                target.write_data.eq(write_data),
+                target.write_strobe.eq(write_strobe),
+                target.request_valid.eq(1),
+            ]
+            # update the last address when using burst mode
+            if self.use_burst_mode:
+                m.d.sync += burst_block_address.eq(address[-self.burst_block_address_width :])
+
+        # Control path
+        with m.If(state == 0):
+            with m.If(accepting_request):
+                m.d.sync += state.eq(1)
+        with m.Elif(state == 1):
+            with m.If(delay_reached & target.port_ready):
+                m.d.sync += state.eq(0)
 
         return m
