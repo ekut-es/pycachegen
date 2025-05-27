@@ -1,13 +1,14 @@
+from typing import Optional
 from amaranth import Module, Signal, unsigned
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from pycachegen.cache_config import CacheConfig
+from pycachegen.cache_config import CacheConfig, DelayConfig
 from pycachegen.cache_wrapper import CacheWrapper
 from pycachegen.pulpissimo.tcdm_cache_adapter import TCDMCacheAdapter
 from pycachegen.pulpissimo.tcdm_signature import TCDMSignature
 from pycachegen.utils import log_parameters
-
+from pycachegen.delay_unit import DelayUnit
 
 @log_parameters
 class CacheSubsystem(wiring.Component):
@@ -15,8 +16,7 @@ class CacheSubsystem(wiring.Component):
         self,
         cache_address_width: int,
         cache_configs: list[CacheConfig],
-        read_delay: int,
-        write_delay: int,
+        delay_config: Optional[DelayConfig]
     ):
         """Cache subsytem for the pulpissimo SoC which includes an adapter and a CacheWrapper.
 
@@ -28,24 +28,21 @@ class CacheSubsystem(wiring.Component):
                 depth of the memory that is connected to the BE of the cache(s).
             cache_configs (tuple[CacheConfig, ...]): Configurations for the caches in the order of L1, L2, ... Can be
                 left empty if no caches shall be generated.
-            read_delay (int): Additional delay for any read requests sent from the cache to the memory. May be set to 0
-                if write_delay is also 0.
-            write_delay (int): Additional delay for any write requests sent from the cache to the memory. May be set to
-                0 if read_delay is also 0.
+            delay_config (DelayConfig | None): Can be used to configure a delay for the main memory to simulate a
+                slower main memory. When set to None, no delay will be used.
         """
         for cache_config in cache_configs:
             assert cache_config.data_width == 32
 
         self.cache_address_width = cache_address_width
         self.cache_configs = cache_configs
-        self.read_delay = read_delay
-        self.write_delay = write_delay
+        self.delay_config = delay_config
         super().__init__({"requestor": In(TCDMSignature()), "target": Out(TCDMSignature())})
 
     def elaborate(self, platform):
         m = Module()
 
-        if (not self.cache_configs) and (not self.read_delay) and (not self.write_delay):
+        if (not self.cache_configs) and (self.delay_config is None):
             # CacheWrapper would be empty, so lets not create one
             # Connect the requestor to the target directly instead
             wiring.connect(m, wiring.flipped(self.requestor), wiring.flipped(self.target))
@@ -61,8 +58,7 @@ class CacheSubsystem(wiring.Component):
             main_memory_data_width=32,
             create_main_memory=False,
             num_ports=1,
-            read_delay=self.read_delay,
-            write_delay=self.write_delay,
+            delay_config=self.delay_config,
             byte_size=8,
         )
 
