@@ -114,6 +114,8 @@ class CacheController(wiring.Component):
         )
         # state that read block should take next
         read_block_next_state = Signal(States)
+        # Whether we're still waiting for a read valid response from the BE
+        read_block_awaiting_be_response = Signal()
 
         # States.FLUSH_CACHE / States.FLUSH_BACKEND
         # index of the set to be flushed next
@@ -469,11 +471,16 @@ class CacheController(wiring.Component):
                         with m.Else():
                             m.d.sync += state.eq(write_back_next_state)
             with m.Case(States.READ_BLOCK):
+                # reset the awaiting_be_response signal if we receive a response
+                with m.If(self.be.read_data_valid):
+                    m.d.sync += read_block_awaiting_be_response.eq(0)
                 # wait until the memory gets ready and (all words of previous request were written to the cache or this
-                # is the first request) and we have not already issued all needed requests
+                # is the first request) and we have not already issued all needed requests and we're not awaiting a
+                # response for the previous request
                 with m.If(
                     ((read_block_write_counter == (config.be_word_multiplier - 1)) | (read_block_read_counter == 0))
                     & (read_block_read_counter < config.read_block_requests_needed)
+                    & (~read_block_awaiting_be_response | self.be.read_data_valid)
                 ):
                     # Issue a memory read request
                     # Critical word first: Start at the word that was requested
@@ -502,10 +509,22 @@ class CacheController(wiring.Component):
                         )
 
                     with m.If(self.be.port_ready):
-                        # store the address so that we still have it when writing the words to the cache
-                        m.d.sync += read_block_previous_address.eq(be_buffer_address.as_value())
+                        m.d.sync += [
+                            # store the address so that we still have it when writing the words to the cache
+                            read_block_previous_address.eq(be_buffer_address.as_value()),
+                            # remember that we're waiting for a response
+                            read_block_awaiting_be_response.eq(1),
+                        ]
 
-                with m.If(self.be.read_data_valid & (read_block_read_counter != 0)):
+                with m.If(
+                    self.be.read_data_valid
+                    & (read_block_read_counter != 0)
+                    & ((read_block_write_counter != 0) | read_block_awaiting_be_response)
+                ):
+                    # The BE read data is valid AND we've already sent a read request (so the read data that's valid is
+                    # actually the one we're looking for) AND (if we're trying to extract the first word from the BE
+                    # data, this is the first cycle after the BE read data has become valid
+                    # (read_block_awaiting_be_response) - we don't want to write it to the store multiple times, maybe)
                     # A read request was processed, write the data to the cache
                     m.d.comb += [
                         self.store.write_request_valid.eq(1),
