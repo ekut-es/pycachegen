@@ -105,7 +105,7 @@ class DelayUnit(wiring.Component):
             ]
 
         # Send the request to the backend when the delay is reached
-        with m.If(state == 1 & delay_reached):
+        with m.If((state == 1) & delay_reached):
             m.d.comb += [
                 target.address.eq(address),
                 target.write_data.eq(write_data),

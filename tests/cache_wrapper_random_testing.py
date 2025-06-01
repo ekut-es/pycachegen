@@ -85,31 +85,31 @@ def random_test(dut: CacheWrapper) -> None:
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
-    sim.run()
-    # with sim.write_vcd("random.vcd"):
-    #     sim.run()
+    # sim.run()
+    with sim.write_vcd("random.vcd"):
+        sim.run()
 
 
 if __name__ == "__main__":
     cache = CacheWrapper(
-        num_ports=1,
-        byte_size=8,
         address_width=8,
-        main_memory_data_width=32,
-        create_main_memory=True,
-        delay_config=DelayConfig(read_delay=3, write_delay=5),
         cache_configs=[
             CacheConfig(
                 data_width=32,
                 num_ways=2,
                 num_sets=8,
-                block_size=1,
+                block_size=4,
                 replacement_policy=ReplacementPolicies.PLRU_TREE,
                 write_policy=WritePolicies.WRITE_THROUGH,
                 write_allocate=False,
-                write_buffer_size=16,
+                write_buffer_size=8,
                 data_memory_module="",
             )
         ],
+        main_memory_data_width=32,
+        create_main_memory=True,
+        num_ports=1,
+        delay_config=DelayConfig(read_delay=5, write_delay=8),
+        byte_size=8,
     )
     random_test(cache)
