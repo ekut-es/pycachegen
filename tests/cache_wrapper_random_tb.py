@@ -12,7 +12,7 @@ from pycachegen import *
     "address_width,cache_data_width,cache_num_sets,cache_replacement_policy,byte_size,cache_write_buffer_size"
     + ",main_memory_data_width,delay_config",
     [(8, 32, 8, ReplacementPolicies.PLRU_TREE, 8, 6, 64, DelayConfig(4, 5, 4, 2, 3))],
-)  # FIXME setting main_memory_data_width to 64 causes tests with block size > 1 to fail
+)
 @pytest.mark.parametrize("cache_num_ways", [1, 4])
 @pytest.mark.parametrize("cache_block_size", [1, 4])
 @pytest.mark.parametrize("cache_write_policy", [WritePolicies.WRITE_THROUGH, WritePolicies.WRITE_BACK])
