@@ -1,14 +1,61 @@
 import random
 
+import pytest
 from amaranth import *
 from amaranth.sim import Simulator
 
 from pycachegen import *
 
 
-def random_test(dut: CacheWrapper) -> None:
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "address_width,cache_data_width,cache_num_sets,cache_replacement_policy,byte_size,cache_write_buffer_size"
+    + ",main_memory_data_width,delay_config",
+    [(8, 32, 8, ReplacementPolicies.PLRU_TREE, 8, 6, 32, DelayConfig(4, 5, 4, 2, 3))],
+)  # FIXME setting main_memory_data_width to 64 causes tests with block size > 1 to fail
+@pytest.mark.parametrize("cache_num_ways", [1, 4])
+@pytest.mark.parametrize("cache_block_size", [1, 4])
+@pytest.mark.parametrize("cache_write_policy", [WritePolicies.WRITE_THROUGH, WritePolicies.WRITE_BACK])
+@pytest.mark.parametrize("cache_write_allocate", [True, False])
+def test(
+    address_width,
+    cache_data_width,
+    cache_num_ways,
+    cache_num_sets,
+    cache_block_size,
+    cache_replacement_policy,
+    cache_write_policy,
+    cache_write_allocate,
+    cache_write_buffer_size,
+    main_memory_data_width,
+    delay_config,
+    byte_size,
+) -> None:
+    random.seed(42)
+    dut = CacheWrapper(
+        address_width=address_width,
+        cache_configs=[
+            CacheConfig(
+                data_width=cache_data_width,
+                num_ways=cache_num_ways,
+                num_sets=cache_num_sets,
+                replacement_policy=cache_replacement_policy,
+                write_policy=cache_write_policy,
+                write_allocate=cache_write_allocate,
+                block_size=cache_block_size,
+                write_buffer_size=cache_write_buffer_size,
+                data_memory_module="",
+            )
+        ],
+        main_memory_data_width=main_memory_data_width,
+        create_main_memory=True,
+        num_ports=1,
+        delay_config=delay_config,
+        arbitration_scheme=ArbitrationScheme.ROUND_ROBIN,
+        byte_size=byte_size,
+    )
+
     async def bench(ctx):
-        requests_processed = 0
         hits = 0
         memory_dict = dict()
         block_size = dut.cache_configs[0].block_size
@@ -17,7 +64,7 @@ def random_test(dut: CacheWrapper) -> None:
         max_address = 2**dut.fe_address_width
         bytes_per_word = dut.fe_memory_bus_signature.bytes_per_word
         address = 0
-        while True:
+        for request_number in range(1, 10_001):
             # generate a random request
             if random.random() < 0.05:
                 # jump to a completely random address
@@ -49,11 +96,10 @@ def random_test(dut: CacheWrapper) -> None:
                 await ctx.tick()
 
             # update own statistics
-            requests_processed += 1
             hits += ctx.get(dut.hit_o_0)
 
             if write_strobe:
-                # write to dict
+                # write request -> write to dict
                 val = memory_dict.get(address, 0)
                 new_val = 0
                 for i in range(bytes_per_word):
@@ -66,50 +112,25 @@ def random_test(dut: CacheWrapper) -> None:
                     new_val += new_byte << (i * dut.byte_size)
                 memory_dict[address] = new_val
             else:
-                # check if read data is correct
+                # read request -> check if read data is correct
                 try:
                     assert ctx.get(dut.fe_0.read_data_valid)
                     assert ctx.get(dut.fe_0.read_data) == memory_dict.get(address, 0)
                 except AssertionError:
                     raise RuntimeError(
-                        f"Request {requests_processed} failed: Tried reading from {address} expecting"
+                        f"Request {request_number} failed: Tried reading from {address} expecting"
                         + f" {memory_dict.get(address, 0)}, got {ctx.get(dut.fe_0.read_data)}"
-                        + f" (valid: {ctx.get(dut.fe_0.read_data_valid)})"
+                        + f" (read_data_valid: {ctx.get(dut.fe_0.read_data_valid)})"
                     )
 
             # print statistics
-            if requests_processed % 100 == 0:
-                print(f"Requests processed: {requests_processed}, hit rate: {'{:.3f}'.format(hits/requests_processed)}")
+            if request_number % 1000 == 0:
+                print(f"Requests processed: {request_number}, hit rate: {'{:.3f}'.format(hits/request_number)}")
 
     # setup simulator
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
-    # sim.run()
-    with sim.write_vcd("random.vcd"):
-        sim.run()
-
-
-if __name__ == "__main__":
-    cache = CacheWrapper(
-        address_width=8,
-        cache_configs=[
-            CacheConfig(
-                data_width=32,
-                num_ways=2,
-                num_sets=8,
-                block_size=4,
-                replacement_policy=ReplacementPolicies.PLRU_TREE,
-                write_policy=WritePolicies.WRITE_THROUGH,
-                write_allocate=False,
-                write_buffer_size=8,
-                data_memory_module="",
-            )
-        ],
-        main_memory_data_width=32,
-        create_main_memory=True,
-        num_ports=1,
-        delay_config=DelayConfig(read_delay=5, write_delay=8),
-        byte_size=8,
-    )
-    random_test(cache)
+    sim.run()
+    # with sim.write_vcd("random.vcd"):
+    #     sim.run()
