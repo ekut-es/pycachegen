@@ -27,7 +27,7 @@ test_build:
     script:
         - pip install --verbose -e .
         - pip install pytest
-        - python -m pytest
+        - python -m pytest --runslow
     interruptible: true
     tags:
         - docker
