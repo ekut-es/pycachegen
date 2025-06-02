@@ -25,7 +25,7 @@ dependencies = ["amaranth==0.5.0", "amaranth-yosys==0.40.0.0.post97"]
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
-dev = ["pre-commit", "bumpver", "pytest"]
+dev = ["pre-commit", "bumpver", "pytest", "pytest-timeout"]
 
 [project.urls]
 Homepage = "https://github.com/ekut-es/pycachegen"
@@ -45,6 +45,7 @@ push = true
 [tool.pytest.ini_options]
 testpaths = "tests/"
 python_files = "*_tb*.py"
+timeout = 30
 
 [tool.black]
 line-length = 120
