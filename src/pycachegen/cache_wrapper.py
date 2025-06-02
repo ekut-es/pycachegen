@@ -12,11 +12,13 @@ from .cache_config import (
     DelayConfig,
     InternalCacheConfig,
     InternalMemoryConfig,
+    log_parameters,
 )
 from .delay_unit import DelayUnit
 from .main_memory import MainMemory
 
 
+@log_parameters
 class CacheWrapper(wiring.Component):
     def __init__(
         self,
