@@ -15,11 +15,8 @@ def pytest_collection_modifyitems(config, items):
         # started the slow tests and we should not care about the --runslow flag
         return
     if config.getoption("--runslow"):
-        # --runslow given in cli: do not skip slow tests, but skip all other tests
-        skip_fast = pytest.mark.skip(reason="ignoring non-slow tests because --runslow was set")
-        for item in items:
-            if "slow" not in item.keywords:
-                item.add_marker(skip_fast)
+        # --runslow given in cli: run all tests
+        return
     else:
         # --runslow not given in cli: skip slow tests, but run all other tests
         skip_slow = pytest.mark.skip(reason="need --runslow option to run")
