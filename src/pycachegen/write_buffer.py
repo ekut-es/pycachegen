@@ -64,10 +64,16 @@ class WriteBuffer(wiring.Component):
         # Buffers for data read from FIFO
         read_data_buffer = Signal(unsigned(self.mem_signature.data_width))
         read_data_valid_buffer = Signal()
-        # Remember whether we're awaitng the response to a read request from the BE
+        # Whether we're awaitng the response to a read request from the BE
         outstanding_be_read_response = Signal()
         with m.If(self.be.read_data_valid):
-            m.d.sync += outstanding_be_read_response.eq(0)
+            m.d.sync += [
+                # clear outstanding response signal
+                outstanding_be_read_response.eq(0),
+                # put the BE read data into our buffer
+                read_data_buffer.eq(self.be.read_data),
+                read_data_valid_buffer.eq(1),
+            ]
         # Output the BE read data if we're awaiting a response from the BE, else output the buffered data
         with m.If(outstanding_be_read_response):
             m.d.comb += [
@@ -107,9 +113,10 @@ class WriteBuffer(wiring.Component):
                         read_data_buffer.eq(storage[addr_match_idx].write_data),
                         read_data_valid_buffer.eq(1),
                     ]
-                with m.Else():
-                    # Else (If we're receiving a write request OR a read request that we have only partially buffered),
-                    # we should clear the response buffer because that one contains false/unwanted data
+                with m.Elif(self.fe.request_valid):
+                    # Elif we're receiving a request (any kind of write request OR a read request that we have only
+                    # partially buffered), we should clear the response buffer because that one contains false/unwanted
+                    # data and the FE should not think that its request got processed already
                     m.d.sync += read_data_valid_buffer.eq(0)
 
                 with m.If(fe_write):

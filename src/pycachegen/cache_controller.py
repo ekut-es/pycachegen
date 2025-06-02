@@ -1,7 +1,7 @@
 from enum import Enum
 
 from amaranth import Array, C, Cat, Module, Mux, Signal, unsigned
-from amaranth.lib import data, wiring
+from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from .cache_address import get_blockwise_incremented_address
@@ -82,7 +82,9 @@ class CacheController(wiring.Component):
         # one hot encode the vector into this signal
         hit_index = one_hot_encode(m, hit_vector)
         # a view for convenient access to the tag/index/word offset bits
-        fe_address_view = data.View(config.address_layout, self.fe.address)
+        fe_address_view = Signal(config.address_layout)
+        m.d.comb += fe_address_view.as_value().eq(self.fe.address)
+        # fe_address_view = data.View(config.address_layout, self.fe.address)
         # Output port ready status based on current state
         m.d.comb += self.fe.port_ready.eq(state == States.READY)
         # Whether to hand the data in the buffer out or the data from the cache store
@@ -478,8 +480,18 @@ class CacheController(wiring.Component):
                 # is the first request) and we have not already issued all needed requests and we're not awaiting a
                 # response for the previous request
                 with m.If(
-                    ((read_block_write_counter == (config.be_word_multiplier - 1)) | (read_block_read_counter == 0))
+                    (
+                        # we finish writing the block to the store in this cycle
+                        (read_block_write_counter == (config.be_word_multiplier - 1))
+                        | (
+                            # or we've already finished writing the block to the store
+                            (read_block_write_counter == 0)
+                            & ~read_block_awaiting_be_response
+                        )
+                    )
+                    # and we still need to send more requests
                     & (read_block_read_counter < config.read_block_requests_needed)
+                    # and the backend is not currently processing one of our previous requests
                     & (~read_block_awaiting_be_response | self.be.read_data_valid)
                 ):
                     # Issue a memory read request

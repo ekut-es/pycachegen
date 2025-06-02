@@ -11,7 +11,7 @@ from pycachegen import *
 @pytest.mark.parametrize(
     "address_width,cache_data_width,cache_num_sets,cache_replacement_policy,byte_size,cache_write_buffer_size"
     + ",main_memory_data_width,delay_config",
-    [(8, 32, 8, ReplacementPolicies.PLRU_TREE, 8, 6, 32, DelayConfig(4, 5, 4, 2, 3))],
+    [(8, 32, 8, ReplacementPolicies.PLRU_TREE, 8, 6, 64, DelayConfig(4, 5, 4, 2, 3))],
 )  # FIXME setting main_memory_data_width to 64 causes tests with block size > 1 to fail
 @pytest.mark.parametrize("cache_num_ways", [1, 4])
 @pytest.mark.parametrize("cache_block_size", [1, 4])
@@ -31,7 +31,8 @@ def test(
     delay_config,
     byte_size,
 ) -> None:
-    random.seed(42)
+    print("Test start")
+    random.seed(45)
     dut = CacheWrapper(
         address_width=address_width,
         cache_configs=[
@@ -118,8 +119,9 @@ def test(
                     assert ctx.get(dut.fe_0.read_data) == memory_dict.get(address, 0)
                 except AssertionError:
                     raise RuntimeError(
-                        f"Request {request_number} failed: Tried reading from {address} expecting"
-                        + f" {memory_dict.get(address, 0)}, got {ctx.get(dut.fe_0.read_data)}"
+                        f"Request {request_number} failed: Tried reading from {'{:X}'.format(address)} expecting"
+                        + f" {'{:X}'.format(memory_dict.get(address, 0))},"
+                        + f" got {'{:X}'.format(ctx.get(dut.fe_0.read_data))}"
                         + f" (read_data_valid: {ctx.get(dut.fe_0.read_data_valid)})"
                     )
 
@@ -128,6 +130,7 @@ def test(
                 print(f"Requests processed: {request_number}, hit rate: {'{:.3f}'.format(hits/request_number)}")
 
     # setup simulator
+    print(f"Starting random test for {dut}")
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(bench)
