@@ -25,8 +25,7 @@ test_build:
     stage: install
     image: ${CI_REGISTRY_IMAGE}
     script:
-        - pip install --verbose -e .
-        - pip install pytest
+        - pip install --verbose -e .\[dev\]
         - python -m pytest --runslow
     interruptible: true
     tags:
