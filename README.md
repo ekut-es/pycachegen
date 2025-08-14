@@ -16,7 +16,7 @@ PyCacheGen is a python package for generating data caches written in the [Amaran
 
 The package can simply be installed using
 
-    python -m pip install path/to/pycachegen
+    python -m pip install https://github.com/ekut-es/pycachegen
 
 To install it for development, run the following from within this repository:
 
