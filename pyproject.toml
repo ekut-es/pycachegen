@@ -10,7 +10,7 @@ version = "0.1.0"
 description = "PyCacheGen"
 readme = "README.md"
 authors = [
-    { name = "Richard Müller", email = "ri.muelller@student.uni-tuebingen.de" },
+    { name = "Richard Müller", email = "ri.mueller@student.uni-tuebingen.de" },
     { name = "Konstantin (k0nze) Lübeck", email = "konstantin.luebeck@uni-tuebingen.de" }
 ]
 license = { file = "LICENSE" }
