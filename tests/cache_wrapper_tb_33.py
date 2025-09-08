@@ -1,5 +1,3 @@
-from amaranth.sim import Simulator
-
 from pycachegen import (
     CacheConfig,
     CacheWrapper,
@@ -8,8 +6,10 @@ from pycachegen import (
     WritePolicies,
 )
 
+from .tb_utils import run_bench
 
-# Testbench for testing a direct mapped cache
+
+# Testbench for testing testbench access to the main memory
 def test():
     dut = CacheWrapper(
         num_ports=1,
@@ -31,19 +31,9 @@ def test():
     )
 
     async def bench(ctx):
-
         ctx.set(dut.main_memory.data_memory.data[0], 0xDEADBEEF)
         await ctx.tick()
 
         assert ctx.get(dut.main_memory.data_memory.data[0]) == 0xDEADBEEF
 
-    sim = Simulator(dut)
-    sim.add_testbench(bench)
-    sim.add_clock(1e-6)
-
-    with sim.write_vcd(f"vcd/cache_wrapper_tb_33.vcd"):
-        sim.run()
-
-
-if __name__ == "__main__":
-    test()
+    run_bench(dut=dut, bench=bench)

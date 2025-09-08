@@ -32,4 +32,5 @@ expected_results = {
     "cache_wrapper_tb_30.vcd": 12000000000,
     "cache_wrapper_tb_31.vcd": 105000000000,
     "cache_wrapper_tb_32.vcd": 198000000000,
+    "cache_wrapper_tb_33.vcd": 1000000000,
 }
