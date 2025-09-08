@@ -103,7 +103,10 @@ class CacheWrapper(wiring.Component):
 
         # Get signature of BE port and create it if needed
         self.be_memory_bus_signature = self.memory_config.memory_bus_signature
-        if not create_main_memory:
+
+        if self.create_main_memory:
+            self.main_memory = MainMemory(config=self.memory_config)
+        else:
             ports["be"] = Out(self.be_memory_bus_signature)
 
         # Get signatures of the FE ports and create them
@@ -161,8 +164,8 @@ class CacheWrapper(wiring.Component):
 
         if self.create_main_memory:
             # create the main memory
-            m.submodules.main_memory = main_memory = MainMemory(config=self.memory_config)
-            in_ports.append(main_memory.fe)
+            m.submodules["main_memory"] = self.main_memory
+            in_ports.append(self.main_memory.fe)
         else:
             # else add the flipped BE port to the in_ports
             in_ports.append(wiring.flipped(self.be))
