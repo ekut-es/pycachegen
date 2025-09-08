@@ -20,20 +20,22 @@ class MainMemory(wiring.Component):
 
         super().__init__({"fe": In(config.memory_bus_signature)})
 
-    def elaborate(self, platform) -> Module:
-        m = Module()
-
-        m.d.comb += self.fe.flush_done.eq(1)
-
         # Create data memory
-        m.submodules.data_memory = data_memory = Memory(
+        self.data_memory = Memory(
             shape=unsigned(self.config.data_width),
             depth=(2**self.config.address_width),
             init=[],
         )
 
-        write_port = data_memory.write_port(granularity=self.config.byte_size)
-        read_port = data_memory.read_port()
+    def elaborate(self, platform) -> Module:
+        m = Module()
+
+        m.submodules["data_memory"] = self.data_memory
+
+        m.d.comb += self.fe.flush_done.eq(1)
+
+        write_port = self.data_memory.write_port(granularity=self.config.byte_size)
+        read_port = self.data_memory.read_port()
 
         # Track whether the last request was a read so that we can hand out the read
         # data and it as valid when appropriate
