@@ -364,19 +364,22 @@ class DelayConfig:
     ):
         """Class for configuring the delay unit.
 
-        The delay unit supports a simple burst mode: The memory is divided into blocks of size burst_block_size. When
-            the previous request used an address from the same block, the current request will use the burst timing.
-            When the current request uses an address from another block, it will use the normal delays and the current
-            burstable block will be the new block.
+        **NOTE**: All delays specify an amount of time by which a certain request will be delayed - they do not specify
+        the total amount of time between sending the request and getting the response.
+
+        For more info on the burst mode, see `pycachegen.delay_unit.DelayUnit`.
 
         Args:
             read_delay (int): Delay for read requests. Must be at least 1.
             write_delay (int): Delay for write requests. Must be at least 1.
-            burst_block_size (int, optional): The size of a burst block. When set to 0, burst mode will not be used.
+            burst_block_size (int, optional): The size of a burst block. Muste be either 0 or a power of two. When set
+                to 0, burst mode will not be used.
             burst_read_delay (int, optional): Delay for burst reads. Must be at least 1 and at most read_delay.
             burst_write_delay (int, optional): Delay for burst writes. Must be at least 1 and at most write_delay.
         """
         self.use_burst_mode = burst_block_size != 0
+        if self.use_burst_mode:
+            assert_is_power_of_two(burst_block_size, "burst_block_size")
         assert_delays_valid(
             read_delay=read_delay,
             write_delay=write_delay,

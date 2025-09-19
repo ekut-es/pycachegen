@@ -23,29 +23,23 @@ def test():
     helper = CacheWrapperBenchHelper(dut)
 
     async def bench(ctx):
-        # do a bunch of reads and writes within the same block. First read should be slow, after that it shoud be fast
-        await helper.read(ctx, 6, 0x0000, False)
-        await helper.read(ctx, 5, 0x0000, False)
-        await helper.write(ctx, 6, 0x1060, False)
-        await helper.write(ctx, 7, 0x1070, False)
-        await helper.read(ctx, 7, 0x1070, False)
-        await helper.read(ctx, 4, 0x0000, False)
-        await helper.write(ctx, 4, 0x1040, False)
-        await helper.read(ctx, 6, 0x1060, False)
-        await helper.write(ctx, 5, 0x1050, False)
-
-        # read/write from addresses outside that block
-        await helper.write(ctx, 0, 0x1000, False)
+        # burst a full block. first read should be slow, the other fast
+        await helper.read(ctx, 2, 0x0000, False)
+        await helper.read(ctx, 3, 0x0000, False)
+        await helper.read(ctx, 0, 0x0000, False)
         await helper.read(ctx, 1, 0x0000, False)
-        await helper.read(ctx, 0, 0x1000, False)
 
-        # read from the first block again
-        await helper.read(ctx, 4, 0x1040, False)
-        await helper.read(ctx, 5, 0x1050, False)
-        await helper.read(ctx, 6, 0x1060, False)
-        await helper.read(ctx, 7, 0x1070, False)
+        # burst two words, then skip one word which should not continue the burst
+        await helper.read(ctx, 0, 0x0000, False)
+        await helper.read(ctx, 1, 0x0000, False)
+        await helper.read(ctx, 3, 0x0000, False)
 
-        # read the next address after that block
-        await helper.read(ctx, 8, 0x0000, False)
+        # go to another block now
+        await helper.read(ctx, 4, 0x0000, False)
+        await helper.read(ctx, 5, 0x0000, False)
+
+        # dont finish the burst and start a new one on another block
+        await helper.read(ctx, 9, 0x0000, False)
+        await helper.read(ctx, 10, 0x0000, False)
 
     run_bench(dut=dut, bench=bench)
