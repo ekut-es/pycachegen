@@ -2,7 +2,7 @@ from typing import Optional
 
 from amaranth import Module
 from amaranth.lib import wiring
-from amaranth.lib.wiring import In, Out
+from amaranth.lib.wiring import In, Out, Signal
 from amaranth.utils import exact_log2
 
 from .arbiter import Arbiter, ArbitrationScheme
@@ -30,6 +30,7 @@ class CacheWrapper(wiring.Component):
         delay_config: Optional[DelayConfig] = None,
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
+        perf_counter: bool = False,
     ) -> None:
         """The top level module for using caches.
 
@@ -66,6 +67,8 @@ class CacheWrapper(wiring.Component):
         self.create_main_memory = create_main_memory
         self.delay_config = delay_config
 
+        self.perf_counter = perf_counter
+
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
         else:
@@ -98,6 +101,23 @@ class CacheWrapper(wiring.Component):
             address_width=memory_address_width,
             byte_size=self.byte_size,
         )
+
+        if self.perf_counter:
+            self.pc_enabled = Signal(1)
+            self.pc_num_accesses = Signal(64)
+            self.pc_num_memory_accesses = Signal(64)
+
+            self.pc_access_in_progress = Signal(1)
+            self.pc_access_in_progress_prev = Signal(1)
+
+            self.pc_memory_in_deep_power_down = Signal(1)
+
+            self.pc_memory_active_cycles = Signal(64)
+
+            self.pc_memory_current_idle_cycles = Signal(32)
+            self.pc_memory_idle_cycles = Signal(64)
+
+            self.pc_memory_deep_power_down_cycles = Signal(64)
 
         ports = {}
 
@@ -174,5 +194,41 @@ class CacheWrapper(wiring.Component):
         assert len(out_ports) == len(in_ports)
         for out_if, in_if in zip(out_ports, in_ports):
             wiring.connect(m, out_if, in_if)
+
+        if self.perf_counter:
+            m.d.sync += self.pc_access_in_progress_prev.eq(self.pc_access_in_progress)
+
+            # enable performance counters on first access at front end port 0
+            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1)):
+                m.d.sync += self.pc_enabled.eq(1)
+                m.d.sync += self.pc_num_accesses.eq(1)
+
+            with m.If(self.pc_enabled == 1):
+                m.d.comb += self.pc_access_in_progress.eq(~self.fe_0.port_ready)
+
+                with m.If(self.fe_0.request_valid == 1):
+                    m.d.sync += self.pc_num_accesses.eq(self.pc_num_accesses + 1)
+
+                # new access
+                with m.If((self.pc_access_in_progress == 1) & (self.pc_access_in_progress_prev == 0)):
+                    m.d.sync += self.pc_num_memory_accesses.eq(self.pc_num_memory_accesses + 1)
+                    m.d.sync += self.pc_memory_current_idle_cycles.eq(0)
+                    m.d.sync += self.pc_memory_in_deep_power_down.eq(0)
+
+                with m.If(self.pc_access_in_progress == 1):
+                    m.d.sync += self.pc_memory_active_cycles.eq(self.pc_memory_active_cycles + 1)
+
+                with m.If(self.pc_access_in_progress == 0):
+                    m.d.sync += self.pc_memory_idle_cycles.eq(self.pc_memory_idle_cycles + 1)
+                    m.d.sync += self.pc_memory_current_idle_cycles.eq(self.pc_memory_current_idle_cycles + 1)
+
+                if self.delay_config.idle_cycles_to_deep_power_down is not None:
+                    with m.If(
+                        self.pc_memory_current_idle_cycles == (self.delay_config.idle_cycles_to_deep_power_down - 1)
+                    ):
+                        m.d.sync += self.pc_memory_in_deep_power_down.eq(1)
+
+                    with m.If(self.pc_memory_in_deep_power_down == 1):
+                        m.d.sync += self.pc_memory_deep_power_down_cycles.eq(self.pc_memory_deep_power_down_cycles + 1)
 
         return m

@@ -361,6 +361,7 @@ class DelayConfig:
         burst_block_size=0,
         burst_read_delay=1,
         burst_write_delay=1,
+        idle_cycles_to_deep_power_down=None,
     ):
         """Class for configuring the delay unit.
 
@@ -392,3 +393,4 @@ class DelayConfig:
         self.burst_block_size = burst_block_size
         self.burst_read_delay = burst_read_delay
         self.burst_write_delay = burst_write_delay
+        self.idle_cycles_to_deep_power_down = idle_cycles_to_deep_power_down
