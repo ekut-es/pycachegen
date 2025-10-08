@@ -30,7 +30,7 @@ class CacheWrapper(wiring.Component):
         delay_config: Optional[DelayConfig] = None,
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
-        perf_counter: bool = False,
+        perf_counters: bool = False,
     ) -> None:
         """The top level module for using caches.
 
@@ -67,7 +67,7 @@ class CacheWrapper(wiring.Component):
         self.create_main_memory = create_main_memory
         self.delay_config = delay_config
 
-        self.perf_counter = perf_counter
+        self.perf_counters = perf_counters
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -102,7 +102,7 @@ class CacheWrapper(wiring.Component):
             byte_size=self.byte_size,
         )
 
-        if self.perf_counter:
+        if self.perf_counters:
             self.pc_enabled = Signal(1)
             self.pc_num_accesses = Signal(64)
             self.pc_num_memory_accesses = Signal(64)
@@ -195,11 +195,11 @@ class CacheWrapper(wiring.Component):
         for out_if, in_if in zip(out_ports, in_ports):
             wiring.connect(m, out_if, in_if)
 
-        if self.perf_counter:
+        if self.perf_counters:
             m.d.sync += self.pc_access_in_progress_prev.eq(self.pc_access_in_progress)
 
-            # enable performance counters on first access at front end port 0
-            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1)):
+            # enable performance counters on read first access at front end port 0
+            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1) & (self.fe_0.write_data == 0)):
                 m.d.sync += self.pc_enabled.eq(1)
                 m.d.sync += self.pc_num_accesses.eq(1)
 

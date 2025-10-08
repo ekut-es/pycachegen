@@ -56,7 +56,7 @@ class TestCacheWrapperPerfCounters(unittest.TestCase):
                     block_size=BLOCK_SIZE,
                 )
             ],
-            perf_counter=True,
+            perf_counters=True,
             main_memory_data_width=16,
         )
 
