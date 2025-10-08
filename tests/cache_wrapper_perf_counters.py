@@ -78,6 +78,8 @@ class TestCacheWrapperPerfCounters(unittest.TestCase):
         async def testbench(ctx):
             await ctx.tick()
 
+            ctx.set(dut.pc_enabled, 1)
+
             await read_request(ctx, 0x04)
             await read_request(ctx, 0x04)
             await read_request(ctx, 0x08)
