@@ -57,6 +57,7 @@ class TestCacheWrapperPerfCounters(unittest.TestCase):
                 )
             ],
             perf_counters=True,
+            perf_counters_initial_address=0x50,
             main_memory_data_width=16,
         )
 
@@ -76,14 +77,17 @@ class TestCacheWrapperPerfCounters(unittest.TestCase):
                 await ctx.tick()
 
         async def testbench(ctx):
-            await ctx.tick()
-
-            ctx.set(dut.pc_enabled, 1)
+            await ctx.tick().repeat(4)
 
             await read_request(ctx, 0x04)
             await read_request(ctx, 0x04)
             await read_request(ctx, 0x08)
-            # await read_request(ctx, 0x08)
+
+            await read_request(ctx, 0x50)
+
+            await read_request(ctx, 0x1C)
+            await read_request(ctx, 0x1C)
+            await read_request(ctx, 0x18)
             # await read_request(ctx, 0x0c)
 
             await ctx.tick().repeat(30)

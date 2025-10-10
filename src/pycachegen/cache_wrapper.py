@@ -31,6 +31,7 @@ class CacheWrapper(wiring.Component):
         arbitration_scheme: ArbitrationScheme = ArbitrationScheme.ROUND_ROBIN,
         byte_size: int = 8,
         perf_counters: bool = False,
+        perf_counters_initial_address: Optional[int] = None,
     ) -> None:
         """The top level module for using caches.
 
@@ -68,6 +69,7 @@ class CacheWrapper(wiring.Component):
         self.delay_config = delay_config
 
         self.perf_counters = perf_counters
+        self.perf_counters_initial_address = perf_counters_initial_address
 
         if self.num_caches:
             self.fe_data_width = cache_configs[0].data_width
@@ -195,13 +197,25 @@ class CacheWrapper(wiring.Component):
         for out_if, in_if in zip(out_ports, in_ports):
             wiring.connect(m, out_if, in_if)
 
+        if self.perf_counters and self.perf_counters_initial_address is None:
+            # enable performance counters on read first access at front end port 0
+            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1) & (self.fe_0.write_data == 0)):
+                m.d.sync += self.pc_enabled.eq(1)
+                m.d.sync += self.pc_num_accesses.eq(1)
+
+        elif self.perf_counters and self.perf_counters_initial_address is not None:
+            # enable performance counters on read first access at front end port 0 from address perf_counters_initial_address
+            with m.If(
+                (self.pc_enabled == 0)
+                & (self.fe_0.request_valid == 1)
+                & (self.fe_0.write_data == 0)
+                & (self.fe_0.address == self.perf_counters_initial_address)
+            ):
+                m.d.sync += self.pc_enabled.eq(1)
+                m.d.sync += self.pc_num_accesses.eq(1)
+
         if self.perf_counters:
             m.d.sync += self.pc_access_in_progress_prev.eq(self.pc_access_in_progress)
-
-            # enable performance counters on read first access at front end port 0
-            # with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1) & (self.fe_0.write_data == 0)):
-            #     m.d.sync += self.pc_enabled.eq(1)
-            #     m.d.sync += self.pc_num_accesses.eq(1)
 
             with m.If(self.pc_enabled == 1):
                 m.d.comb += self.pc_access_in_progress.eq(~self.fe_0.port_ready)
