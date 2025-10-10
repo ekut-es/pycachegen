@@ -199,7 +199,7 @@ class CacheWrapper(wiring.Component):
 
         if self.perf_counters and self.perf_counters_initial_address is None:
             # enable performance counters on read first access at front end port 0
-            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1) & (self.fe_0.write_data == 0)):
+            with m.If((self.pc_enabled == 0) & (self.fe_0.request_valid == 1) & (self.fe_0.write_strobe == 0)):
                 m.d.sync += self.pc_enabled.eq(1)
                 m.d.sync += self.pc_num_accesses.eq(1)
 
@@ -208,7 +208,7 @@ class CacheWrapper(wiring.Component):
             with m.If(
                 (self.pc_enabled == 0)
                 & (self.fe_0.request_valid == 1)
-                & (self.fe_0.write_data == 0)
+                & (self.fe_0.write_strobe == 0)
                 & (self.fe_0.address == self.perf_counters_initial_address)
             ):
                 m.d.sync += self.pc_enabled.eq(1)
