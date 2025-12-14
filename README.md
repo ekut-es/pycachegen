@@ -2,6 +2,20 @@
 
 PyCacheGen is a python package for generating data caches written in the [Amaranth HDL](https://github.com/amaranth-lang/amaranth). The generated caches can be converted into synthesizable Verilog code.
 
+## Citing
+
+```
+@InProceedings{pycachegen2025,
+    author = {M{\"u}ller, Richard and L{\"u}beck, Konstantin and Kuhn, Michael and Bernardo, Paul Palomero and Bringmann, Oliver},
+    title = {PyCacheGen: A Highly Configurable Open-Source Generator for Synthesizable Caches},
+    booktitle = {Proceedings of the CPS Summer School PhD Workshop "Designing Cyber-Physical Systems – From Concepts to Implementation"},
+    volume = {4106},
+    year = {2025},
+    publisher = {CEUR},
+    address = {Alghero, Sardinia, Italy}
+}
+```
+
 ## Feature overview
 
 - Configurable number of sets, block size, associativity, word width, address width, byte size
