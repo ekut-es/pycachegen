@@ -4,6 +4,10 @@ PyCacheGen is a python package for generating data caches written in the [Amaran
 
 ## Citing
 
+If you are using PyCacheGen for an academic publication, please cite the following paper:
+
+[Link to Paper](https://ceur-ws.org/Vol-4106/short4.pdf)
+
 ```
 @InProceedings{pycachegen2025,
     author = {M{\"u}ller, Richard and L{\"u}beck, Konstantin and Kuhn, Michael and Bernardo, Paul Palomero and Bringmann, Oliver},
